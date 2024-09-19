@@ -5,3 +5,7 @@ build:
 .PHONY: test
 test:
 	cargo test
+
+.PHONY: lint
+lint:
+	cargo fmt

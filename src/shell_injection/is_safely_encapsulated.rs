@@ -1,4 +1,3 @@
-
 // Function to get current and next segments
 fn get_current_and_next_segments(array: Vec<&str>) -> Vec<(&str, &str)> {
     // Create a vector to hold the segments
@@ -25,7 +24,8 @@ pub fn is_safely_encapsulated(command: &str, user_input: &str) -> bool {
         let char_before_user_input = current_segment.chars().last();
         let char_after_user_input = next_segment.chars().next();
 
-        let is_escape_char = char_before_user_input.map_or(false, |c| ESCAPE_CHARS.contains(&c.to_string().as_str()));
+        let is_escape_char = char_before_user_input
+            .map_or(false, |c| ESCAPE_CHARS.contains(&c.to_string().as_str()));
 
         if !is_escape_char {
             return false;
@@ -41,7 +41,10 @@ pub fn is_safely_encapsulated(command: &str, user_input: &str) -> bool {
 
         // Check for dangerous characters inside double quotes
         if char_before_user_input == Some('"') {
-            if user_input.chars().any(|c| DANGEROUS_CHARS_INSIDE_DOUBLE_QUOTES.contains(&c.to_string().as_str())) {
+            if user_input
+                .chars()
+                .any(|c| DANGEROUS_CHARS_INSIDE_DOUBLE_QUOTES.contains(&c.to_string().as_str()))
+            {
                 return false;
             }
         }

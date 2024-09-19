@@ -9,7 +9,10 @@ mod tests {
         assert_eq!(contains_shell_syntax("\n\n", "\n\n"), false);
 
         assert_eq!(contains_shell_syntax("$(command)", "$(command)"), true);
-        assert_eq!(contains_shell_syntax("$(command arg arg)", "$(command arg arg"), true);
+        assert_eq!(
+            contains_shell_syntax("$(command arg arg)", "$(command arg arg"),
+            true
+        );
         assert_eq!(contains_shell_syntax("`command`", "`command`"), true);
         assert_eq!(contains_shell_syntax("\narg", "\narg"), true);
         assert_eq!(contains_shell_syntax("\targ", "\targ"), true);
@@ -21,10 +24,15 @@ mod tests {
         assert_eq!(contains_shell_syntax("/bin/rm -rf", "/bin/rm -rf"), true);
         assert_eq!(contains_shell_syntax("/bin/rm", "/bin/rm"), true);
         assert_eq!(contains_shell_syntax("/sbin/sleep", "/sbin/sleep"), true);
-        assert_eq!(contains_shell_syntax("/usr/bin/kill", "/usr/bin/kill"), true);
+        assert_eq!(
+            contains_shell_syntax("/usr/bin/kill", "/usr/bin/kill"),
+            true
+        );
 
-
-        assert_eq!(contains_shell_syntax("/usr/bin/killall", "/usr/bin/killall"), true);
+        assert_eq!(
+            contains_shell_syntax("/usr/bin/killall", "/usr/bin/killall"),
+            true
+        );
         assert_eq!(contains_shell_syntax("/usr/bin/env", "/usr/bin/env"), true);
         assert_eq!(contains_shell_syntax("/bin/ps", "/bin/ps"), true);
         //assert_eq!(contains_shell_syntax("/usr/bin/W", "/usr/bin/W"), true);
@@ -65,7 +73,10 @@ mod tests {
     #[test]
     fn test_treats_colon_as_command() {
         assert!(contains_shell_syntax(":|echo", ":|"));
-        assert!(!contains_shell_syntax("https://www.google.com", "https://www.google.com"));
+        assert!(!contains_shell_syntax(
+            "https://www.google.com",
+            "https://www.google.com"
+        ));
     }
 
     #[test]
@@ -93,15 +104,23 @@ mod tests {
     fn test_command_with_multiple_separators() {
         assert!(contains_shell_syntax("rm -rf; echo 'done'", "rm"));
         assert!(contains_shell_syntax("ls | grep 'test'", "ls"));
-        assert!(contains_shell_syntax("find . -name '*.txt' | xargs rm", "rm"));
+        assert!(contains_shell_syntax(
+            "find . -name '*.txt' | xargs rm",
+            "rm"
+        ));
     }
     #[test]
     fn test_command_with_path_prefixes() {
         assert!(contains_shell_syntax("/bin/rm -rf /tmp", "/bin/rm"));
-        assert!(contains_shell_syntax("/usr/bin/killall process_name", "/usr/bin/killall"));
-        assert!(contains_shell_syntax("/sbin/shutdown now", "/sbin/shutdown"));
+        assert!(contains_shell_syntax(
+            "/usr/bin/killall process_name",
+            "/usr/bin/killall"
+        ));
+        assert!(contains_shell_syntax(
+            "/sbin/shutdown now",
+            "/sbin/shutdown"
+        ));
     }
-
 
     #[test]
     fn test_command_with_colon() {
@@ -149,5 +168,4 @@ mod tests {
         assert!(contains_shell_syntax("/usr/bin/ls -l", "/usr/bin/ls"));
         assert!(contains_shell_syntax("/bin/cp file1 file2", "/bin/cp"));
     }
-
 }

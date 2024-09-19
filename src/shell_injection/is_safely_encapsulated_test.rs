@@ -22,9 +22,18 @@ mod tests {
     }
     #[test]
     fn test_same_user_input_multiple_times() {
-        assert_eq!(is_safely_encapsulated("echo '$USER' '$USER'", "$USER"), true);
-        assert_eq!(is_safely_encapsulated("echo \"$USER\" '$USER'", "$USER"), false);
-        assert_eq!(is_safely_encapsulated("echo \"$USER\" \"$USER\"", "$USER"), false);
+        assert_eq!(
+            is_safely_encapsulated("echo '$USER' '$USER'", "$USER"),
+            true
+        );
+        assert_eq!(
+            is_safely_encapsulated("echo \"$USER\" '$USER'", "$USER"),
+            false
+        );
+        assert_eq!(
+            is_safely_encapsulated("echo \"$USER\" \"$USER\"", "$USER"),
+            false
+        );
     }
 
     #[test]

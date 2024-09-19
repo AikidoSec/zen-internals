@@ -1,11 +1,14 @@
+use super::contains_shell_syntax::contains_shell_syntax;
+use super::is_safely_encapsulated::is_safely_encapsulated;
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_int};
 use std::str;
-use super::contains_shell_syntax::contains_shell_syntax;
-use super::is_safely_encapsulated::is_safely_encapsulated;
 
 #[no_mangle]
-pub extern "C"   fn detect_shell_injection(command: *const c_char, userinput: *const c_char) -> c_int {
+pub extern "C" fn detect_shell_injection(
+    command: *const c_char,
+    userinput: *const c_char,
+) -> c_int {
     // Check if the pointers are null
     if command.is_null() || userinput.is_null() {
         eprintln!("Received null pointer for command or userinput.");
@@ -13,7 +16,6 @@ pub extern "C"   fn detect_shell_injection(command: *const c_char, userinput: *c
     }
     let command_bytes = unsafe { CStr::from_ptr(command).to_bytes() };
     let userinput_bytes = unsafe { CStr::from_ptr(userinput).to_bytes() };
-
 
     let command_str = str::from_utf8(command_bytes).unwrap();
     let userinput_str = str::from_utf8(userinput_bytes).unwrap();

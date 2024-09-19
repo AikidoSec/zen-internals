@@ -2,32 +2,8 @@ use regex::{Regex, RegexBuilder};
 
 // Constants
 const DANGEROUS_CHARS: [&str; 26] = [
-    "#",
-    "!",
-    "\"",
-    "$",
-    "&",
-    "'",
-    "(",
-    ")",
-    "*",
-    ";",
-    "<",
-    "=",
-    ">",
-    "?",
-    "[",
-    "\\",
-    "]",
-    "^",
-    "`",
-    "{",
-    "|",
-    "}",
-    " ",
-    "\n",
-    "\t",
-    "~",
+    "#", "!", "\"", "$", "&", "'", "(", ")", "*", ";", "<", "=", ">", "?", "[", "\\", "]", "^",
+    "`", "{", "|", "}", " ", "\n", "\t", "~",
 ];
 const COMMANDS: [&str; 61] = [
     "sleep",
@@ -90,7 +66,7 @@ const COMMANDS: [&str; 61] = [
     "finger",
     "top",
     "shopt",
-    ":",  // Colon is a null command
+    ":", // Colon is a null command
 ];
 const PATH_PREFIXES: [&str; 6] = [
     "/bin/",
@@ -104,16 +80,24 @@ const SEPARATORS: [&str; 10] = [" ", "\t", "\n", ";", "&", "|", "(", ")", "<", "
 
 fn create_commands_regex() -> Regex {
     // Escape path prefixes and join them
-    let path_prefixes_pattern = PATH_PREFIXES.iter().map(|s| regex::escape(s)).collect::<Vec<_>>().join("|");
-    
+    let path_prefixes_pattern = PATH_PREFIXES
+        .iter()
+        .map(|s| regex::escape(s))
+        .collect::<Vec<_>>()
+        .join("|");
+
     // Sort commands by length in descending order and escape them
     let mut sorted_commands = COMMANDS.to_vec();
     sorted_commands.sort_by_key(|b| std::cmp::Reverse(b.len())); // Sort by length, descending
-    let commands_pattern = sorted_commands.iter().map(|s| regex::escape(s)).collect::<Vec<_>>().join("|");
-    
+    let commands_pattern = sorted_commands
+        .iter()
+        .map(|s| regex::escape(s))
+        .collect::<Vec<_>>()
+        .join("|");
+
     // Create the regex pattern
     let pattern = format!(r"([/.]*({})?({}))", path_prefixes_pattern, commands_pattern);
-    
+
     // Create the regex with case insensitive and multiline flags
     RegexBuilder::new(&pattern)
         .case_insensitive(true)
@@ -121,7 +105,6 @@ fn create_commands_regex() -> Regex {
         .build()
         .unwrap()
 }
-
 
 // Function to check if the user input contains shell syntax given the command
 pub fn contains_shell_syntax(command: &str, user_input: &str) -> bool {
@@ -170,16 +153,20 @@ pub fn contains_shell_syntax(command: &str, user_input: &str) -> bool {
             None
         };
 
-
         // Check surrounding characters
-        if char_before.map_or(false, |c| SEPARATORS.contains(&c.to_string().as_str())) &&
-           char_after.map_or(false, |c| SEPARATORS.contains(&c.to_string().as_str())) {
+        if char_before.map_or(false, |c| SEPARATORS.contains(&c.to_string().as_str()))
+            && char_after.map_or(false, |c| SEPARATORS.contains(&c.to_string().as_str()))
+        {
             return true; // e.g. `<separator>rm<separator>`
         }
-        if char_before.map_or(false, |c| SEPARATORS.contains(&c.to_string().as_str())) && char_after.is_none() {
+        if char_before.map_or(false, |c| SEPARATORS.contains(&c.to_string().as_str()))
+            && char_after.is_none()
+        {
             return true; // e.g. `<separator>rm`
         }
-        if char_before.is_none() && char_after.map_or(false, |c| SEPARATORS.contains(&c.to_string().as_str())) {
+        if char_before.is_none()
+            && char_after.map_or(false, |c| SEPARATORS.contains(&c.to_string().as_str()))
+        {
             return true; // e.g. `rm<separator>`
         }
     }

@@ -4,13 +4,21 @@ mod tests {
     use std::assert;
 
     fn is_shell_injection(command: &str, user_input: &str) {
-        assert!(detect_shell_injection_stringified(command, user_input), 
-            "command: {}, userInput: {}", command, user_input);
+        assert!(
+            detect_shell_injection_stringified(command, user_input),
+            "command: {}, userInput: {}",
+            command,
+            user_input
+        );
     }
 
     fn is_not_shell_injection(command: &str, user_input: &str) {
-        assert!(!detect_shell_injection_stringified(command, user_input), 
-            "command: {}, userInput: {}", command, user_input);
+        assert!(
+            !detect_shell_injection_stringified(command, user_input),
+            "command: {}, userInput: {}",
+            command,
+            user_input
+        );
     }
 
     #[test]
@@ -158,7 +166,10 @@ mod tests {
 
     #[test]
     fn test_detects_attempts_to_escape_out_of_quotes() {
-        is_shell_injection("echo \"safe\"; echo \"malicious\"", "\"; echo \"malicious\"");
+        is_shell_injection(
+            "echo \"safe\"; echo \"malicious\"",
+            "\"; echo \"malicious\"",
+        );
     }
 
     #[test]
@@ -180,7 +191,10 @@ mod tests {
 
     #[test]
     fn test_recognizes_safe_paths_that_include_patterns_similar_to_user_input() {
-        is_not_shell_injection("ls /constant/path/without/user/input/", "/constant/path/without/user/input/");
+        is_not_shell_injection(
+            "ls /constant/path/without/user/input/",
+            "/constant/path/without/user/input/",
+        );
     }
 
     #[test]
@@ -310,8 +324,14 @@ mod tests {
 
     #[test]
     fn test_rm_being_part_of_other_commands() {
-        is_shell_injection("find /path/to/search -type f -name \"pattern\" | xargs rm", "rm");
-        is_shell_injection("find /path/to/search -type f -name \"pattern\" -exec rm {} \\;", "rm");
+        is_shell_injection(
+            "find /path/to/search -type f -name \"pattern\" | xargs rm",
+            "rm",
+        );
+        is_shell_injection(
+            "find /path/to/search -type f -name \"pattern\" -exec rm {} \\;",
+            "rm",
+        );
         is_shell_injection("ls .|rm", "rm");
     }
 
@@ -326,10 +346,19 @@ mod tests {
     #[test]
     fn test_does_not_flag_domain_name_as_argument_unless_contains_backticks() {
         is_not_shell_injection("binary --domain www.example.com", "www.example.com");
-        is_not_shell_injection("binary --domain https://www.example.com", "https://www.example.com");
+        is_not_shell_injection(
+            "binary --domain https://www.example.com",
+            "https://www.example.com",
+        );
 
-        is_shell_injection("binary --domain www.example`whoami`.com", "www.example`whoami`.com");
-        is_shell_injection("binary --domain https://www.example`whoami`.com", "https://www.example`whoami`.com");
+        is_shell_injection(
+            "binary --domain www.example`whoami`.com",
+            "www.example`whoami`.com",
+        );
+        is_shell_injection(
+            "binary --domain https://www.example`whoami`.com",
+            "https://www.example`whoami`.com",
+        );
     }
 
     #[test]
