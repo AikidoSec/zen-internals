@@ -1,0 +1,24 @@
+name: Linting check
+
+on: [push, pull_request]
+
+jobs:
+  rustfmt:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          override-file: Cargo.toml
+
+      - name: Install rustfmt
+        run: rustup component add rustfmt
+
+      - name: Run rustfmt
+        run: cargo fmt -- --check
