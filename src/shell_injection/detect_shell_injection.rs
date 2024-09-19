@@ -24,7 +24,7 @@ pub extern "C"   fn detect_shell_injection(command: *const c_char, userinput: *c
     0
 }
 
-fn detect_shell_injection_stringified(command: &str, user_input: &str) -> bool {
+pub fn detect_shell_injection_stringified(command: &str, user_input: &str) -> bool {
     if user_input == "~" && command.len() > 1 && command.contains("~") {
         // Block single ~ character. For example echo ~
         return true;
