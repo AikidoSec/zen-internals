@@ -22,7 +22,6 @@ pub fn is_safely_encapsulated(command: &str, user_input: &str) -> bool {
     let segments = get_current_and_next_segments(command.split(user_input).collect());
 
     for (current_segment, next_segment) in segments {
-        println!("Segemnt : {} - {}", current_segment, next_segment);
         let char_before_user_input = current_segment.chars().last();
         let char_after_user_input = next_segment.chars().next();
 

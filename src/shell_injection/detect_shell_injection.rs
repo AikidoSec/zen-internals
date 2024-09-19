@@ -17,7 +17,6 @@ pub extern "C"   fn detect_shell_injection(command: *const c_char, userinput: *c
 
     let command_str = str::from_utf8(command_bytes).unwrap();
     let userinput_str = str::from_utf8(userinput_bytes).unwrap();
-    println!("Command : {} And userinput : {}", command_str, userinput_str);
     if detect_shell_injection_stringified(command_str, userinput_str) {
         return 1;
     }

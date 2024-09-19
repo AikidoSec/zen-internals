@@ -126,7 +126,6 @@ fn create_commands_regex() -> Regex {
 // Function to check if the user input contains shell syntax given the command
 pub fn contains_shell_syntax(command: &str, user_input: &str) -> bool {
     let commands_regex = create_commands_regex();
-    println!("Regex : {}", commands_regex);
 
     if user_input.trim().is_empty() {
         // The entire user input is just whitespace, ignore
@@ -149,11 +148,9 @@ pub fn contains_shell_syntax(command: &str, user_input: &str) -> bool {
     // Check if the command contains a commonly used command
     for mat in commands_regex.captures_iter(command) {
         let matched_command = &mat[0];
-        println!("Matched command : {}", matched_command);
         // We found a command like `rm` or `/sbin/shutdown` in the command
         // Check if the command is the same as the user input
         if user_input != matched_command {
-            println!("User input not matched command, continuing");
             continue;
         }
 
@@ -173,7 +170,6 @@ pub fn contains_shell_syntax(command: &str, user_input: &str) -> bool {
             None
         };
 
-        println!("Char after : '{:?}' Char before : '{:?}'", char_after, char_before);
 
         // Check surrounding characters
         if char_before.map_or(false, |c| SEPARATORS.contains(&c.to_string().as_str())) &&
