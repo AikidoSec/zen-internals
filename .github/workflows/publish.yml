@@ -22,8 +22,10 @@ jobs:
       - name: Build the project
         run: cargo build --release
 
-      - name: Publish artifact
-        uses: actions/upload-artifact@v3
+      - name: Upload release asset
+        uses: actions/upload-release-asset@v1
         with:
-          name: rust-release-artifact
-          path: target/release/libzen_rustlib.so
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: target/release/libzen_rustlib.so
+          asset_name: libzen_rustlib.so
+          asset_content_type: application/octet-stream
