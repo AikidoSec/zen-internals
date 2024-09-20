@@ -137,4 +137,12 @@ mod tests {
             "not_a_secret".to_string()
         );
     }
+
+    #[test]
+    fn test_bson_objectids() {
+        assert_eq!(
+            replace_segment_with_param("66ec29159d00113616fc7184"),
+            ":objectId".to_string()
+        )
+    }
 }

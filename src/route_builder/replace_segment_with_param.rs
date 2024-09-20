@@ -7,6 +7,7 @@ const NUMBER_REGEX: &str = r"^\d+$";
 const DATE_REGEX: &str = r"^\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4}$";
 const EMAIL_REGEX: &str = r"^[a-zA-Z0-9.!#$%&\'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$";
 const HASH_REGEX: &str = r"^(?:[a-f0-9]{32}|[a-f0-9]{40}|[a-f0-9]{64}|[a-f0-9]{128})$";
+const OBJECT_REGEX: &str = r"^[0-9a-f]{24}$";
 const HASH_LENGTHS: [usize; 4] = [32, 40, 64, 128];
 
 pub fn replace_segment_with_param(segment: &str) -> String {
@@ -22,6 +23,14 @@ pub fn replace_segment_with_param(segment: &str) -> String {
 
     if segment.len() == 36 && Regex::new(UUID_REGEX).unwrap().is_match(segment) {
         return ":uuid".to_string();
+    }
+
+    let object_regex = RegexBuilder::new(OBJECT_REGEX)
+        .case_insensitive(true)
+        .build()
+        .unwrap();
+    if segment.len() == 24 && object_regex.is_match(segment) {
+        return ":objectId".to_string();
     }
 
     if starts_with_number && Regex::new(DATE_REGEX).unwrap().is_match(segment) {
