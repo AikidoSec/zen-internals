@@ -34,8 +34,11 @@ pub extern "C" fn detect_shell_injection(
 
     let command_str = str::from_utf8(command_bytes).unwrap();
     let userinput_str = str::from_utf8(userinput_bytes).unwrap();
+
+    // Returns an integer value, representing a boolean (1 = true, 0 = false).
     if detect_shell_injection_stringified(command_str, userinput_str) {
-        return 1;
+        1
+    } else {
+        0
     }
-    0
 }
