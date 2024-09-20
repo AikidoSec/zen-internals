@@ -1,0 +1,29 @@
+name: Build and Publish Rust Artifact
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          override-file: Cargo.toml
+
+      - name: Build the project
+        run: cargo build --release
+
+      - name: Publish artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: rust-release-artifact
+          path: target/release/libzen_rustlib.so
