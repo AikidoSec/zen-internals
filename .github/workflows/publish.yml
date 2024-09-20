@@ -23,7 +23,7 @@ jobs:
         run: cargo build --release
 
       - name: Publish artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: rust-release-artifact
           path: target/release/libzen_rustlib.so
