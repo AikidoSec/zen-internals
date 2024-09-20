@@ -2,6 +2,9 @@
  * Using FFI. Currently we support the following algorithms :
  * - Shell Injection (WIP)
  */
-pub mod helpers;
-pub mod route_builder;
-pub mod shell_injection;
+mod helpers;
+mod route_builder;
+mod shell_injection;
+
+// FFI Bindings :
+pub mod ffi_bindings;
