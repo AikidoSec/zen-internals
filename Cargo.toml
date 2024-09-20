@@ -10,3 +10,6 @@ crate-type = ["dylib"]
 
 [dependencies]
 regex = "1.10.6"
+
+[dev-dependencies]
+rand = "0.8.5"
