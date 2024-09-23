@@ -28,7 +28,8 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
     let query_without_input: &str = &query_lower.replace(userinput_lower, "COUNT");
     let tokens_without_input = tokenize_with_fallback(query_without_input, dialect);
 
-    return delta_dangerous_tokens(tokens, tokens_without_input) == 0;
+    // Return true if a delta exists, because this indicates a possible injection :
+    return delta_dangerous_tokens(tokens, tokens_without_input) != 0;
 }
 
 fn tokenize_with_fallback(query: &str, dialect: i32) -> Vec<Token> {
