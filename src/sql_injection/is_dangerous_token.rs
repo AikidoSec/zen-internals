@@ -24,8 +24,9 @@ pub fn is_dangerous_token(token: &Token) -> bool {
 
         // General safe tokens
         Token::EOF => false,
-        Token::Word(_) => false,
+        Token::Number(_, _) => false,
         Token::Whitespace(_) => false,
+        Token::Comma => false,
 
         // All other tokens are considered dangerous
         _ => true,
