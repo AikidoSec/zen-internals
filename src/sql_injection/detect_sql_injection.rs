@@ -3,6 +3,10 @@ use super::tokenize_query::tokenize_query;
 use sqlparser::tokenizer::Token;
 
 pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> bool {
+    if userinput.chars().all(char::is_alphanumeric) {
+        // Userinput is alphanumerical, ignore.
+        return false;
+    }
     if userinput.len() <= 3 || query.len() < userinput.len() {
         // Ignore small user input or a query that's too small.
         return false;
