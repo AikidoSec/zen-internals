@@ -2,6 +2,10 @@
 build:
 	cargo build --release
 
+.PHONY: buildwasm
+buildwasm:
+	wasm-pack build --target bundler
+
 .PHONY: test
 test:
 	cargo test

@@ -24,3 +24,6 @@ if __name__ == "__main__":
     result = zen_rustlib.build_route_from_url(url)
     print("Result", result.decode("utf-8"))
 ```
+
+## Setup : 
+Make sure to have `clang` installed.
