@@ -79,14 +79,14 @@ mod tests {
                 prefix: "".to_string()
             }
         )));
+        assert!(!is_dangerous_token(&Token::Number("123".to_string(), true))); // Unsigned numeric literal
+        assert!(!is_dangerous_token(&Token::Comma)); // Comma token
     }
 
     #[test]
     fn test_dangerous_tokens() {
         // Test various dangerous tokens
-        assert!(is_dangerous_token(&Token::Number("123".to_string(), true))); // Unsigned numeric literal
         assert!(is_dangerous_token(&Token::Char('a'))); // Unrecognized character
-        assert!(is_dangerous_token(&Token::Comma)); // Comma token
         assert!(is_dangerous_token(&Token::DoubleEq)); // Double equals sign
         assert!(is_dangerous_token(&Token::Eq)); // Equality operator
         assert!(is_dangerous_token(&Token::Neq)); // Not equals operator
