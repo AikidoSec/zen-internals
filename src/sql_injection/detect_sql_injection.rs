@@ -6,16 +6,21 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
         // Ignore small user input or a query that's too small.
         return false;
     }
-    if !query.contains(userinput) {
+
+    // Lowercase both query and userinput
+    let query_lower: &str = &query.to_lowercase();
+    let userinput_lower: &str = &userinput.to_lowercase();
+
+    if !query_lower.contains(userinput_lower) {
         // Userinput is not inside query, so not an injection.
         return false;
     }
     // Count dangerous tokens in query :
-    let dangerous_tokens = count_dangerous_tokens(query, dialect);
+    let dangerous_tokens = count_dangerous_tokens(query_lower, dialect);
 
     // Count dangerous tokens in query without user input :
     // We replace with "COUNT" since this is a Word and matched as a safe token.
-    let query_without_input: &str = &query.replace(userinput, "COUNT");
+    let query_without_input: &str = &query_lower.replace(userinput_lower, "COUNT");
     let dangerous_tokens_without_input = count_dangerous_tokens(query_without_input, dialect);
 
     println!(
