@@ -11,3 +11,6 @@ mod sql_injection;
 
 // FFI Bindings :
 pub mod ffi_bindings;
+
+// Wasm bindings :
+mod wasm_bindings;
