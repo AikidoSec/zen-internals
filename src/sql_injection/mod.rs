@@ -5,5 +5,5 @@ pub mod select_dialect_based_on_enum;
 
 pub mod tokenize_query;
 
-pub mod is_dangerous_token;
-pub mod is_dangerous_token_test;
+pub mod is_whitespace_token;
+pub mod is_whitespace_token_test;

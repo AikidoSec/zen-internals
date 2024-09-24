@@ -1,4 +1,4 @@
-use super::is_dangerous_token::is_dangerous_token;
+use super::is_whitespace_token::is_whitespace_token;
 use super::tokenize_query::tokenize_query;
 use sqlparser::tokenizer::Token;
 
