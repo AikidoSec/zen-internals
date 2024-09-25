@@ -138,4 +138,9 @@ mod tests {
             "\"table_name\" "
         )
     }
+
+    #[test]
+    fn test_escape_sequences() {
+        not_is_injection!("SELECT * FROM users WHERE id = 'users\\\\'", "users\\\\")
+    }
 }
