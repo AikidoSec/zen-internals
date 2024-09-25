@@ -1,6 +1,7 @@
 use super::comment_structure_altered::comment_structure_altered;
 use super::is_whitespace_token::is_whitespace_token;
 use super::tokenize_query::tokenize_query;
+use crate::tokens_have_delta;
 use sqlparser::tokenizer::Token;
 
 // `userinput` and `query` provided to this function should already be lowercase.
@@ -16,9 +17,8 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
     let query_without_input: &str = &query.replace(userinput, "str");
     let tokens_without_input = tokenize_with_fallback(query_without_input, dialect);
 
-    // Check delta for both whitespace tokens and all tokens in general :
-    let tokens_general_delta = tokens.len().abs_diff(tokens_without_input.len());
-    if tokens_general_delta != 0 {
+    // Check delta for both comment tokens and all tokens in general :
+    if tokens_have_delta!(tokens, tokens_without_input) {
         // If a delta exists in all tokens, mark this as an injection.
         return true;
     }
