@@ -34,10 +34,14 @@ jobs:
           draft: false
           prerelease: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
 
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v3
+      - name: Upload binary artifact
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         with:
-          name: libzen_rustlib.so  # Name of the artifact
-          path: target/release/libzen_rustlib.so  # Adjust this to the path of your compiled library
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./target/release/libzen_rustlib.so
+          asset_name: libzen_rustlib.so
+          asset_content_type: application/octet-stream
