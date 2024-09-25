@@ -108,4 +108,14 @@ mod tests {
             "  "
         );
     }
+
+    #[test]
+    fn test_auto_concat_strs() {
+        not_is_injection!("SELECT * FROM 'abc' 'abc'", "abc");
+        not_is_injection!("SELECT * FROM 'abc' 'abc'", "'abc'");
+        not_is_injection!("SELECT * FROM 'abc' 'def'", "abc");
+
+        is_injection!("SELECT * FROM 'abc' 'ebc' 'def'", "abc' 'ebc");
+        is_injection!("SELECT * FROM 'abc' 'abc' 'abc'", "abc' 'abc");
+    }
 }
