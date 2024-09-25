@@ -1,3 +1,4 @@
+use super::comment_structure_altered::comment_structure_altered;
 use super::is_whitespace_token::is_whitespace_token;
 use super::tokenize_query::tokenize_query;
 use sqlparser::tokenizer::Token;
