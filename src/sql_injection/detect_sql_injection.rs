@@ -22,14 +22,7 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
         // If a delta exists in all tokens, mark this as an injection.
         return true;
     }
-    let tokens_whitespace_delta = delta_whitespace_tokens(tokens, tokens_without_input);
-    if tokens_whitespace_delta != 0 {
-        // A delta exists in whitespace tokens, regardless of input the amount of whitespace
-        // tokens, like comments, should remain the same.
-        return true;
-    }
-
-    return false;
+    return comment_structure_altered(tokens, tokens_without_input);
 }
 
 fn tokenize_with_fallback(query: &str, dialect: i32) -> Vec<Token> {
