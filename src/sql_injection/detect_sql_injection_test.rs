@@ -95,7 +95,6 @@ mod tests {
     }
     #[test]
     fn test_character_combos() {
-        // SQL Injection :
         is_injection!(
             "INSERT INTO users (name, surname) VALUES ('Alice', 'Bob')",
             "('"
