@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use crate::sql_injection::is_whitespace_token::is_whitespace_token;
+    use crate::sql_injection::is_whitespace_token::{
+        is_multiline_comment, is_singleline_comment, is_whitespace_token,
+    };
     use sqlparser::ast::DollarQuotedString;
     use sqlparser::keywords::Keyword;
     use sqlparser::tokenizer::{Token, Whitespace, Word};
@@ -79,5 +81,46 @@ mod tests {
                 prefix: "".to_string()
             }
         )));
+    }
+    #[test]
+    fn test_is_singleline_comment() {
+        let single_line_comment_token = Token::Whitespace(Whitespace::SingleLineComment {
+            comment: "This is a single line comment".to_string(),
+            prefix: "//".to_string(),
+        });
+
+        let space_token = Token::Whitespace(Whitespace::Space);
+        let newline_token = Token::Whitespace(Whitespace::Newline);
+        let multi_line_comment_token = Token::Whitespace(Whitespace::MultiLineComment(
+            "This is a multi-line comment".to_string(),
+        ));
+
+        // Test for single line comment
+        assert!(is_singleline_comment(&single_line_comment_token));
+        // Test for other whitespace types
+        assert!(!is_singleline_comment(&space_token));
+        assert!(!is_singleline_comment(&newline_token));
+        assert!(!is_singleline_comment(&multi_line_comment_token));
+    }
+
+    #[test]
+    fn test_is_multiline_comment() {
+        let multi_line_comment_token = Token::Whitespace(Whitespace::MultiLineComment(
+            "This is a multi-line comment".to_string(),
+        ));
+
+        let single_line_comment_token = Token::Whitespace(Whitespace::SingleLineComment {
+            comment: "This is a single line comment".to_string(),
+            prefix: "//".to_string(),
+        });
+        let space_token = Token::Whitespace(Whitespace::Space);
+        let newline_token = Token::Whitespace(Whitespace::Newline);
+
+        // Test for multi-line comment
+        assert!(is_multiline_comment(&multi_line_comment_token));
+        // Test for other whitespace types
+        assert!(!is_multiline_comment(&single_line_comment_token));
+        assert!(!is_multiline_comment(&space_token));
+        assert!(!is_multiline_comment(&newline_token));
     }
 }
