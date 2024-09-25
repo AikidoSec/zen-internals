@@ -8,3 +8,5 @@ pub mod tokenize_query_test;
 
 pub mod is_whitespace_token;
 pub mod is_whitespace_token_test;
+
+pub mod comment_structure_altered;
