@@ -58,7 +58,8 @@ fn is_safe_userinput_token(token: &Token) -> bool {
         }
     } else if let Token::Word(word) = token {
         if let Keyword::NoKeyword = word.keyword {
-            return true;
+            // We want to make sure stuff like "table_name" does not get approved as safe.
+            return word.quote_style == None;
         }
     }
     return false;

@@ -133,5 +133,9 @@ mod tests {
         is_injection!("SELECT * FROM hakuna matata", "FROM h");
         is_injection!("SELECT * FROM hakuna matata", "FROM hakuna");
         is_injection!("SELECT * FROM hakuna matata", "FROM hakuna matata");
+        is_injection!(
+            "SELECT * FROM \"table_name\" WHERE comment = \"I\" \"m writting you\"",
+            "\"table_name\" "
+        )
     }
 }
