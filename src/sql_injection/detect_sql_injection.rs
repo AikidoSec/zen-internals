@@ -1,5 +1,4 @@
 use super::comment_structure_altered::comment_structure_altered;
-use super::is_whitespace_token::is_whitespace_token;
 use super::tokenize_query::tokenize_query;
 use crate::tokens_have_delta;
 use sqlparser::tokenizer::Token;
@@ -32,17 +31,4 @@ fn tokenize_with_fallback(query: &str, dialect: i32) -> Vec<Token> {
         return tokenize_query(query, 0);
     }
     return query_tokens;
-}
-
-fn delta_whitespace_tokens(tokens1: Vec<Token>, tokens2: Vec<Token>) -> usize {
-    let dangerous_tokens1: Vec<_> = tokens1
-        .iter()
-        .filter(|&token| is_whitespace_token(token))
-        .collect();
-    let dangerous_tokens2: Vec<_> = tokens2
-        .iter()
-        .filter(|&token| is_whitespace_token(token))
-        .collect();
-
-    return dangerous_tokens2.len().abs_diff(dangerous_tokens1.len());
 }
