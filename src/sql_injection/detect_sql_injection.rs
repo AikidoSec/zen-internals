@@ -16,7 +16,7 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
     let tokens_without_input = tokenize_with_fallback(query_without_input, dialect);
 
     // Check delta for both whitespace tokens and all tokens in general :
-    let tokens_general_delta = tokens.len() - tokens_without_input.len();
+    let tokens_general_delta = tokens.len().abs_diff(tokens_without_input.len());
     if tokens_general_delta != 0 {
         // If a delta exists in all tokens, mark this as an injection.
         return true;
@@ -50,5 +50,5 @@ fn delta_whitespace_tokens(tokens1: Vec<Token>, tokens2: Vec<Token>) -> usize {
         .filter(|&token| is_whitespace_token(token))
         .collect();
 
-    return dangerous_tokens2.len() - dangerous_tokens1.len();
+    return dangerous_tokens2.len().abs_diff(dangerous_tokens1.len());
 }
