@@ -26,13 +26,14 @@ jobs:
         run: cargo test --release
 
       - name: Create Release
+        uses: actions/create-release@v1
         id: create_release
-        uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ github.ref }}  # The tag that triggered the workflow
-          release_name: Release ${{ github.ref }}  # Name of the release
           draft: false
           prerelease: false
+          release_name: ${{ steps.version.outputs.version }}
+          tag_name: ${{ github.ref }}
+          body_path: CHANGELOG.md
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
