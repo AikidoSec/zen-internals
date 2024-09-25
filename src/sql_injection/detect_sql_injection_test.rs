@@ -103,7 +103,8 @@ mod tests {
             "INSERT INTO users (name, surname) VALUES ('Alice', 'Bob')",
             ", "
         );
-        is_injection!(
+
+        not_is_injection!(
             "INSERT  INTO users (name, surname) VALUES ('Alice', 'Bob')",
             "  "
         );
@@ -117,5 +118,20 @@ mod tests {
 
         is_injection!("SELECT * FROM 'abc' 'ebc' 'def'", "abc' 'ebc");
         is_injection!("SELECT * FROM 'abc' 'abc' 'abc'", "abc' 'abc");
+    }
+
+    #[test]
+    fn test_nokeyword_exemption() {
+        not_is_injection!("SELECT * FROM hakuna matata", "hakuna matata");
+        not_is_injection!("SELECT * FROM hakuna matata", "hakuna ");
+        not_is_injection!(
+            "SELECT * FROM hakuna matata theory",
+            " hakuna matata theory"
+        );
+        not_is_injection!("SELECT * FROM hakuna matata theory", " kuna matata theo");
+
+        is_injection!("SELECT * FROM hakuna matata", "FROM h");
+        is_injection!("SELECT * FROM hakuna matata", "FROM hakuna");
+        is_injection!("SELECT * FROM hakuna matata", "FROM hakuna matata");
     }
 }
