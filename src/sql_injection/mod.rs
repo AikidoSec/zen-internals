@@ -8,5 +8,5 @@ pub mod tokenize_query_test;
 
 pub mod filter_for_comment_tokens;
 
-pub mod check_comments_changed;
-pub mod check_comments_changed_test;
+pub mod have_comments_changed;
+pub mod have_comments_changed_test;

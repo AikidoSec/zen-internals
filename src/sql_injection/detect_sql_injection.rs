@@ -1,4 +1,4 @@
-use super::check_comments_changed::check_comments_changed;
+use super::have_comments_changed::have_comments_changed;
 use super::tokenize_query::tokenize_query;
 use crate::diff_in_vec_len;
 use sqlparser::tokenizer::Token;
@@ -30,7 +30,7 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
         // If a delta exists in all tokens, mark this as an injection.
         return true;
     }
-    if check_comments_changed(tokens, tokens_without_input) {
+    if have_comments_changed(tokens, tokens_without_input) {
         // This checks if structure of comments in the query is altered after removing user input.
         // It makes sure the lengths of all single line and multiline comments are all still the same
         // And makes sure no extra comments were added or that the order was altered.
