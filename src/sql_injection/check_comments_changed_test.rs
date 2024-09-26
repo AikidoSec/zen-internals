@@ -35,7 +35,7 @@ mod tests {
     }
 
     #[test]
-    fn test_quries_different_but_singleline_comments_same() {
+    fn test_queries_different_but_singleline_comments_same() {
         not_comments_changed!("SELECT AVG(salary) AS average_salary FROM employees; -- hewwo", "INSERT INTO employees (name, position, salary) VALUES ('John Doe', 'Software Engineer', 70000); -- hewwo");
         not_comments_changed!(
             "DELETE FROM employees WHERE job_title = 'Intern';  --   Bonjorno    ",
@@ -56,4 +56,24 @@ mod tests {
             -- Hello"
         );
     }
+
+    #[test]
+    fn test_multiline_comments_in_same_order_and_length() {
+        not_comments_changed!("SELECT /*Comment 1*/ COUNT(*) AS total_employees/*Commentz*/ FROM employees;/* hello */", "/*Comment 1*/ SELECT name FROM employees WHERE department =/*Commentz*/ 'Marketing';/* hello */");
+        not_comments_changed!(
+            "/**/UPDATE employees/*1*/ SET salary = salary * 1.05 WHERE id = 1;",
+            "DELETE FROM employees WHERE job_title = 'Intern';/**/ /*1*/"
+        );
+        not_comments_changed!("/*Comment1*//*Comment2*/INSERT INTO employees (name, job_title, salary) VALUES ('Jane Smith', 'Developer', 75000);", "SELECT DISTINCT job_title FROM employees;/*Comment1*//*Comment2*/");
+    }
+
+    #[test]
+    fn test_multiline_comments_changed() {}
+
+    #[test]
+    fn test_singlelin_comments_changed() {}
+    #[test]
+    fn test_singleline_comments_different_prefix() {}
+    #[test]
+    fn test_combination_multiline_and_singleline() {}
 }
