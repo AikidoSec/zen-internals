@@ -133,7 +133,10 @@ mod tests {
     }
 
     #[test]
-    fn test_singleline_comments_different_prefix() {}
+    fn test_singleline_comments_different_prefix() {
+        not_comments_changed!("COUNT # Hello!", "SELECT * FROM # Hello!");
+        comments_changed!("COUNT -- Hello", "COUNT # Hello");
+    }
 
     #[test]
     fn test_combination_multiline_and_singleline() {
