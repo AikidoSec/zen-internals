@@ -1,6 +1,6 @@
 use super::comment_structure_altered::comment_structure_altered;
 use super::tokenize_query::tokenize_query;
-use crate::tokens_have_delta;
+use crate::diff_in_vec_len;
 use sqlparser::tokenizer::Token;
 
 const SPACE_CHAR: char = ' ';
@@ -26,7 +26,7 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
     let tokens_without_input = tokenize_with_fallback(query_without_input, dialect);
 
     // Check delta for both comment tokens and all tokens in general :
-    if tokens_have_delta!(tokens, tokens_without_input) {
+    if diff_in_vec_len!(tokens, tokens_without_input) {
         // If a delta exists in all tokens, mark this as an injection.
         return true;
     }
