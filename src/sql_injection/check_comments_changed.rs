@@ -2,6 +2,13 @@ use super::filter_comment_tokens::*;
 use crate::diff_in_vec_len;
 use sqlparser::tokenizer::Token;
 
+/*
+ * Takes in token input from two queries, and filters them using get_singleline_comments and
+ * get_multiline_comments (See filter_comment_tokens.rs). Afterwards makes these checks  :
+ * - Makes sure amount of singleline & multiline comments remains the same
+ * - Makes sure the prefix and length of comment remains the same for singeline
+ * - Makes sure the length of the comment remains the same for multiline
+ */
 pub fn check_comments_changed(tokens1: Vec<Token>, tokens2: Vec<Token>) -> bool {
     // Filter token vectors based on type (singleline and multiline)
     let singlelines1 = get_singleline_comments(tokens1.clone());
