@@ -135,6 +135,10 @@ mod tests {
             "INSERT  INTO users (name, surname) VALUES ('Alice', 'Bob')",
             "  "
         );
+        not_is_injection!(
+            "INSERT  INTO users (name, surname) VALUES ('Alice', 'Bob')",
+            "                 "
+        );
     }
 
     #[test]
