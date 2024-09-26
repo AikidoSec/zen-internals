@@ -95,6 +95,42 @@ mod tests {
     }
 
     #[test]
+    fn test_short_sql_with_singeline_comment() {
+        let sql = "1=1 -- This is a lovely single line comment.";
+        let dialect = 0; // Replace with the appropriate dialect enum value
+        let tokens = tokenize_query(sql, dialect);
+
+        let expected_tokens: Vec<Token> = vec![
+            Token::Number("1".to_string(), false),
+            Token::Eq,
+            Token::Number("1".to_string(), false),
+            Token::Whitespace(Whitespace::Space),
+            Token::Whitespace(Whitespace::SingleLineComment {
+                comment: " This is a lovely single line comment.".to_string(),
+                prefix: "--".to_string(),
+            }),
+        ];
+        assert_eq!(tokens, expected_tokens);
+    }
+    #[test]
+    fn test_short_sql_with_multiline_comment() {
+        let sql: &str = "1=1 /* Multiline Comment */";
+        let dialect = 0; // Replace with the appropriate dialect enum value
+        let tokens = tokenize_query(sql, dialect);
+
+        let expected_tokens: Vec<Token> = vec![
+            Token::Number("1".to_string(), false),
+            Token::Eq,
+            Token::Number("1".to_string(), false),
+            Token::Whitespace(Whitespace::Space),
+            Token::Whitespace(Whitespace::MultiLineComment(
+                " Multiline Comment ".to_string(),
+            )),
+        ];
+        assert_eq!(tokens, expected_tokens);
+    }
+
+    #[test]
     fn test_tokenize_error_handling() {
         let sql = "sdlerg F'RM %^"; // Malformed SQL
         let dialect = 0; // Replace with the appropriate dialect enum value

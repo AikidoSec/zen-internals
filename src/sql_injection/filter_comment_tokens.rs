@@ -1,8 +1,12 @@
 use sqlparser::tokenizer::{Token, Whitespace};
 
 /* Function `get_singleline_comments`
- * Returns : Vector of a tuple (comment, prefix).
- */
+* Returns : Vector of a tuple (comment, prefix). Example :
+*  query : `1=1 -- This is a lovely single line comment.`
+*  tokens vector : [Number(..), Eq, Number(..), Whitespace(Space),
+       Whitespace(SingleLineComment { comment: " This is a lovely single line comment.", prefix: "--" })]
+*  Output : [(" This is a lovely single line comment.", "--")]
+*/
 pub fn get_singleline_comments(tokens: Vec<Token>) -> Vec<(String, String)> {
     let singleline_comments: Vec<(String, String)> = tokens
         .iter()
@@ -13,7 +17,10 @@ pub fn get_singleline_comments(tokens: Vec<Token>) -> Vec<(String, String)> {
 }
 
 /* Function `get_multiline_comments`
- * Returns : Vector of all multiline comments as strings.
+ * Returns : Vector of all multiline comments as strings. Example :
+ *  query : ``
+ *  tokens vector : [Number(..), Eq, Number(..), Whitespace(Space), Whitespace(MultiLineComment(" Multiline Comment "))]
+ *  Output : [" Multiline Comment "]
  */
 pub fn get_multiline_comments(tokens: Vec<Token>) -> Vec<String> {
     let multiline_comments: Vec<String> = tokens
