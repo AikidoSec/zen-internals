@@ -97,11 +97,52 @@ mod tests {
     }
 
     #[test]
-    fn test_singlelin_comments_changed() {}
+    fn test_singleline_comments_changed() {
+        // Comments remain the same but different order :
+        comments_changed!(
+            "SELECT --123;
+            FROM --1234",
+            "SELECT --1234;
+            FROM --123"
+        );
+        comments_changed!(
+            "SELECT -- Holla!
+            FROM --Mi Amigos",
+            "SELECT --Mi Amigos
+            FROM -- Holla!"
+        );
+
+        // Exactly the same comment but count is different :
+        comments_changed!(
+            "SELECT --1;
+            FROM /*1*/ --1;",
+            "SELECT --1;
+            FROM --1;
+            --1;"
+        );
+
+        // Comments differ in length but not position :
+        comments_changed!(
+            "--1234
+            --123456
+            --12",
+            "--123
+            --123456
+            --12"
+        );
+    }
+
     #[test]
     fn test_singleline_comments_different_prefix() {}
+
     #[test]
     fn test_combination_multiline_and_singleline() {
         comments_changed!("SELECT /*1*/; FROM /*1*/;", "SELECT /*1*/ FROM --1");
+        comments_changed!(
+            "SELECT --1;
+            FROM /*1*/ --1;",
+            "SELECT --1;
+            FROM --1;"
+        );
     }
 }
