@@ -6,6 +6,8 @@ use sqlparser::{
     tokenizer::{Token, Whitespace},
 };
 
+const SPACE_CHAR: char = ' ';
+
 // `userinput` and `query` provided to this function should already be lowercase.
 pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> bool {
     // Tokenize query :
@@ -14,15 +16,18 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
         // Tokens are empty, probably a parsing issue with original query, return false.
         return false;
     }
+    // Remove leading and trailing spaces from userinput :
+    let trimmed_userinput = userinput.trim_matches(SPACE_CHAR);
 
     // Tokenize query without user input :
-    let query_without_input: &str = &query.replace(userinput, "str");
+    let query_without_input: &str = &query.replace(trimmed_userinput, "str");
     let tokens_without_input = tokenize_with_fallback(query_without_input, dialect);
 
     // Check delta for both comment tokens and all tokens in general :
     if tokens_have_delta!(tokens, tokens_without_input) {
         // If a delta exists in all tokens, mark this as an injection.
         if userinput_is_safe(userinput, dialect) {
+            // No need to send trimmed userinput.
             // Do a check on the user input, if it's safe we can safely ignore the delta.
             return false;
         }

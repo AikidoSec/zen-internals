@@ -84,15 +84,32 @@ mod tests {
             "INSERT INTO users (name, surname) VALUES ('Alice', 'Bob')",
             "INTO users"
         );
-        is_injection!(
+    }
+    #[test]
+
+    fn test_spaces_are_trimmed_from_input() {
+        not_is_injection!(
             "INSERT INTO users (name, surname) VALUES ('Alice', 'Bob')",
             "VALUES "
         );
-        is_injection!(
+        not_is_injection!(
             "INSERT INTO users (name, surname) VALUES ('Alice', 'Bob')",
             " INTO"
         );
+        not_is_injection!(
+            "INSERT INTO users (name, surname) VALUES ('Alice', 'Bob')",
+            " surname"
+        );
+        not_is_injection!(
+            "INSERT INTO users (name, surname) VALUES ('Alice', 'Bob')",
+            " VALUES "
+        );
+        not_is_injection!(
+            "INSERT INTO users (name, surname) VALUES ('Alice', 'Bob')",
+            "          VALUES             "
+        )
     }
+
     #[test]
     fn test_character_combos() {
         is_injection!(
@@ -133,7 +150,7 @@ mod tests {
         is_injection!("SELECT * FROM hakuna matata", "FROM h");
         is_injection!("SELECT * FROM hakuna matata", "FROM hakuna");
         is_injection!("SELECT * FROM hakuna matata", "FROM hakuna matata");
-        is_injection!(
+        not_is_injection!(
             "SELECT * FROM \"table_name\" WHERE comment = \"I\" \"m writting you\"",
             "\"table_name\" "
         )
