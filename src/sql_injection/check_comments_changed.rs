@@ -1,4 +1,4 @@
-use super::filter_comment_tokens::*;
+use super::filter_for_comment_tokens::*;
 use crate::diff_in_vec_len;
 use sqlparser::tokenizer::Token;
 
