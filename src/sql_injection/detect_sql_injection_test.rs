@@ -116,9 +116,19 @@ mod tests {
             "INSERT INTO users (name, surname) VALUES ('Alice', 'Bob')",
             "('"
         );
-        is_injection!(
+
+        // one character, after spaces removed cannot be injection :
+        not_is_injection!(
             "INSERT INTO users (name, surname) VALUES ('Alice', 'Bob')",
             ", "
+        );
+        not_is_injection!(
+            "INSERT INTO users (name, surname) VALUES ('Alice', 'Bob')          ;          ",
+            "          ;          "
+        );
+        not_is_injection!(
+            "INSERT INTO users (name, surname) VALUES ('Alice', 'Bob')          6          ",
+            "          6          "
         );
 
         not_is_injection!(
@@ -139,13 +149,15 @@ mod tests {
 
     #[test]
     fn test_nokeyword_exemption() {
-        not_is_injection!("SELECT * FROM hakuna matata", "hakuna matata");
+        is_injection!("SELECT * FROM hakuna matata", "hakuna matata");
         not_is_injection!("SELECT * FROM hakuna matata", "hakuna ");
-        not_is_injection!(
+        not_is_injection!("SELECT * FROM hakuna matata", "una ");
+
+        is_injection!(
             "SELECT * FROM hakuna matata theory",
             " hakuna matata theory"
         );
-        not_is_injection!("SELECT * FROM hakuna matata theory", " kuna matata theo");
+        is_injection!("SELECT * FROM hakuna matata theory", " kuna matata theo");
 
         is_injection!("SELECT * FROM hakuna matata", "FROM h");
         is_injection!("SELECT * FROM hakuna matata", "FROM hakuna");
