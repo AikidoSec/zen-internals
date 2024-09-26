@@ -1,47 +1,70 @@
 use super::filter_comment_tokens::*;
-use crate::tokens_have_delta;
+use crate::diff_in_vec_len;
 use sqlparser::tokenizer::Token;
 
 pub fn comment_structure_altered(tokens1: Vec<Token>, tokens2: Vec<Token>) -> bool {
-    // First things first, we need to get these token lists both sorted :
-    let tokens1_singeline = get_singleline_comments(tokens1.clone());
-    let tokens2_singleline = get_singleline_comments(tokens2.clone());
-    let tokens1_multiline = get_multiline_comments(tokens1);
-    let tokens2_multiline = get_multiline_comments(tokens2);
+    // Filter token vectors based on type (singleline and multiline)
+    let singlelines1 = get_singleline_comments(tokens1.clone());
+    let singlelines2 = get_singleline_comments(tokens2.clone());
+    let multilines1 = get_multiline_comments(tokens1);
+    let multilines2 = get_multiline_comments(tokens2);
 
-    // Now we do an early true return if the lengths don't match (i.e. the structure is altered)
-    if tokens_have_delta!(tokens1_singeline, tokens2_singleline) {
-        return true;
-    }
-    if tokens_have_delta!(tokens1_multiline, tokens2_multiline) {
+    // Do an early return if the lengths don't match -> structure is different.
+    if diff_in_vec_len!(singlelines1, singlelines2) || diff_in_vec_len!(multilines1, multilines2) {
         return true;
     }
 
-    // Now we check the actual structure, starting with singeline comments :
-    // prefix should remain the same and the length of the comments.
-    for i in 0..tokens1_singeline.len() {
-        let token1_singeline = &tokens1_singeline[i];
-        let token2_singeline = &tokens2_singleline[i];
-        let comment1_len = token1_singeline.0.len();
-        let comment2_len = token2_singeline.0.len();
+    // Check if the structure of singleline and/or multiline comments is altered.
+    if structure_of_singlelines_altered(singlelines1, singlelines2) {
+        return true;
+    }
+    if structure_of_multilines_altered(multilines1, multilines2) {
+        return true;
+    }
+
+    return false;
+}
+
+/* Function structure_of_singlelines_altered
+ * Returns true if the structure of the vectors of single lines does not match (i.e. prefix or comment length)
+ * Optimalization to keep in mind : We only check length of comments since in case of attack
+ *      the length of the comment will only be able to increase.
+ */
+fn structure_of_singlelines_altered(
+    singlelines1: Vec<(String, String)>,
+    singlelines2: Vec<(String, String)>,
+) -> bool {
+    for i in 0..singlelines1.len() {
+        let singleline1 = &singlelines1[i];
+        let singleline2 = &singlelines2[i];
+
+        // the first element (.0) of a single line tuple is the comment : (i.e. "Good Afternoon" in -- Good Afternoon)
+        let comment1_len = singleline1.0.len();
+        let comment2_len: usize = singleline2.0.len();
         if comment1_len.abs_diff(comment2_len) != 0 {
-            // The length of both comments are not the same, return true.
+            // The length of both comments are not the same which means the structure is altered
+            // This could mean e.g. that due to an injection a comment has been made longer.
             return true;
         }
-        if token1_singeline.1 != token2_singeline.1 {
-            // The prefix differs, return true.
-            return true;
-        }
-    }
-    // Test structure for multiline comments : length of comments should be the same.
-    for i in 0..tokens1_multiline.len() {
-        let multiline1 = &tokens1_multiline[i];
-        let multiline2 = &tokens2_multiline[i];
-        if multiline1.len().abs_diff(multiline2.len()) != 0 {
-            // The length of both comments are not the same, return true.
+        if singleline1.1 != singleline2.1 {
+            // The second element (.1) contains prefix.
+            // The prefixes differ for both comments (e.g. Prefix of -- Good Afternoon is "--")
+            // If prefixes differ this is a sign that comment structure was altered
             return true;
         }
     }
 
+    return false;
+}
+
+fn structure_of_multilines_altered(multilines1: Vec<String>, multilines2: Vec<String>) -> bool {
+    for i in 0..multilines1.len() {
+        let multiline1 = &multilines1[i];
+        let multiline2 = &multilines2[i];
+        if multiline1.len().abs_diff(multiline2.len()) != 0 {
+            // The length of both comments are not the same -> Strucutre is altered.
+            return true;
+        }
+    }
     return false;
 }
