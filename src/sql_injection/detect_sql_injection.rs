@@ -30,7 +30,14 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
         // If a delta exists in all tokens, mark this as an injection.
         return true;
     }
-    return comment_structure_altered(tokens, tokens_without_input);
+    if comment_structure_altered(tokens, tokens_without_input) {
+        // This checks if structure of comments in the query is altered after removing user input.
+        // It makes sure the lengths of all single line and multiline comments are all still the same
+        // And makes sure no extra comments were added or that the order was altered.
+        return true;
+    }
+
+    return false;
 }
 
 fn tokenize_with_fallback(query: &str, dialect: i32) -> Vec<Token> {
