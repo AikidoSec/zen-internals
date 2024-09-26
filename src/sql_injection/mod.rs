@@ -8,4 +8,5 @@ pub mod tokenize_query_test;
 
 pub mod filter_comment_tokens;
 
-pub mod comment_structure_altered;
+pub mod check_comments_changed;
+pub mod check_comments_changed_test;

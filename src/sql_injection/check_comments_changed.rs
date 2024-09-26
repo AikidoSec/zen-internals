@@ -2,7 +2,7 @@ use super::filter_comment_tokens::*;
 use crate::diff_in_vec_len;
 use sqlparser::tokenizer::Token;
 
-pub fn comment_structure_altered(tokens1: Vec<Token>, tokens2: Vec<Token>) -> bool {
+pub fn check_comments_changed(tokens1: Vec<Token>, tokens2: Vec<Token>) -> bool {
     // Filter token vectors based on type (singleline and multiline)
     let singlelines1 = get_singleline_comments(tokens1.clone());
     let singlelines2 = get_singleline_comments(tokens2.clone());
