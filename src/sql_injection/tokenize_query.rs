@@ -13,7 +13,6 @@ pub fn tokenize_query(sql: &str, dialect: i32) -> Vec<Token> {
     match tokenizer.tokenize() {
         Ok(tokens) => tokens, // Return the tokens if successful
         Err(e) => {
-            println!("Tokenization error: {}", e);
             Vec::new() // Return empty vector if unsuccessfull.
         }
     }
