@@ -59,7 +59,7 @@ fn comment_token_differs_from_singleline(
         return false;
     }
 
-    return true;
+    return true; // means this is another type
 }
 
 /* Optimalization to keep in mind : We only check length of comments since in case of attack
