@@ -1,14 +1,14 @@
 {
-  "name": "@aikidosec/zen_rustlib",
+  "name": "@aikidosec/zen_internals",
   "collaborators": [
     "Aikido Security"
   ],
   "version": "0.1.0",
   "files": [
-    "zen_rustlib_bg.wasm",
-    "zen_rustlib.js",
-    "zen_rustlib.d.ts"
+    "zen_internals_bg.wasm",
+    "zen_internals.js",
+    "zen_internals.d.ts"
   ],
-  "main": "zen_rustlib.js",
-  "types": "zen_rustlib.d.ts"
+  "main": "zen_internals.js",
+  "types": "zen_internals.d.ts"
 }
