@@ -1,12 +1,15 @@
-name: Build and Publish Rust Artifact
+name: Create Release
 
 on:
-  release:
-    types: [created]
+  push:
+    tags:
+      - 'v*.*.*'  # Matches tags like v1.0.0, v2.1.3, etc.
 
 jobs:
-  build:
+  release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Grant write access to contents
 
     steps:
       - name: Checkout code
@@ -15,19 +18,33 @@ jobs:
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: stable  # You can specify a version like '1.56.0' if needed
           override: true
-          override-file: Cargo.toml
 
       - name: Build the project
         run: cargo build --release
 
-      - name: Upload release asset
+      - name: Run tests
+        run: cargo test --release
+
+      - name: Create Release
+        uses: actions/create-release@v1
+        id: create_release
+        with:
+          draft: false
+          prerelease: false
+          release_name: ${{ steps.version.outputs.version }}
+          tag_name: ${{ github.ref }}
+          body_path: CHANGELOG.md
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Upload binary artifact
         uses: actions/upload-release-asset@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
         with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: target/release/libzen_rustlib.so
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./target/release/libzen_rustlib.so
           asset_name: libzen_rustlib.so
           asset_content_type: application/octet-stream

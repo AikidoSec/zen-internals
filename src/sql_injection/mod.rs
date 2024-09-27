@@ -1,9 +1,12 @@
 pub mod detect_sql_injection;
 pub mod detect_sql_injection_test;
 
-pub mod select_dialect_based_on_enum;
+pub mod helpers;
 
 pub mod tokenize_query;
+pub mod tokenize_query_test;
 
-pub mod is_dangerous_token;
-pub mod is_dangerous_token_test;
+pub mod filter_for_comment_tokens;
+
+pub mod have_comments_changed;
+pub mod have_comments_changed_test;
