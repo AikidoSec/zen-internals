@@ -45,31 +45,30 @@ fn comment_token_differs_from_singleline(
     prefix1: String,
     comment_token2: Whitespace,
 ) -> bool {
-    match comment_token2 {
-        Whitespace::SingleLineComment { comment, prefix } => {
-            if comment.len().abs_diff(comment1.len()) != 0 {
-                // The length of both comments are not the same which means the structure is altered
-                // This could mean e.g. that due to an injection a comment has been made longer.
-                return true;
-            }
-            if prefix != prefix1 {
-                // The prefixes differ for both comments (e.g. Prefix of -- Good Afternoon is "--")
-                // If prefixes differ this is a sign that comment structure was altered
-                return true;
-            }
-            return false;
+    if let Whitespace::SingleLineComment { comment, prefix } = comment_token2 {
+        if comment.len().abs_diff(comment1.len()) != 0 {
+            // The length of both comments are not the same which means the structure is altered
+            // This could mean e.g. that due to an injection a comment has been made longer.
+            return true;
         }
-        _ => true, // So if it's a multiline whitespace for example.
+        if prefix != prefix1 {
+            // The prefixes differ for both comments (e.g. Prefix of -- Good Afternoon is "--")
+            // If prefixes differ this is a sign that comment structure was altered
+            return true;
+        }
+        return false;
     }
+
+    return true;
 }
 
 /* Optimalization to keep in mind : We only check length of comments since in case of attack
  *      the length of the comment will only be able to increase.
 */
 fn comment_token_differs_from_multiline(comment1: String, comment_token2: Whitespace) -> bool {
-    match comment_token2 {
+    if let Whitespace::MultiLineComment(comment2) = comment_token2 {
         // The length of both comments are not the same -> Strucutre is altered.
-        Whitespace::MultiLineComment(comment2) => comment2.len().abs_diff(comment1.len()) != 0,
-        _ => true, // So if it's a singleline whitespace for example.
+        return comment2.len().abs_diff(comment1.len()) != 0;
     }
+    return true; // So if it's a singleline whitespace for example.
 }
