@@ -4,7 +4,7 @@
   "collaborators": [
     "Aikido Security"
   ],
-  "version": "0.1.0",
+  "version": "0.1.1",
   "files": [
     "zen_internals_bg.wasm",
     "zen_internals.js",
