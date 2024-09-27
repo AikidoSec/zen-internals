@@ -1,0 +1,15 @@
+{
+  "name": "@aikidosec/zen-internals",
+  "repository": "https://github.com/AikidoSec/zen-internals",
+  "collaborators": [
+    "Aikido Security"
+  ],
+  "version": "0.1.0",
+  "files": [
+    "zen_internals_bg.wasm",
+    "zen_internals.js",
+    "zen_internals.d.ts"
+  ],
+  "main": "zen_internals.js",
+  "types": "zen_internals.d.ts"
+}

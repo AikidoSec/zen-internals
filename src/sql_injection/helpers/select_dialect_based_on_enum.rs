@@ -28,7 +28,7 @@ pub fn select_dialect_based_on_enum(enumerator: i32) -> Box<dyn Dialect> {
         7 => Box::new(MsSqlDialect {}),
         8 => Box::new(MySqlDialect {}),
         9 => Box::new(PostgreSqlDialect {}),
-        19 => Box::new(RedshiftSqlDialect {}),
+        10 => Box::new(RedshiftSqlDialect {}),
         11 => Box::new(SnowflakeDialect {}),
         12 => Box::new(SQLiteDialect {}),
         _ => Box::new(GenericDialect {}),

@@ -6,12 +6,13 @@ authors = ["Aikido Security"]
 
 [lib]
 name = "zen_internals"
-crate-type = ["dylib"]
+crate-type = ["cdylib"]
 
 [dependencies]
 regex = "1.10.6"
 sqlparser = "0.51.0"
 url = "2.5.2"
+wasm-bindgen = "0.2"
 
 [dev-dependencies]
 rand = "0.8.5"
