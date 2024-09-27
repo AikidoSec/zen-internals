@@ -1,9 +1,8 @@
 name: Build and Publish WASM Package
 
 on:
-  pull_request:
-    branches:
-      - main  # Change this to your default branch if it's not 'main'
+  release:
+    types: [created]
 
 jobs:
   build:
