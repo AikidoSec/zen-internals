@@ -35,4 +35,4 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}  # Use npm token from secrets
         run: |
           cd pkg
-          npm publish --access public  # Change access level if needed
+          npm publish --provenance --access public
