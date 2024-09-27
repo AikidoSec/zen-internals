@@ -10,6 +10,7 @@ crate-type = ["dylib"]
 
 [dependencies]
 regex = "1.10.6"
+sqlparser = "0.51.0"
 url = "2.5.2"
 
 [dev-dependencies]
