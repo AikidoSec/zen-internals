@@ -33,6 +33,10 @@ jobs:
       - name : Copy package.wasm.json file
         run: |
           cp package.wasm.json ./pkg/package.json
+      - name: Get the version
+        id: get_version
+        run: echo ::set-output name=tag::${GITHUB_REF/refs\/tags\//}
+      - run: cd pkg && npm --no-git-tag-version version ${{ steps.get_version.outputs.tag }}
       - name: Publish to npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}  # Use npm token from secrets
