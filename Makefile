@@ -4,7 +4,7 @@ build:
 
 .PHONY: buildwasm
 buildwasm:
-	wasm-pack build --target bundler
+	wasm-pack build --target nodejs
 
 .PHONY: test
 test:
