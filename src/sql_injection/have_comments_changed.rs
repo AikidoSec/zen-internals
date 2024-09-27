@@ -11,24 +11,24 @@ use sqlparser::tokenizer::{Token, Whitespace};
  */
 pub fn have_comments_changed(tokens1: Vec<Token>, tokens2: Vec<Token>) -> bool {
     // Filter token vectors based on type (singleline and multiline)
-    let comments1: Vec<Whitespace> = filter_for_comment_tokens(tokens1);
-    let comments2: Vec<Whitespace> = filter_for_comment_tokens(tokens2);
+    let comment_tokens1: Vec<Whitespace> = filter_for_comment_tokens(tokens1);
+    let comment_tokens2: Vec<Whitespace> = filter_for_comment_tokens(tokens2);
 
     // Do an early return if the lengths don't match -> structure is different.
-    if diff_in_vec_len!(comments1, comments2) {
+    if diff_in_vec_len!(comment_tokens1, comment_tokens2) {
         return true;
     }
 
     // Loop over comments :
-    for i in 0..comments1.len() {
-        let comment1: Whitespace = comments1[i].clone();
-        let comment2: Whitespace = comments2[i].clone();
-        if let Whitespace::SingleLineComment { comment, prefix } = comment1 {
-            if whitespace_differs_from_singleline(comment, prefix, comment2) {
+    for i in 0..comment_tokens1.len() {
+        let comment_token1: Whitespace = comment_tokens1[i].clone();
+        let comment_token2: Whitespace = comment_tokens2[i].clone();
+        if let Whitespace::SingleLineComment { comment, prefix } = comment_token1 {
+            if comment_token_differs_from_singleline(comment, prefix, comment_token2) {
                 return true;
             }
-        } else if let Whitespace::MultiLineComment(comment) = comment1 {
-            if whitespace_differs_from_multiline(comment, comment2) {
+        } else if let Whitespace::MultiLineComment(comment) = comment_token1 {
+            if comment_token_differs_from_multiline(comment, comment_token2) {
                 return true;
             }
         }
@@ -40,12 +40,12 @@ pub fn have_comments_changed(tokens1: Vec<Token>, tokens2: Vec<Token>) -> bool {
 /* Optimalization to keep in mind : We only check length of comments since in case of attack
  *      the length of the comment will only be able to increase.
 */
-fn whitespace_differs_from_singleline(
+fn comment_token_differs_from_singleline(
     comment1: String,
     prefix1: String,
-    whitespace2: Whitespace,
+    comment_token2: Whitespace,
 ) -> bool {
-    match whitespace2 {
+    match comment_token2 {
         Whitespace::SingleLineComment { comment, prefix } => {
             if comment.len().abs_diff(comment1.len()) != 0 {
                 // The length of both comments are not the same which means the structure is altered
@@ -66,8 +66,8 @@ fn whitespace_differs_from_singleline(
 /* Optimalization to keep in mind : We only check length of comments since in case of attack
  *      the length of the comment will only be able to increase.
 */
-fn whitespace_differs_from_multiline(comment1: String, whitespace2: Whitespace) -> bool {
-    match whitespace2 {
+fn comment_token_differs_from_multiline(comment1: String, comment_token2: Whitespace) -> bool {
+    match comment_token2 {
         // The length of both comments are not the same -> Strucutre is altered.
         Whitespace::MultiLineComment(comment2) => comment2.len().abs_diff(comment1.len()) != 0,
         _ => true, // So if it's a singleline whitespace for example.
