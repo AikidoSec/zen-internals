@@ -1,0 +1,38 @@
+name: Build and Publish WASM Package
+
+on:
+  pull_request:
+    branches:
+      - main  # Change this to your default branch if it's not 'main'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          override-file: rust-toolchain
+
+      - name: Install wasm-pack
+        run: |
+          cargo install wasm-pack
+
+      - name: Build with wasm-pack
+        run: |
+          make buildwasm
+      - name : Copy package.wasm.json file
+        run: |
+          cp package.wasm.json ./pkg/package.json
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}  # Use npm token from secrets
+        run: |
+          cd pkg
+          npm publish --access public  # Change access level if needed
