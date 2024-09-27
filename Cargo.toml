@@ -1,11 +1,11 @@
 [package]
-name = "zen-rustlib"
+name = "zen-internals"
 version = "0.1.0"
 edition = "2021"
 authors = ["Aikido Security"]
 
 [lib]
-name = "zen_rustlib"
+name = "zen_internals"
 crate-type = ["dylib"]
 
 [dependencies]
