@@ -83,12 +83,19 @@ jobs:
       - name: Prepare release
         run: |
           cd target/x86_64-pc-windows-gnu/release
-          EVENT_DATA=$(cat "$GITHUB_EVENT_PATH")
-          RELEASE_NAME=$(echo "$EVENT_DATA" | jq -r .release.tag_name)
-          FILE=libzen_internals_${RELEASE_NAME}_x86_64-pc-windows-gnu.exe
+          FILE=libzen_internals_x86_64-pc-windows-gnu.exe
           sudo zip -9r ${FILE}.zip zen_internals.exe && sudo rm zen_internals.exe
           sudo touch ${FILE}.zip.sha256sum && sudo chmod 777 ${FILE}.zip.sha256sum
           sudo sha256sum "${FILE}.zip" | cut -d ' ' -f 1 > ${FILE}.zip.sha256sum
+      - name: Debug
+        run: |
+          ls -la
+          cd target
+          ls -la
+          cd x86_64-pc-windows-gnu
+          ls -la
+          cd release
+          ls -la
 
       - name: Store the zipfile and shasum
         uses: actions/upload-artifact@v3
@@ -162,19 +169,20 @@ jobs:
         with:
           name: linux-binaries
           path: ./artifacts/linux
+
+      - name: Download Windows binaries
+        uses: actions/download-artifact@v3
+        with:
+          name: windows-binaries
+          path: ./artifacts/windows
+
       - name : Debug artifacts
         run: |
           ls -la
           cd artifacts
           ls -la
-          cd linux
+          cd windows
           ls -la
-
-      #- name: Download Windows binaries
-      #  uses: actions/download-artifact@v3
-      #  with:
-      #    name: windows-binaries
-      #    path: ./artifacts/windows
 
       - name: Upload Linux binary tar
         uses: actions/upload-release-asset@v1
