@@ -130,7 +130,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: mac-binaries
-          path: target/x86_64-pc-windows-gnu/release/libzen_internals_*
+          path: target/x86_64-apple-darwin/release/libzen_internals_*
 
   create-github-release:
     needs: [build-linux, build-windows, build-mac]
