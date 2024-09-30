@@ -40,7 +40,7 @@ const detected = wasm_detect_sql_injection(
     9 // MySQL dialect
 );
 
-console.log(detected); // true
+console.log(detected); // 1
 ```
 
 See [list of dialects](https://github.com/AikidoSec/zen-internals/blob/main/src/sql_injection/helpers/select_dialect_based_on_enum.rs#L18)
