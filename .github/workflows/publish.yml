@@ -53,7 +53,7 @@ jobs:
           sudo touch ${FILE}.so.sha256sum && sudo chmod 777 ${FILE}.so.sha256sum
           sudo sha256sum "${FILE}.so" | cut -d ' ' -f 1 > ${FILE}.so.sha256sum
 
-      - name: Store the zipfile and shasum
+      - name: Store the .so file and the sha256sum file
         uses: actions/upload-artifact@v3
         with:
           name: linux-binaries
@@ -88,7 +88,7 @@ jobs:
           sudo touch ${FILE}.sha256sum && sudo chmod 777 ${FILE}.sha256sum
           sudo sha256sum "${FILE}" | cut -d ' ' -f 1 > ${FILE}.sha256sum
 
-      - name: Store the zipfile and shasum
+      - name: Store the .dll file and sha256sum file
         uses: actions/upload-artifact@v3
         with:
           name: windows-binaries
@@ -113,29 +113,27 @@ jobs:
 
       - name: Build for mac
         run: |
-          docker run --rm \
-            --volume "${PWD}":/root/src \
-            --workdir /root/src \
-            joseluisq/rust-linux-darwin-builder:1.81.0 \
-            sh -c "CC=o64-clang CXX=o64-clang++ cargo build --release --target x86_64-apple-darwin"
+          CC=o64-clang CXX=o64-clang++ cargo build --release --target x86_64-apple-darwin
 
       - id: prep
         name: Prepare release
         run: |
           cd target/x86_64-apple-darwin/release
-          EVENT_DATA=$(cat "$GITHUB_EVENT_PATH")
-          RELEASE_NAME=$(echo "$EVENT_DATA" | jq -r .release.tag_name)
-          FILE=zen_internals_${RELEASE_NAME}_x86_64-apple-darwin
-          sudo zip -9r ${FILE}.zip zen_internals && sudo rm zen_internals
-          sudo touch ${FILE}.zip.sha256sum && sudo chmod 777 ${FILE}.zip.sha256sum
-          CHECKSUM=$(sudo sha256sum "${FILE}.zip" | cut -d ' ' -f 1)
-          echo "${CHECKSUM}" > ${FILE}.zip.sha256sum
+          FILE=libzen_internals_x86_64-apple-darwin
+          sudo mv x ${FILE}.dylib
+          sudo touch ${FILE}.dylib.sha256sum && sudo chmod 777 ${FILE}.dylib.sha256sum
+          CHECKSUM=$(sudo sha256sum "${FILE}.dylib" | cut -d ' ' -f 1)
+          echo "${CHECKSUM}" > ${FILE}.dylib.sha256sum
           printf "::set-output name=%s::%s\n" sha256sum "${CHECKSUM}"
 
-      # Upload artifacts here
+      - name: Store the .dylib file and the sha256sum file
+        uses: actions/upload-artifact@v3
+        with:
+          name: mac-binaries
+          path: target/x86_64-pc-windows-gnu/release/libzen_internals_*
 
   create-github-release:
-    needs: [build-linux, build-windows] # [build-mac, build-linux, build-windows]
+    needs: [build-linux, build-windows, build-mac]
     runs-on: ubuntu-latest
     permissions:
       contents: write  # Grant write access to contents
@@ -155,24 +153,29 @@ jobs:
           body_path: CHANGELOG.md
         env:
           GITHUB_TOKEN: ${{ github.token }}
+
       - name: Download Linux binaries
         uses: actions/download-artifact@v3
         with:
           name: linux-binaries
           path: ./artifacts/linux
-
       - name: Download Windows binaries
         uses: actions/download-artifact@v3
         with:
           name: windows-binaries
           path: ./artifacts/windows
+      - name: Download Mac OS X binaries
+        uses: actions/download-artifact@v3
+        with:
+          name: mac-binaries
+          path: ./artifacts/mac
 
       - name : Debug artifacts
         run: |
           ls -la
           cd artifacts
           ls -la
-          cd windows
+          cd mac
           ls -la
 
       - name: Upload Linux binary tar
