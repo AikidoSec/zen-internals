@@ -83,19 +83,10 @@ jobs:
       - name: Prepare release
         run: |
           cd target/x86_64-pc-windows-gnu/release
-          FILE=libzen_internals_x86_64-pc-windows-gnu.exe
-          sudo zip -9r ${FILE}.zip zen_internals.exe && sudo rm zen_internals.exe
-          sudo touch ${FILE}.zip.sha256sum && sudo chmod 777 ${FILE}.zip.sha256sum
-          sudo sha256sum "${FILE}.zip" | cut -d ' ' -f 1 > ${FILE}.zip.sha256sum
-      - name: Debug
-        run: |
-          ls -la
-          cd target
-          ls -la
-          cd x86_64-pc-windows-gnu
-          ls -la
-          cd release
-          ls -la
+          FILE=libzen_internals_x86_64-pc-windows-gnu.dll
+          sudo mv zen_internals.dll ${FILE}
+          sudo touch ${FILE}.sha256sum && sudo chmod 777 ${FILE}.sha256sum
+          sudo sha256sum "${FILE}" | cut -d ' ' -f 1 > ${FILE}.sha256sum
 
       - name: Store the zipfile and shasum
         uses: actions/upload-artifact@v3
@@ -199,13 +190,24 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./artifacts/linux/libzen_internals_x86_64-unknown-linux-gnu.tar.gz.sha256sum
           asset_name: libzen_internals_x86_64-unknown-linux-gnu.tar.gz.sha256sum
-          asset_content_type: application/gzip
+          asset_content_type: text/plain
         env:
           GITHUB_TOKEN: ${{ github.token }}
-      #- name: Upload Windows binaries to Release
-      #  uses: actions/upload-release-asset@v1
-      #  with:
-      #    upload_url: ${{ steps.create_release.outputs.upload_url }}
-      #    asset_path: ./artifacts/windows/*.zip
-      #    asset_name: libzen_internals_windows.zip
-      #    asset_content_type: application/zip
+      - name: Upload Windows binary to Release
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/windows/libzen_internals_x86_64-pc-windows-gnu.dll
+          asset_name: libzen_internals_x86_64-pc-windows-gnu.dll
+          asset_content_type: application/octet-stream
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Upload Windows binary sha256sum
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/windows/libzen_internals_x86_64-pc-windows-gnu.dll.sha256sum
+          asset_name: libzen_internals_x86_64-pc-windows-gnu.dll.sha256sum
+          asset_content_type: text/plain
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
