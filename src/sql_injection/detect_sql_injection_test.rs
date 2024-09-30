@@ -51,6 +51,16 @@ mod tests {
             "INSERT INTO users (name, surname) VALUES ('John', 'Doe')",
             "John',"
         );
+        // MySQL Specific : 
+        assert!(!detect_sql_injection_str(
+            "INSERT INTO `users` (name, surname) VALUES ('John', 'Doe')", "`users`", 8));
+        assert!(detect_sql_injection_str(
+            "INSERT INTO `users` (name, surname) VALUES ('John', 'Doe')", "INTO `users`", 8));
+        assert!(!detect_sql_injection_str("SELECT * FROM `comm` ents", "`comm`", 8));
+        assert!(detect_sql_injection_str("SELECT * FROM `comm` ents", "`comm` ents", 8));
+        assert!(detect_sql_injection_str("SELECT * FROM `comm` ", "FROM `comm`", 8));
+
+
     }
 
     #[test]
