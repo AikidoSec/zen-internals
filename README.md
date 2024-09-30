@@ -21,6 +21,9 @@ if __name__ == "__main__":
 
 ```bash
 $ npm install @aikidosec/zen-internals
+```
+
+```bash
 $ yarn add @aikidosec/zen-internals
 ```
 
@@ -32,8 +35,8 @@ $ yarn add @aikidosec/zen-internals
 const { wasm_detect_sql_injection } = require("@aikidosec/zen-internals");
 
 const detected = wasm_detect_sql_injection(
-    `SELECT * FROM users WHERE id = '' OR 1=1 -- '`,
-    `' OR 1=1 -- `,
+    `SELECT * FROM users WHERE id = '' OR 1=1 -- '`, // query
+    `' OR 1=1 -- `, // user input
     9 // MySQL dialect
 );
 
