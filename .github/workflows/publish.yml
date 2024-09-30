@@ -96,7 +96,7 @@ jobs:
 
   build-mac:
     needs: tests-and-linting
-    runs-on: ubuntu-latest
+    runs-on: macos-amd64
     outputs:
       sha256sum: ${{ steps.prep.outputs.sha256sum }}
     steps:
@@ -113,8 +113,14 @@ jobs:
 
       - name: Build for mac
         run: |
-          CC=o64-clang CXX=o64-clang++ cargo build --release --target x86_64-apple-darwin
-
+          cargo build --release --target x86_64-apple-darwin
+      - name : Debug
+        run: |
+          ls -la
+          cd target
+          ls -la
+          cd x86_64-apple-darwin/release
+          ls -la
       - id: prep
         name: Prepare release
         run: |
