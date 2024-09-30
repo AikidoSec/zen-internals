@@ -45,7 +45,7 @@ jobs:
         run:
           cargo build --release --target x86_64-unknown-linux-gnu
       - name: Debug
-        run:
+        run: |
           cd target/x86_64-unknown-linux-gnu/release
           ls -la
       - name: Prepare release
