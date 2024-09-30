@@ -186,4 +186,21 @@ mod tests {
     fn test_escape_sequences() {
         not_is_injection!("SELECT * FROM users WHERE id = 'users\\\\'", "users\\\\")
     }
+
+    #[test]
+    fn test_multiple_string_characters() {
+        // Query 1 testing : INSERT INTO books (title, description) VALUES ('${title}', "Description set by the user: '${description}'")
+        not_is_injection!(
+            "INSERT INTO books (title, description) VALUES ('${title}', \"Description set by the user: ''), ('exploit',system_user());'\")",
+        "'), ('exploit',system_user());");
+        // Submission AIKIDO-OCRA7GFG :
+        is_injection!(
+            "INSERT INTO books (title, description) VALUES ('${title}', \"Description set by the user: '\"), (\"exploit\",system_user());--'\")",
+            "\"), (\"exploit\",system_user());--"
+        );
+        is_injection!(
+            "INSERT INTO books (title, description) VALUES ('${title}', \"Description set by the user: \"), (\"exploit\",system_user()))",
+            "\"), (\"exploit\",system_user())"
+        );
+    }
 }
