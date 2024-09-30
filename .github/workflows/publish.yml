@@ -44,15 +44,11 @@ jobs:
       - name: Build for linux
         run:
           cargo build --release --target x86_64-unknown-linux-gnu
-      - name: Debug
-        run: |
-          cd target/x86_64-unknown-linux-gnu/release
-          ls -la
       - name: Prepare release
         run: |
           cd target/x86_64-unknown-linux-gnu/release
           FILE=libzen_internals_x86_64-unknown-linux-gnu
-          sudo mv libzen_internals.so {$FILE}.so
+          sudo mv libzen_internals.so ${FILE}.so
           sudo touch ${FILE}.so.sha256sum && sudo chmod 777 ${FILE}.so.sha256sum
           sudo sha256sum "${FILE}.so" | cut -d ' ' -f 1 > ${FILE}.so.sha256sum
 
