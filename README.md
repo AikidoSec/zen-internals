@@ -1,7 +1,7 @@
 # Zen Internals library.
-Zen Internals is a library that can be used via FFI in different languages. Contains vulnerability code, like : 
-- Shell Injection (WIP)
-- SQL Injection
+Zen Internals is a library that can be used via FFI in different languages. Contains algorithms to detect:
+- Shell Injections (WIP)
+- SQL Injections
 
 ## Python FFI Example code : 
 ```py
@@ -14,3 +14,33 @@ if __name__ == "__main__":
     result = zen_internals.detect_shell_injection(command, userinput)
     print("Result", bool(result))
 ```
+
+## Node.js bindings
+
+### Install
+
+```bash
+$ npm install @aikidosec/zen-internals
+```
+
+```bash
+$ yarn add @aikidosec/zen-internals
+```
+
+### API 
+
+#### SQL injection detection
+
+```js
+const { wasm_detect_sql_injection } = require("@aikidosec/zen-internals");
+
+const detected = wasm_detect_sql_injection(
+    `SELECT * FROM users WHERE id = '' OR 1=1 -- '`, // query
+    `' OR 1=1 -- `, // user input
+    9 // MySQL dialect
+);
+
+console.log(detected); // 1
+```
+
+See [list of dialects](https://github.com/AikidoSec/zen-internals/blob/main/src/sql_injection/helpers/select_dialect_based_on_enum.rs#L18)
