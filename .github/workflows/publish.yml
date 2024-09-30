@@ -1,8 +1,9 @@
-on:
-  release:
-    types:
-      - created
+name: Build and Create Release
 
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Matches tags like v1.0.0, v2.1.3, etc.
 jobs:
   tests-and-linting:
     runs-on: ubuntu-latest
@@ -37,29 +38,23 @@ jobs:
         with:
           toolchain: stable
           default: true
+          target: x86_64-unknown-linux-gnu
           override: true
 
       - name: Build for linux
         run:
-          cargo build --release
+          cargo build --release --target x86_64-unknown-linux-gnu
 
       - name: Prepare release
         run: |
-          cd target/x86_64-unknown-linux-musl/release
+          cd target/x86_64-unknown-linux-gnu/release
           EVENT_DATA=$(cat "$GITHUB_EVENT_PATH")
           RELEASE_NAME=$(echo "$EVENT_DATA" | jq -r .release.tag_name)
-          FILE=zen_internals_${RELEASE_NAME}_x86_64-unknown-linux-musl
-          sudo tar -czvf ${FILE}.tar.gz zen_internals && sudo rm zen_internals
+          FILE=libzen_internals_${RELEASE_NAME}_x86_64-unknown-linux-gnu
+          sudo tar -czvf ${FILE}.tar.gz libzen_internals.so && sudo rm libzen_internals.so
           sudo touch ${FILE}.tar.gz.sha256sum && sudo chmod 777 ${FILE}.tar.gz.sha256sum
           sudo sha256sum "${FILE}.tar.gz" | cut -d ' ' -f 1 > ${FILE}.tar.gz.sha256sum
-
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            target/x86_64-unknown-linux-musl/release/zen_internals_*
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Upload artifacts here
 
   build-windows:
     needs: tests-and-linting
@@ -88,17 +83,12 @@ jobs:
           cd target/x86_64-pc-windows-gnu/release
           EVENT_DATA=$(cat "$GITHUB_EVENT_PATH")
           RELEASE_NAME=$(echo "$EVENT_DATA" | jq -r .release.tag_name)
-          FILE=zen_internals_${RELEASE_NAME}_x86_64-pc-windows-gnu.exe
+          FILE=libzen_internals_${RELEASE_NAME}_x86_64-pc-windows-gnu.exe
           sudo zip -9r ${FILE}.zip zen_internals.exe && sudo rm zen_internals.exe
           sudo touch ${FILE}.zip.sha256sum && sudo chmod 777 ${FILE}.zip.sha256sum
           sudo sha256sum "${FILE}.zip" | cut -d ' ' -f 1 > ${FILE}.zip.sha256sum
+      # Upload artifacts here
 
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: target/x86_64-pc-windows-gnu/release/zen_internals_*
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-mac:
     needs: tests-and-linting
@@ -138,10 +128,28 @@ jobs:
           echo "${CHECKSUM}" > ${FILE}.zip.sha256sum
           printf "::set-output name=%s::%s\n" sha256sum "${CHECKSUM}"
 
-      - name: Release
-        uses: softprops/action-gh-release@v1
+      # Upload artifacts here
+
+  create-github-release:
+    needs: [build-mac, build-linux, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Grant write access to contents
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Create Release
+        uses: actions/create-release@v1
+        id: create_release
         with:
-          files: |
-            target/x86_64-apple-darwin/release/zen_internals_*
+          draft: false
+          prerelease: false
+          release_name: ${{ steps.version.outputs.version }}
+          tag_name: ${{ github.ref }}
+          body_path: CHANGELOG.md
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+      # Download artifacts from build jobs here ..
+      # Upload artifacts here ..
