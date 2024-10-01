@@ -36,7 +36,8 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         return true;
     }
 
-    let is_common_sql_pattern: Regex = Regex::new(r"(?i)^[a-zA-Z_][a-zA-Z0-9_]* +(ASC|DESC)$").unwrap();
+    let is_common_sql_pattern: Regex =
+        Regex::new(r"(?i)^[a-zA-Z_][a-zA-Z0-9_]* +(ASC|DESC)$").unwrap();
 
     return is_common_sql_pattern.is_match(user_input);
 }
