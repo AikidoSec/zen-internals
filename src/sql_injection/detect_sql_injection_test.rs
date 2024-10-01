@@ -169,7 +169,7 @@ mod tests {
             "SELECT * FROM hakuna matata theory",
             " hakuna matata theory"
         );
-        is_injection!("SELECT * FROM hakuna matata theory", " kuna matata theo");
+        is_injection!("SELECT * FROM hakuna matata theory", "kuna matata theo");
 
         is_injection!("SELECT * FROM hakuna matata", "FROM h");
         is_injection!("SELECT * FROM hakuna matata", "FROM hakuna");
@@ -178,6 +178,11 @@ mod tests {
             "SELECT * FROM \"table_name\" WHERE comment = \"I\" \"m writting you\"",
             "\"table_name\" "
         )
+    }
+
+    #[test]
+    fn test_if_query_does_not_contain_user_input() {
+        not_is_injection!("SELECT * FROM users WHERE id = 1", "id = 'something else'");
     }
 
     #[test]
