@@ -6,6 +6,13 @@ macro_rules! is_injection {
             0
         ))
     };
+    ($query:expr, $input:expr, $dialect:expr) => {
+        assert!(detect_sql_injection_str(
+            &$query.to_lowercase(),
+            &$input.to_lowercase(),
+            $dialect
+        ))
+    };
 }
 macro_rules! not_is_injection {
     ($query:expr, $input:expr) => {
@@ -13,6 +20,13 @@ macro_rules! not_is_injection {
             &$query.to_lowercase(),
             &$input.to_lowercase(),
             0
+        ))
+    };
+    ($query:expr, $input:expr, $dialect:expr) => {
+        assert!(!detect_sql_injection_str(
+            &$query.to_lowercase(),
+            &$input.to_lowercase(),
+            $dialect
         ))
     };
 }
@@ -60,31 +74,19 @@ mod tests {
             "John',"
         );
         // MySQL Specific :
-        assert!(!detect_sql_injection_str(
+        not_is_injection!(
             "INSERT INTO `users` (name, surname) VALUES ('John', 'Doe')",
             "`users`",
             8
-        ));
-        assert!(detect_sql_injection_str(
+        );
+        is_injection!(
             "INSERT INTO `users` (name, surname) VALUES ('John', 'Doe')",
             "INTO `users`",
             8
-        ));
-        assert!(!detect_sql_injection_str(
-            "SELECT * FROM `comm` ents",
-            "`comm`",
-            8
-        ));
-        assert!(detect_sql_injection_str(
-            "SELECT * FROM `comm` ents",
-            "`comm` ents",
-            8
-        ));
-        assert!(detect_sql_injection_str(
-            "SELECT * FROM `comm` ",
-            "FROM `comm`",
-            8
-        ));
+        );
+        not_is_injection!("SELECT * FROM `comm` ents", "`comm`", 8);
+        is_injection!("SELECT * FROM `comm` ents", "`comm` ents", 8);
+        is_injection!("SELECT * FROM `comm` ", "FROM `comm`", 8);
     }
 
     #[test]
