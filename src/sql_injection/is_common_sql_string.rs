@@ -39,6 +39,7 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
     if user_input.contains("asc") || user_input.contains("desc") {
         // Check if the user input is a common SQL pattern like "column_name ASC"
         // e.g. https://ghost.org/docs/content-api/#order (Ghost validates the order parameter)
+        // SQL identifiers can't start with a number
         let looks_like_order_by: Regex =
             Regex::new(r"(?i)^[a-zA-Z_][a-zA-Z0-9_]* +(ASC|DESC)$").unwrap();
 
