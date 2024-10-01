@@ -1,4 +1,5 @@
 use super::have_comments_changed::have_comments_changed;
+use super::is_common_sql_string::is_common_sql_string;
 use super::tokenize_query::tokenize_query;
 use crate::diff_in_vec_len;
 use sqlparser::tokenizer::Token;
@@ -7,6 +8,17 @@ const SPACE_CHAR: char = ' ';
 
 // `userinput` and `query` provided to this function should already be lowercase.
 pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> bool {
+    if !query.contains(userinput) {
+        // If the query does not contain the user input, it's not an injection.
+        return false;
+    }
+
+    // "SELECT *", "INSERT INTO", ... will occur in most queries
+    // If the user input is equal to any of these, we can assume it's not an injection.
+    if is_common_sql_string(userinput) {
+        return false;
+    }
+
     // Tokenize query :
     let tokens = tokenize_with_fallback(query, dialect);
     if tokens.len() <= 0 {
