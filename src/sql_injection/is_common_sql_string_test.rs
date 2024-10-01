@@ -122,5 +122,13 @@ mod tests {
         assert_eq!(is_common_sql_string("$"), false);
         assert_eq!(is_common_sql_string("%"), false);
         assert_eq!(is_common_sql_string("^"), false);
+        assert_eq!(is_common_sql_string("^ asc"), false);
+        assert_eq!(is_common_sql_string("^ desc"), false);
+        assert_eq!(is_common_sql_string("% asc"), false);
+        assert_eq!(is_common_sql_string("% desc"), false);
+        assert_eq!(is_common_sql_string("asc $"), false);
+        assert_eq!(is_common_sql_string("desc $"), false);
+        assert_eq!(is_common_sql_string("asc$"), false);
+        assert_eq!(is_common_sql_string("desc$"), false);
     }
 }
