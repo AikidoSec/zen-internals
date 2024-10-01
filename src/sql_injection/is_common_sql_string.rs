@@ -1,6 +1,6 @@
 use regex::Regex;
 
-const COMMON_SQL_STRINGS: [&str; 23] = [
+pub const COMMON_SQL_STRINGS: [&str; 23] = [
     "SELECT *",
     "SELECT COUNT(*)",
     "INSERT INTO",
