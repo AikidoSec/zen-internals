@@ -176,4 +176,110 @@ mod tests {
     fn test_escape_sequences() {
         not_is_injection!("SELECT * FROM users WHERE id = 'users\\\\'", "users\\\\")
     }
+
+    #[test]
+    fn test_common_sql_combinations_are_not_flagged() {
+        not_is_injection(
+            "SELECT * FROM users WHERE email = 'user@example.com';",
+            "SELECT *"
+        );
+        not_is_injection(
+            "INSERT INTO orders (user_id, product_id, quantity) VALUES (1, 2, 3);",
+            "INSERT INTO"
+        );
+        not_is_injection(
+            "SELECT users.first_name, users.last_name, orders.order_id
+             FROM users
+             INNER JOIN orders ON users.id = orders.user_id
+             WHERE orders.status = 'completed'",
+             "INNER JOIN"
+        );
+        not_is_injection(
+            "SELECT users.first_name, users.last_name, orders.order_id
+             FROM users
+             LEFT JOIN orders ON users.id = orders.user_id;",
+            "LEFT JOIN"
+        );
+        not_is_injection(
+            "SELECT orders.order_id, users.first_name, users.last_name
+             FROM orders
+             RIGHT JOIN users ON orders.user_id = users.id;",
+            "RIGHT JOIN"
+        );
+        not_is_injection(
+            "SELECT users.first_name, users.last_name, orders.order_id
+             FROM users
+             LEFT OUTER JOIN orders ON users.id = orders.user_id;",
+            "LEFT OUTER JOIN"
+        );
+        not_is_injection(
+            "SELECT orders.order_id, users.first_name, users.last_name
+             FROM orders
+             RIGHT OUTER JOIN users ON orders.user_id = users.id;",
+            "RIGHT OUTER JOIN"
+        );
+        not_is_injection(
+            "DELETE FROM sessions WHERE session_id = 'xyz123'",
+            "DELETE FROM"
+        );
+        not_is_injection(
+            "SELECT first_name, last_name, created_at
+             FROM users
+             ORDER BY created_at DESC;",
+            "ORDER BY"
+        );
+        not_is_injection(
+            "SELECT category_id, COUNT(*) AS total_products
+             FROM products
+             GROUP BY category_id;",
+            "GROUP BY"
+        );
+        not_is_injection(
+            "INSERT INTO wishlists (user_id, product_id) VALUES (1, 3) ON CONFLICT (user_id, product_id) DO NOTHING",
+            "ON CONFLICT"
+        );
+        not_is_injection(
+            "INSERT INTO users (id, email, login_count)
+             VALUES (1, 'user@example.com', 1)
+             ON CONFLICT (id)
+             DO UPDATE SET login_count = users.login_count + 1;",
+             "DO UPDATE"
+        );
+        not_is_injection(
+            "INSERT INTO wishlists (user_id, product_id) VALUES (1, 3) ON CONFLICT (user_id, product_id) DO NOTHING",
+            "DO NOTHING"
+        );
+        not_is_injection(
+            "INSERT INTO users (id, email)
+             VALUES (1, 'user@example.com')
+             ON DUPLICATE KEY UPDATE email = 'user@example.com';",
+            "ON DUPLICATE KEY UPDATE"
+        );
+        not_is_injection(
+            "SELECT COUNT(*) FROM users WHERE status = 'active';",
+            "SELECT COUNT(*)"
+        );
+        not_is_injection(
+            "SELECT COUNT(*) FROM users WHERE status = 'active';",
+            "COUNT(*)"
+        );
+        not_is_injection(
+            "SELECT * FROM orders WHERE shipped_at IS NULL;",
+            "IS NULL"
+        );
+        not_is_injection(
+            "SELECT * FROM orders WHERE shipped_at IS NOT NULL;",
+            "IS NOT NULL"
+        );
+        not_is_injection(
+            "SELECT * FROM users WHERE NOT EXISTS (SELECT 1 FROM orders WHERE users.id = orders.user_id);",
+            "NOT EXISTS"
+        );
+        not_is_injection(
+            "SELECT DISTINCT ON (email) email, first_name, last_name
+             FROM users
+             ORDER BY email, created_at DESC;",
+            "DISTINCT ON"
+        );
+    }
 }
