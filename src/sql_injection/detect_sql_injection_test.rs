@@ -30,10 +30,7 @@ mod tests {
             "SELECT * FROM users WHERE id = '1'; DROP TABLE users; -- '",
             "'1'; DROP TABLE users; --"
         );
-        is_injection!(
-            "SELECT * FROM users WHERE id = 1 OR 1=1",
-            "1 OR 1=1"
-        );
+        is_injection!("SELECT * FROM users WHERE id = 1 OR 1=1", "1 OR 1=1");
     }
 
     #[test]
