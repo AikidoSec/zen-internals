@@ -1,11 +1,11 @@
 macro_rules! is_injection {
     ($query:expr, $input:expr) => {
-        assert!(detect_sql_injection_str($query, $input, 0))
+        assert!(detect_sql_injection_str(&$query.to_lowercase(), &$input.to_lowercase(), 0))
     };
 }
 macro_rules! not_is_injection {
     ($query:expr, $input:expr) => {
-        assert!(!detect_sql_injection_str($query, $input, 0))
+        assert!(!detect_sql_injection_str(&$query.to_lowercase(), &$input.to_lowercase(), 0))
     };
 }
 #[cfg(test)]

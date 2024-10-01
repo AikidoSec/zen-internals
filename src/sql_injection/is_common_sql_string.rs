@@ -30,5 +30,5 @@ pub fn is_common_sql_string(
     COMMON_SQL_STRINGS
       .iter()
       .map(|s| s.to_lowercase())
-      .any(|common_string| user_input.to_lowercase() == common_string)
+      .any(|common_string| user_input == common_string)
 }
