@@ -6,6 +6,13 @@ macro_rules! is_injection {
             0
         ))
     };
+    ($query:expr, $input:expr, $dialect:expr) => {
+        assert!(detect_sql_injection_str(
+            &$query.to_lowercase(),
+            &$input.to_lowercase(),
+            $dialect
+        ))
+    };
 }
 macro_rules! not_is_injection {
     ($query:expr, $input:expr) => {
@@ -13,6 +20,13 @@ macro_rules! not_is_injection {
             &$query.to_lowercase(),
             &$input.to_lowercase(),
             0
+        ))
+    };
+    ($query:expr, $input:expr, $dialect:expr) => {
+        assert!(!detect_sql_injection_str(
+            &$query.to_lowercase(),
+            &$input.to_lowercase(),
+            $dialect
         ))
     };
 }
@@ -98,6 +112,20 @@ mod tests {
             "INSERT INTO users (name, surname) VALUES ('John', 'Doe')",
             "John',"
         );
+        // MySQL Specific :
+        not_is_injection!(
+            "INSERT INTO `users` (name, surname) VALUES ('John', 'Doe')",
+            "`users`",
+            8
+        );
+        is_injection!(
+            "INSERT INTO `users` (name, surname) VALUES ('John', 'Doe')",
+            "INTO `users`",
+            8
+        );
+        not_is_injection!("SELECT * FROM `comm` ents", "`comm`", 8);
+        is_injection!("SELECT * FROM `comm` ents", "`comm` ents", 8);
+        is_injection!("SELECT * FROM `comm` ", "FROM `comm`", 8);
     }
 
     #[test]
@@ -227,6 +255,23 @@ mod tests {
     #[test]
     fn test_escape_sequences() {
         not_is_injection!("SELECT * FROM users WHERE id = 'users\\\\'", "users\\\\")
+    }
+
+    #[test]
+    fn test_multiple_string_characters() {
+        // Query 1 testing : INSERT INTO books (title, description) VALUES ('${title}', "Description set by the user: '${description}'")
+        not_is_injection!(
+            "INSERT INTO books (title, description) VALUES ('${title}', \"Description set by the user: ''), ('exploit',system_user());'\")",
+        "'), ('exploit',system_user());");
+        // Submission AIKIDO-OCRA7GFG :
+        is_injection!(
+            "INSERT INTO books (title, description) VALUES ('${title}', \"Description set by the user: '\"), (\"exploit\",system_user());--'\")",
+            "\"), (\"exploit\",system_user());--"
+        );
+        is_injection!(
+            "INSERT INTO books (title, description) VALUES ('${title}', \"Description set by the user: \"), (\"exploit\",system_user()))",
+            "\"), (\"exploit\",system_user())"
+        );
     }
 
     #[test]
