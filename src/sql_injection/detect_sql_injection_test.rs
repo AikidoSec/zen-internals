@@ -304,4 +304,28 @@ mod tests {
             "DISTINCT ON"
         );
     }
+
+    #[test]
+    fn test_common_sql_patterns_are_not_flagged() {
+        not_is_injection!("SELECT * FROM users ORDER BY name ASC", "name ASC");
+        not_is_injection!("SELECT * FROM users ORDER BY name DESC", "name DESC");
+        not_is_injection!("SELECT * FROM users ORDER BY created_at ASC", "created_at ASC");
+        not_is_injection!("SELECT * FROM users ORDER BY created_at DESC", "created_at DESC");
+        not_is_injection!(
+            "select `recommendations`.*, (select count(*) from `recommendation_click_events` where `recommendation_click_events`.`recommendation_id` = recommendations.id) as `count__clicks`, (select count(*) from `recommendation_subscribe_events` where `recommendation_subscribe_events`.`recommendation_id` = recommendations.id) as `count__subscribers` from `recommendations` order by created_at desc limit ?",
+            "created_at desc"
+        );
+    }
+
+    #[test]
+    fn test_it_still_flags_common_sql_patterns_with_more_stuff() {
+        is_injection!(
+          "select `recommendations`.*, (select count(*) from `recommendation_click_events` where `recommendation_click_events`.`recommendation_id` = recommendations.id) as `count__clicks`, (select count(*) from `recommendation_subscribe_events` where `recommendation_subscribe_events`.`recommendation_id` = recommendations.id) as `count__subscribers` from `recommendations` order by date DESC LIMIT 1",
+          "date DESC LIMIT 1"
+        );
+        is_injection!(
+          "select `recommendations`.*, (select count(*) from `recommendation_click_events` where `recommendation_click_events`.`recommendation_id` = recommendations.id) as `count__clicks`, (select count(*) from `recommendation_subscribe_events` where `recommendation_subscribe_events`.`recommendation_id` = recommendations.id) as `count__subscribers` from `recommendations` order by date DESC, id ASC limit 1",
+          "date DESC, id ASC"
+        );
+    }
 }

@@ -1,3 +1,5 @@
+use regex::Regex;
+
 const COMMON_SQL_STRINGS: [&str; 23] = [
     "SELECT *",
     "SELECT COUNT(*)",
@@ -25,8 +27,16 @@ const COMMON_SQL_STRINGS: [&str; 23] = [
 ];
 
 pub fn is_common_sql_string(user_input: &str) -> bool {
-    COMMON_SQL_STRINGS
+    let is_common_sql_string = COMMON_SQL_STRINGS
         .iter()
         .map(|s| s.to_lowercase())
-        .any(|common_string| user_input == common_string)
+        .any(|common_string| user_input == common_string);
+
+    if is_common_sql_string {
+        return true;
+    }
+
+    let is_common_sql_pattern: Regex = Regex::new(r"(?i)^[a-zA-Z_][a-zA-Z0-9_]* +(ASC|DESC)$").unwrap();
+
+    return is_common_sql_pattern.is_match(user_input);
 }
