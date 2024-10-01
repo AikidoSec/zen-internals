@@ -72,7 +72,7 @@ mod tests {
             "VALUES"
         );
 
-        is_injection!(
+        not_is_injection!(
             "INSERT INTO users (name, surname) VALUES ('Alice', 'Bob')",
             "INSERT INTO"
         );
