@@ -3,6 +3,8 @@ pub mod detect_sql_injection_test;
 
 pub mod helpers;
 
+pub mod is_common_sql_string;
+
 pub mod tokenize_query;
 pub mod tokenize_query_test;
 
