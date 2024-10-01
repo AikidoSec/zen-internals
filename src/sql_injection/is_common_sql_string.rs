@@ -36,9 +36,14 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         return true;
     }
 
-    // Check if the user input is a common SQL pattern like "column_name ASC"
-    let looks_like_order_by: Regex =
-        Regex::new(r"(?i)^[a-zA-Z_][a-zA-Z0-9_]* +(ASC|DESC)$").unwrap();
+    if user_input.contains("asc") || user_input.contains("desc") {
+        // Check if the user input is a common SQL pattern like "column_name ASC"
+        // e.g. https://ghost.org/docs/content-api/#order (Ghost validates the order parameter)
+        let looks_like_order_by: Regex =
+            Regex::new(r"(?i)^[a-zA-Z_][a-zA-Z0-9_]* +(ASC|DESC)$").unwrap();
 
-    return looks_like_order_by.is_match(user_input);
+        return looks_like_order_by.is_match(user_input);
+    }
+
+    return false;
 }
