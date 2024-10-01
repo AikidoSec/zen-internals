@@ -21,6 +21,48 @@ mod tests {
     use crate::sql_injection::detect_sql_injection::detect_sql_injection_str;
 
     #[test]
+    fn test_it_detects_injections() {
+        is_injection!(
+            "SELECT * FROM users WHERE id = '' OR 1=1 -- '",
+            "' OR 1=1 --"
+        );
+        is_injection!(
+            "SELECT * FROM users WHERE id = '1'; DROP TABLE users; -- '",
+            "'1'; DROP TABLE users; --"
+        );
+        is_injection!(
+            "SELECT * FROM users WHERE id = 1 OR 1=1",
+            "1 OR 1=1"
+        );
+    }
+
+    #[test]
+    fn test_false_positives() {
+        not_is_injection!(
+            r#"SELECT * FROM users WHERE id = "' OR 1=1 -- ""#,
+            "' OR 1=1 -- "
+        );
+    }
+
+    #[test]
+    fn test_parse_server_injection() {
+        // https://pwn-la-chapelle.eu/posts/dhm2024_parsemypostgres/
+        is_injection!(
+            r#"SELECT * FROM "_User" WHERE "username" ~ 'A''B''';SELECT PG_SLEEP(3);--;' AND ("_rperm" IS NULL OR "_rperm" && ARRAY['*','*'])  LIMIT 100"#,
+            "A''B''';SELECT PG_SLEEP(3);--"
+        );
+    }
+
+    #[test]
+    fn test_litellm() {
+        // https://huntr.com/bounties/a4f6d357-5b44-4e00-9cac-f1cc351211d2
+        is_injection!(
+            r#"SELECT * FROM "LiteLLM_UserTable" WHERE "user_id" IN ('1', '') UNION SELECT '1', '','{}', '', NULL, 0, '', '{}', NULL, NULL, NULL, '', NULL, '{}', '{}', '{}' from pg_sleep(3)-- -')"#,
+            r#"') UNION SELECT '1', '','{}', '', NULL, 0, '', '{}', NULL, NULL, NULL, '', NULL, '{}', '{}', '{}' from pg_sleep(3)-- -"#
+        );
+    }
+
+    #[test]
     fn test_injection_with_token_counts() {
         is_injection!(
             "INSERT INTO users (name, age, email, city) VALUES ('Alice');;;;;;;    -- ', 30, 'alice@example.com', 'Wonderland'); -- Hellow",
