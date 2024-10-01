@@ -36,8 +36,9 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         return true;
     }
 
-    let is_common_sql_pattern: Regex =
+    // Check if the user input is a common SQL pattern like "column_name ASC"
+    let looks_like_order_by: Regex =
         Regex::new(r"(?i)^[a-zA-Z_][a-zA-Z0-9_]* +(ASC|DESC)$").unwrap();
 
-    return is_common_sql_pattern.is_match(user_input);
+    return looks_like_order_by.is_match(user_input);
 }
