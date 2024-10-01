@@ -235,6 +235,18 @@ mod tests {
             "GROUP BY"
         );
         not_is_injection!(
+            "SELECT category_id, COUNT(*) AS total_products
+             FROM products
+             GROUP BY category_id;",
+            "group BY"
+        );
+        not_is_injection!(
+            "SELECT category_id, COUNT(*) AS total_products
+             FROM products
+             group by category_id;",
+            "GROUP BY"
+        );
+        not_is_injection!(
             "INSERT INTO wishlists (user_id, product_id) VALUES (1, 3) ON CONFLICT (user_id, product_id) DO NOTHING",
             "ON CONFLICT"
         );
