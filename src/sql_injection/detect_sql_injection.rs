@@ -8,6 +8,8 @@ const SPACE_CHAR: char = ' ';
 
 // `userinput` and `query` provided to this function should already be lowercase.
 pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> bool {
+    // "SELECT *", "INSERT INTO", ... will occur in most queries
+    // If the user input is equal to any of these, we can assume it's not an injection.
     if is_common_sql_string(userinput) {
         return false;
     }
