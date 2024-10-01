@@ -1,11 +1,19 @@
 macro_rules! is_injection {
     ($query:expr, $input:expr) => {
-        assert!(detect_sql_injection_str(&$query.to_lowercase(), &$input.to_lowercase(), 0))
+        assert!(detect_sql_injection_str(
+            &$query.to_lowercase(),
+            &$input.to_lowercase(),
+            0
+        ))
     };
 }
 macro_rules! not_is_injection {
     ($query:expr, $input:expr) => {
-        assert!(!detect_sql_injection_str(&$query.to_lowercase(), &$input.to_lowercase(), 0))
+        assert!(!detect_sql_injection_str(
+            &$query.to_lowercase(),
+            &$input.to_lowercase(),
+            0
+        ))
     };
 }
 #[cfg(test)]
@@ -192,7 +200,7 @@ mod tests {
              FROM users
              INNER JOIN orders ON users.id = orders.user_id
              WHERE orders.status = 'completed'",
-             "INNER JOIN"
+            "INNER JOIN"
         );
         not_is_injection!(
             "SELECT users.first_name, users.last_name, orders.order_id
@@ -255,7 +263,7 @@ mod tests {
              VALUES (1, 'user@example.com', 1)
              ON CONFLICT (id)
              DO UPDATE SET login_count = users.login_count + 1;",
-             "DO UPDATE"
+            "DO UPDATE"
         );
         not_is_injection!(
             "INSERT INTO wishlists (user_id, product_id) VALUES (1, 3) ON CONFLICT (user_id, product_id) DO NOTHING",
@@ -275,10 +283,7 @@ mod tests {
             "SELECT COUNT(*) FROM users WHERE status = 'active';",
             "COUNT(*)"
         );
-        not_is_injection!(
-            "SELECT * FROM orders WHERE shipped_at IS NULL;",
-            "IS NULL"
-        );
+        not_is_injection!("SELECT * FROM orders WHERE shipped_at IS NULL;", "IS NULL");
         not_is_injection!(
             "SELECT * FROM orders WHERE shipped_at IS NOT NULL;",
             "IS NOT NULL"
