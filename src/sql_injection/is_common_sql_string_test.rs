@@ -6,7 +6,12 @@ mod tests {
     #[test]
     fn test_common_sql_strings() {
         COMMON_SQL_STRINGS.iter().for_each(|common_string| {
-            assert_eq!(is_common_sql_string(&common_string.to_lowercase()), true, "Failed for {}", common_string);
+            assert_eq!(
+                is_common_sql_string(&common_string.to_lowercase()),
+                true,
+                "Failed for {}",
+                common_string
+            );
         });
     }
 
@@ -30,16 +35,28 @@ mod tests {
     fn test_looks_like_order_by_false_positive() {
         assert_eq!(is_common_sql_string("order by column_name asc"), false);
         assert_eq!(is_common_sql_string("order by column_name desc"), false);
-        assert_eq!(is_common_sql_string("column_name asc, column_name2 desc"), false);
-        assert_eq!(is_common_sql_string("column_name asc, column_name2 desc;"), false);
+        assert_eq!(
+            is_common_sql_string("column_name asc, column_name2 desc"),
+            false
+        );
+        assert_eq!(
+            is_common_sql_string("column_name asc, column_name2 desc;"),
+            false
+        );
         assert_eq!(is_common_sql_string("column_name asc;"), false);
         assert_eq!(is_common_sql_string("column_name desc;"), false);
         assert_eq!(is_common_sql_string(";column_name asc"), false);
         assert_eq!(is_common_sql_string(";column_name desc"), false);
         assert_eq!(is_common_sql_string("column_name asc limit 1"), false);
         assert_eq!(is_common_sql_string("column_name desc limit 1"), false);
-        assert_eq!(is_common_sql_string("column_name asc, column_name2 asc limit 1"), false);
-        assert_eq!(is_common_sql_string("column_name desc, column_name2 desc limit 1"), false);
+        assert_eq!(
+            is_common_sql_string("column_name asc, column_name2 asc limit 1"),
+            false
+        );
+        assert_eq!(
+            is_common_sql_string("column_name desc, column_name2 desc limit 1"),
+            false
+        );
         assert_eq!(is_common_sql_string("asc1"), false);
         assert_eq!(is_common_sql_string("desc1"), false);
         assert_eq!(is_common_sql_string("asc 1"), false);
