@@ -45,7 +45,9 @@ jobs:
           name: linux-binaries
           path: target/x86_64-unknown-linux-gnu/release/libzen_internals_*
   build-windows:
-    needs: tests-and-linting
+    needs:
+      - tests
+      - lint
     runs-on: ubuntu-latest
 
     steps:
@@ -81,7 +83,9 @@ jobs:
           path: target/x86_64-pc-windows-gnu/release/libzen_internals_*
 
   build-mac:
-    needs: tests-and-linting
+    needs:
+      - tests
+      - lint
     # https://docs.github.com/en/actions/writing-workflows/choosing-where-your-workflow-runs/choosing-the-runner-for-a-job :
     runs-on: macos-latest
     outputs:
