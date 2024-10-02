@@ -43,11 +43,6 @@ jobs:
         id: get_version
         run: echo ::set-output name=tag::${GITHUB_REF/refs\/tags\/v/}
       - run: cd pkg && npm --no-git-tag-version version ${{ steps.get_version.outputs.tag }}
-      - run: npm whoami
+      - run: cd pkg && wasm-pack publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      - run: cat $NPM_CONFIG_USERCONFIG
-      - name: Publish to npm
-        run: cd pkg && npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}  # Use npm token from secrets
