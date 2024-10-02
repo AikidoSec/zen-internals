@@ -28,24 +28,15 @@ jobs:
           toolchain: stable
           override: true
           override-file: rust-toolchain
-
       - name: Install wasm-pack
-        run: |
-          cargo install wasm-pack
-
+        run: cargo install wasm-pack
       - name: Build with wasm-pack
-        run: |
-          make buildwasm
-      - name : Copy package.wasm.json file
-        run: |
-          cp package.wasm.json ./pkg/package.json
+        run: wasm-pack build --scope aikidosec
       - name: Get the version
         id: get_version
         run: echo ::set-output name=tag::${GITHUB_REF/refs\/tags\/v/}
       - run: cd pkg && npm --no-git-tag-version version ${{ steps.get_version.outputs.tag }}
-      - run: npm whoami
-      - run: cat $NPM_CONFIG_USERCONFIG
-      - name: Publish to npm
-        run: cd pkg && npm publish --provenance --access public
+      - run: wasm-pack pack
+      - run: wasm-pack publish --access public
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}  # Use npm token from secrets
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

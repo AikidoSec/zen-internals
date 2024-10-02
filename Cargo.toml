@@ -1,8 +1,10 @@
 [package]
 name = "zen-internals"
-version = "0.1.0"
+version = "0.0.0" # Will be replaced with npm version when publishing
 edition = "2021"
 authors = ["Aikido Security"]
+description = "Internal library with utilities to power Zen by Aikido"
+license = "AGPL-3.0-or-later"
 
 [lib]
 name = "zen_internals"

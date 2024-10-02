@@ -12,7 +12,7 @@ pub fn tokenize_query(sql: &str, dialect: i32) -> Vec<Token> {
     let mut tokenizer = Tokenizer::new(dialect.as_ref(), sql).with_unescape(false);
     match tokenizer.tokenize() {
         Ok(tokens) => tokens, // Return the tokens if successful
-        Err(e) => {
+        Err(_e) => {
             Vec::new() // Return empty vector if unsuccessfull.
         }
     }
