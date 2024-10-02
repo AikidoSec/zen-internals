@@ -3,7 +3,6 @@ name: Rust Unit Tests
 on:
   workflow_call: {}
   push: {}
-  pull_request: {}
 
 jobs:
   build:
