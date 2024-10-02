@@ -1,12 +1,9 @@
 name: Rust Unit Tests
 
 on:
-  push:
-    branches:
-      - main  # Change this to your default branch if it's not 'main'
-  pull_request:
-    branches:
-      - main  # Change this to your default branch if it's not 'main'
+  workflow_call: {}
+  push: {}
+  pull_request: {}
 
 jobs:
   build:

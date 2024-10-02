@@ -7,17 +7,7 @@ on:
 
 jobs:
   tests:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-            toolchain: stable
-            override: true
-      - name: Run tests
-        run: cargo test
+    uses: ./.github/workflows/unit-test.yml
 
   build:
     needs: tests
@@ -31,6 +21,7 @@ jobs:
         with:
           node-version: "18.x"
           registry-url: "https://registry.npmjs.org"
+          scope: "@aikidosec"
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:

@@ -1,6 +1,9 @@
 name: Linting check
 
-on: [push, pull_request]
+on:
+  workflow_call: {}
+  push: {}
+  pull_request: {}
 
 jobs:
   rustfmt:
