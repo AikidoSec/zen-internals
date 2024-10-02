@@ -1,6 +1,6 @@
 use crate::shell_injection::detect_shell_injection::detect_shell_injection_stringified;
 use crate::sql_injection::detect_sql_injection::detect_sql_injection_str;
-use std::ffi::{CStr, CString};
+use std::ffi::{CStr};
 use std::os::raw::{c_char, c_int};
 use std::str;
 
