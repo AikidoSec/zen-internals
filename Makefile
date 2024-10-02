@@ -4,7 +4,7 @@ build:
 
 .PHONY: buildwasm
 buildwasm:
-	wasm-pack build --release --target nodejs
+	wasm-pack build --release --target nodejs --scope aikidosec
 
 .PHONY: test
 test:
