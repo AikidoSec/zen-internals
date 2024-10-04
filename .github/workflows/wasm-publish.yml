@@ -31,7 +31,7 @@ jobs:
       - name: Install wasm-pack
         run: cargo install wasm-pack
       - name: Build with wasm-pack
-        run: wasm-pack build --scope aikidosec
+        run: wasm-pack build --scope aikidosec --target nodejs
       - name: Get the version
         id: get_version
         run: echo ::set-output name=tag::${GITHUB_REF/refs\/tags\/v/}
@@ -42,7 +42,6 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - run: wasm-pack publish --access public
-        continue-on-error: true
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Output npm error log if failed
