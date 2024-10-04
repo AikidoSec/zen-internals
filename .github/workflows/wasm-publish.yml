@@ -39,5 +39,11 @@ jobs:
       - run: wasm-pack pack
       - run: npm whoami
       - run: wasm-pack publish --access public
+        continue-on-error: true
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Output npm error log if failed
+        if: failure()
+        run: |
+          echo "npm publish failed. Outputting log:"
+          cat /home/runner/.npm/_logs/*-debug-*.log
