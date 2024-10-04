@@ -18,3 +18,6 @@ wasm-bindgen = "0.2"
 
 [dev-dependencies]
 rand = "0.8.5"
+
+[target.aarch64-unknown-linux-gnu]
+linker = "aarch64-linux-gnu-gcc"
