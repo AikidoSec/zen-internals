@@ -44,6 +44,42 @@ jobs:
         with:
           name: linux-binaries
           path: target/x86_64-unknown-linux-gnu/release/libzen_internals_*
+
+  build-linux-arm64:
+    needs:
+      - tests
+      - lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+
+      - name: Install latest rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          default: true
+          target: aarch64-unknown-linux-gnu
+          override: true
+
+      - name: Build for linux
+        run:
+          cargo build --release --target aarch64-unknown-linux-gnu
+      - name: Prepare release
+        run: |
+          cd target/aarch64-unknown-linux-gnu/release
+          FILE=libzen_internals_aarch64-unknown-linux-gnu
+          sudo mv libzen_internals.so ${FILE}.so
+          sudo touch ${FILE}.so.sha256sum && sudo chmod 777 ${FILE}.so.sha256sum
+          sudo sha256sum "${FILE}.so" | cut -d ' ' -f 1 > ${FILE}.so.sha256sum
+
+      - name: Store the .so file and the sha256sum file
+        uses: actions/upload-artifact@v3
+        with:
+          name: linux-binaries-arm64
+          path: target/aarch64-unknown-linux-gnu/release/libzen_internals_*
+
   build-windows:
     needs:
       - tests
@@ -122,8 +158,48 @@ jobs:
           name: mac-binaries
           path: target/x86_64-apple-darwin/release/libzen_internals_*
 
+  build-mac-arm64:
+    needs:
+      - tests
+      - lint
+    # https://docs.github.com/en/actions/writing-workflows/choosing-where-your-workflow-runs/choosing-the-runner-for-a-job :
+    runs-on: macos-latest
+    outputs:
+      sha256sum: ${{ steps.prep.outputs.sha256sum }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+
+      - name: Install latest rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: aarch64-apple-darwin
+          default: true
+          override: true
+
+      - name: Build for mac
+        run: |
+          cargo build --release --target aarch64-apple-darwin
+      - id: prep
+        name: Prepare release
+        run: |
+          cd target/aarch64-apple-darwin/release
+          FILE=libzen_internals_aarch64-apple-darwin
+          sudo mv libzen_internals.dylib ${FILE}.dylib
+          sudo touch ${FILE}.dylib.sha256sum && sudo chmod 777 ${FILE}.dylib.sha256sum
+          CHECKSUM=$(sudo sha256sum "${FILE}.dylib" | cut -d ' ' -f 1)
+          echo "${CHECKSUM}" > ${FILE}.dylib.sha256sum
+          printf "::set-output name=%s::%s\n" sha256sum "${CHECKSUM}"
+
+      - name: Store the .dylib file and the sha256sum file
+        uses: actions/upload-artifact@v3
+        with:
+          name: mac-binaries-arm64
+          path: target/aarch64-apple-darwin/release/libzen_internals_*
+
   create-github-release:
-    needs: [build-linux, build-windows, build-mac]
+    needs: [build-linux, build-linux-arm64, build-windows, build-mac, build-mac-arm64]
     runs-on: ubuntu-latest
     permissions:
       contents: write  # Grant write access to contents
@@ -163,6 +239,31 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./artifacts/linux/libzen_internals_x86_64-unknown-linux-gnu.so.sha256sum
           asset_name: libzen_internals_x86_64-unknown-linux-gnu.so.sha256sum
+          asset_content_type: text/plain
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      # Add Linux arm64 binary and sha file to release :
+      - name: Download Linux binaries (arm64)
+        uses: actions/download-artifact@v3
+        with:
+          name: linux-binaries-arm64
+          path: ./artifacts/linux-arm64
+      - name: Upload Linux binary tar (arm64)
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/linux-arm64/libzen_internals_aarch64-unknown-linux-gnu.so
+          asset_name: libzen_internals_aarch64-unknown-linux-gnu.so
+          asset_content_type: application/octet-stream
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Upload Linux binary sha256sum (arm64)
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/linux-arm64/libzen_internals_aarch64-unknown-linux-gnu.so.sha256sum
+          asset_name: libzen_internals_aarch64-unknown-linux-gnu.so.sha256sum
           asset_content_type: text/plain
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -207,12 +308,37 @@ jobs:
           asset_content_type: application/octet-stream
         env:
           GITHUB_TOKEN: ${{ github.token }}
-      - name: Upload Windows binary sha256sum
+      - name: Upload Mac OSX binary sha256sum
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./artifacts/mac/libzen_internals_x86_64-apple-darwin.dylib.sha256sum
           asset_name: libzen_internals_x86_64-apple-darwin.dylib.sha256sum
+          asset_content_type: text/plain
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      # Add Mac arm64 binary and sha file to release :
+      - name: Download Mac OS X binaries (arm64)
+        uses: actions/download-artifact@v3
+        with:
+          name: mac-binaries-arm64
+          path: ./artifacts/mac-arm64
+      - name: Upload Mac OSX binary to Release (arm64)
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/mac-arm64/libzen_internals_aarch64-apple-darwin.dylib
+          asset_name: libzen_internals_aarch64-apple-darwin.dylib
+          asset_content_type: application/octet-stream
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Upload Mac OSX binary sha256sum (arm64)
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/mac-arm64/libzen_internals_aarch64-apple-darwin.dylib.sha256sum
+          asset_name: libzen_internals_aarch64-apple-darwin.dylib.sha256sum
           asset_content_type: text/plain
         env:
           GITHUB_TOKEN: ${{ github.token }}
