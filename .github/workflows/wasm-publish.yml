@@ -38,6 +38,8 @@ jobs:
       - run: cd pkg && npm --no-git-tag-version version ${{ steps.get_version.outputs.tag }}
       - run: wasm-pack pack
       - run: npm whoami
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - run: wasm-pack publish --access public
         continue-on-error: true
         env:
