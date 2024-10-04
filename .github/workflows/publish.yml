@@ -148,7 +148,7 @@ jobs:
           FILE=libzen_internals_x86_64-apple-darwin
           sudo mv libzen_internals.dylib ${FILE}.dylib
           sudo touch ${FILE}.dylib.sha256sum && sudo chmod 777 ${FILE}.dylib.sha256sum
-          CHECKSUM=$(sudo sha256sum "${FILE}.dylib" | cut -d ' ' -f 1)
+          CHECKSUM=$(sudo shasum -a 256 "${FILE}.dylib" | cut -d ' ' -f 1)
           echo "${CHECKSUM}" > ${FILE}.dylib.sha256sum
           printf "::set-output name=%s::%s\n" sha256sum "${CHECKSUM}"
 
@@ -188,7 +188,7 @@ jobs:
           FILE=libzen_internals_aarch64-apple-darwin
           sudo mv libzen_internals.dylib ${FILE}.dylib
           sudo touch ${FILE}.dylib.sha256sum && sudo chmod 777 ${FILE}.dylib.sha256sum
-          CHECKSUM=$(sudo sha256sum "${FILE}.dylib" | cut -d ' ' -f 1)
+          CHECKSUM=$(sudo shasum -a 256 "${FILE}.dylib" | cut -d ' ' -f 1)
           echo "${CHECKSUM}" > ${FILE}.dylib.sha256sum
           printf "::set-output name=%s::%s\n" sha256sum "${CHECKSUM}"
 
