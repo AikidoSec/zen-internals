@@ -31,7 +31,7 @@ jobs:
       - name: Install wasm-pack
         run: cargo install wasm-pack
       - name: Build with wasm-pack
-        run: wasm-pack build --scope aikidosec --target nodejs
+        run: wasm-pack build --scope aikidosec
       - name: Get the version
         id: get_version
         run: echo ::set-output name=tag::${GITHUB_REF/refs\/tags\/v/}
