@@ -201,6 +201,41 @@ jobs:
           name: mac-binaries-arm64
           path: target/aarch64-apple-darwin/release/libzen_internals_*
 
+  build-wasm:
+    needs:
+      - tests
+      - lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "18.x"
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          override-file: rust-toolchain
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
+      - name: Build with wasm-pack
+        run: wasm-pack build --target nodejs
+      - run: |
+          cd pkg
+          tar -czvf zen_internals.tgz zen_internals.js zen_internals.d.ts zen_internals_bg.wasm
+          FILE=zen_internals.tgz
+          sudo touch ${FILE}.sha256sum && sudo chmod 777 ${FILE}.sha256sum
+          sudo sha256sum "${FILE}" | cut -d ' ' -f 1 > ${FILE}.sha256sum
+      - name: Store the .tgz file and the sha256sum file
+        uses: actions/upload-artifact@v3
+        with:
+          name: wasm-binaries
+          path: pkg/zen_internals.tgz*
+
   create-github-release:
     needs: [build-linux, build-linux-arm64, build-windows, build-mac, build-mac-arm64]
     runs-on: ubuntu-latest
@@ -342,6 +377,31 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./artifacts/mac-arm64/libzen_internals_aarch64-apple-darwin.dylib.sha256sum
           asset_name: libzen_internals_aarch64-apple-darwin.dylib.sha256sum
+          asset_content_type: text/plain
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      # Add WASM binary and sha file to release :
+      - name: Download WASM binaries
+        uses: actions/download-artifact@v3
+        with:
+          name: wasm-binaries
+          path: ./artifacts/wasm
+      - name: Upload WASM binary to Release
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/wasm/zen_internals.tgz
+          asset_name: zen_internals.tgz
+          asset_content_type: application/octet-stream
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Upload WASM binary sha256sum
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/wasm/zen_internals.tgz.sha256sum
+          asset_name: zen_internals.tgz.sha256sum
           asset_content_type: text/plain
         env:
           GITHUB_TOKEN: ${{ github.token }}
