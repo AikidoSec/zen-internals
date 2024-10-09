@@ -131,4 +131,34 @@ mod tests {
         assert_eq!(is_common_sql_string("asc$"), false);
         assert_eq!(is_common_sql_string("desc$"), false);
     }
+
+    #[test]
+    fn test_it_sees_table_column_pattern() {
+        assert_eq!(is_common_sql_string("table.column"), true);
+        assert_eq!(is_common_sql_string("views.user_id"), true);
+        assert_eq!(is_common_sql_string("table_name.column_name"), true);
+        assert_eq!(is_common_sql_string("table_name.column_name1"), true);
+        assert_eq!(is_common_sql_string("table_name.column_name_1"), true);
+        assert_eq!(is_common_sql_string("table_name.column_name_1_2"), true);
+        assert_eq!(is_common_sql_string("table_name.column_1_name"), true);
+        assert_eq!(is_common_sql_string("table_name.column_name_name_1"), true);
+    }
+
+    #[test]
+    fn test_it_returns_false_for_table_column_pattern_false_positive() {
+        assert_eq!(is_common_sql_string(";table.column"), false);
+        assert_eq!(is_common_sql_string("table.column;"), false);
+        assert_eq!(is_common_sql_string("table.column "), false);
+        assert_eq!(is_common_sql_string("table .column"), false);
+        assert_eq!(is_common_sql_string("1_table.column"), false);
+        assert_eq!(is_common_sql_string("1table.column"), false);
+        assert_eq!(is_common_sql_string("= table.column"), false);
+        assert_eq!(is_common_sql_string("table.column ="), false);
+        assert_eq!(is_common_sql_string("table.column = "), false);
+        assert_eq!(is_common_sql_string("table.column = 1"), false);
+        assert_eq!(is_common_sql_string("table.column = 1;"), false);
+        assert_eq!(is_common_sql_string("table.column = 1 "), false);
+        assert_eq!(is_common_sql_string("table.column table.column"), false);
+        assert_eq!(is_common_sql_string("table.column,table.column"), false);
+    }
 }
