@@ -483,6 +483,7 @@ mod tests {
             WHERE views.business_id = ?
         "#;
 
+        not_is_injection!(query, "views.id");
         not_is_injection!(query, "view_settings.user_id");
     }
 }
