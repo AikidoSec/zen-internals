@@ -431,14 +431,14 @@ mod tests {
     #[test]
     fn test_postgres_backslash_escaping() {
         is_injection!(
-          r#"SELECT * FROM users WHERE id = '\'OR 1=1--'"#,
-          "'OR 1=1--",
-          dialect("postgresql")
+            r#"SELECT * FROM users WHERE id = '\'OR 1=1--'"#,
+            "'OR 1=1--",
+            dialect("postgresql")
         );
         not_is_injection!(
-          r#"SELECT * FROM users WHERE id = E'\'OR 1=1--'"#,
-          "'OR 1=1--",
-          dialect("postgresql")
+            r#"SELECT * FROM users WHERE id = E'\'OR 1=1--'"#,
+            "'OR 1=1--",
+            dialect("postgresql")
         );
     }
 }
