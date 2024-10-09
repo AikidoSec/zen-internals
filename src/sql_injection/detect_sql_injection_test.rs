@@ -473,4 +473,16 @@ mod tests {
             dialect("postgresql")
         );
     }
+
+    #[test]
+    fn test_user_input_appears_as_column_name() {
+        let query = r#"
+            SELECT views.id AS view_id, view_settings.user_id, view_settings.settings
+            FROM views
+            INNER JOIN view_settings ON views.id = view_settings.view_id AND view_settings.user_id = ?
+            WHERE views.business_id = ?
+        "#;
+
+        not_is_injection!(query, "view_settings.user_id");
+    }
 }
