@@ -34,6 +34,15 @@ macro_rules! not_is_injection {
 mod tests {
     use crate::sql_injection::detect_sql_injection::detect_sql_injection_str;
 
+    fn dialect(s: &str) -> i32 {
+        match s {
+            "mysql" => 8,
+            "postgresql" => 9,
+            "sqlite" => 12,
+            _ => panic!("Unknown dialect"),
+        }
+    }
+
     #[test]
     fn test_it_detects_injections() {
         is_injection!(
@@ -416,6 +425,20 @@ mod tests {
         is_injection!(
           "select `recommendations`.*, (select count(*) from `recommendation_click_events` where `recommendation_click_events`.`recommendation_id` = recommendations.id) as `count__clicks`, (select count(*) from `recommendation_subscribe_events` where `recommendation_subscribe_events`.`recommendation_id` = recommendations.id) as `count__subscribers` from `recommendations` order by date DESC, id ASC limit 1",
           "date DESC, id ASC"
+        );
+    }
+
+    #[test]
+    fn test_postgres_backslash_escaping() {
+        is_injection!(
+          r#"SELECT * FROM users WHERE id = '\'OR 1=1--'"#,
+          "'OR 1=1--",
+          dialect("postgresql")
+        );
+        not_is_injection!(
+          r#"SELECT * FROM users WHERE id = E'\'OR 1=1--'"#,
+          "'OR 1=1--",
+          dialect("postgresql")
         );
     }
 }
