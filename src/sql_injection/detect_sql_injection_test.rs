@@ -485,5 +485,7 @@ mod tests {
 
         not_is_injection!(query, "views.id");
         not_is_injection!(query, "view_settings.user_id");
+
+        is_injection!(query, "= view_settings.view_id");
     }
 }
