@@ -48,7 +48,8 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
 
     if user_input.contains(".") {
         // Allow table.column pattern
-        let looks_like_table_column: Regex = Regex::new(r"(?i)^[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*$").unwrap();
+        let looks_like_table_column: Regex =
+            Regex::new(r"(?i)^[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*$").unwrap();
 
         return looks_like_table_column.is_match(user_input);
     }
