@@ -44,6 +44,38 @@ mod tests {
     }
 
     #[test]
+    fn test_postgres_dollar_signs() {
+        not_is_injection!(
+            "SELECT * FROM users WHERE id = $$' OR 1=1 -- $$",
+            "' OR 1=1 -- "
+        );
+        not_is_injection!(
+            "SELECT * FROM users WHERE id = $$1; DROP TABLE users; -- $$",
+            "1; DROP TABLE users; -- "
+        );
+        is_injection!(
+            "SELECT * FROM users WHERE id = $$1$$ OR 1=1 -- $$",
+            "1$$ OR 1=1 -- "
+        );
+    }
+
+    #[test]
+    fn test_postgres_dollar_named_dollar_signs() {
+        not_is_injection!(
+            "SELECT * FROM users WHERE id = $name$' OR 1=1 -- $name$",
+            "' OR 1=1 -- "
+        );
+        not_is_injection!(
+            "SELECT * FROM users WHERE id = $name$1; DROP TABLE users; -- $name$",
+            "1; DROP TABLE users; -- "
+        );
+        is_injection!(
+            "SELECT * FROM users WHERE id = $name$1$name$ OR 1=1 -- $name$",
+            "1$name$ OR 1=1 -- "
+        );
+    }
+
+    #[test]
     fn test_it_detects_injections() {
         is_injection!(
             "SELECT * FROM users WHERE id = '' OR 1=1 -- '",
