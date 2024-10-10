@@ -201,8 +201,8 @@ mod tests {
             "INTO users"
         );
     }
-    #[test]
 
+    #[test]
     fn test_spaces_are_trimmed_from_input() {
         not_is_injection!(
             "INSERT INTO users (name, surname) VALUES ('Alice', 'Bob')",
@@ -487,5 +487,47 @@ mod tests {
         not_is_injection!(query, "view_settings.user_id");
 
         is_injection!(query, "= view_settings.view_id");
+    }
+
+    #[test]
+    fn test_function_calls() {
+        is_injection!(
+            "SELECT * FROM users WHERE id = 187 AND VERSION()",
+            "187 AND VERSION()"
+        );
+        not_is_injection!(
+            "SELECT * FROM users WHERE id = '187 AND VERSION()'",
+            "187 AND VERSION()"
+        );
+    }
+
+    #[test]
+    fn test_sleep() {
+        is_injection!(
+            "SELECT * FROM users WHERE id = 187 AND SLEEP(5)",
+            "187 AND SLEEP(5)"
+        );
+        not_is_injection!(
+            "SELECT * FROM users WHERE id = '187 AND SLEEP(5)'",
+            "187 AND SLEEP(5)"
+        );
+        is_injection!(
+            "SELECT * FROM users WHERE id=984 AND IF(SUBSTRING(version(),1,1)=5,SLEEP(10),null)",
+            "984 AND IF(SUBSTRING(version(),1,1)=5,SLEEP(10),null)"
+        );
+    }
+
+    #[test]
+    fn test_single_line_comments() {
+        is_injection!(
+            "SELECT * FROM users WHERE id = '1' OR 1=1 # '",
+            "1' OR 1=1 # ",
+            dialect("mysql")
+        );
+        not_is_injection!(
+            "SELECT * FROM users WHERE id = '1'' OR 1=1 # '",
+            "1' OR 1=1 # ",
+            dialect("mysql")
+        );
     }
 }
