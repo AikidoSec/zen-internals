@@ -14,7 +14,7 @@ macro_rules! is_injection {
         ))
     };
 }
-macro_rules! is_not_injection {
+macro_rules! not_injection {
     ($query:expr, $input:expr) => {
         assert!(!detect_sql_injection_str(
             &$query.to_lowercase(),
@@ -45,11 +45,11 @@ mod tests {
 
     #[test]
     fn test_postgres_dollar_signs() {
-        is_not_injection!(
+        not_injection!(
             "SELECT * FROM users WHERE id = $$' OR 1=1 -- $$",
             "' OR 1=1 -- "
         );
-        is_not_injection!(
+        not_injection!(
             "SELECT * FROM users WHERE id = $$1; DROP TABLE users; -- $$",
             "1; DROP TABLE users; -- "
         );
@@ -61,11 +61,11 @@ mod tests {
 
     #[test]
     fn test_postgres_dollar_named_dollar_signs() {
-        is_not_injection!(
+        not_injection!(
             "SELECT * FROM users WHERE id = $name$' OR 1=1 -- $name$",
             "' OR 1=1 -- "
         );
-        is_not_injection!(
+        not_injection!(
             "SELECT * FROM users WHERE id = $name$1; DROP TABLE users; -- $name$",
             "1; DROP TABLE users; -- "
         );
@@ -90,7 +90,7 @@ mod tests {
 
     #[test]
     fn test_false_positives() {
-        is_not_injection!(
+        not_injection!(
             r#"SELECT * FROM users WHERE id = "' OR 1=1 -- ""#,
             "' OR 1=1 -- "
         );
@@ -128,19 +128,19 @@ mod tests {
 
     #[test]
     fn test_encapsulated_strings() {
-        is_not_injection!(
+        not_injection!(
             "INSERT INTO users (name, surname) VALUES ('Alice', 'Bob')",
             "Alice"
         );
-        is_not_injection!(
+        not_injection!(
             "INSERT INTO users (name, surname) VALUES ('Alice', 'Bob')",
             "Bob"
         );
-        is_not_injection!(
+        not_injection!(
             "INSERT INTO users (name, surname) VALUES ('W.Al294*is', 'Bob')",
             "W.Al294*is"
         );
-        is_not_injection!(
+        not_injection!(
             "INSERT INTO users (name, surname) VALUES ('John', 'Doe')",
             "'John'"
         );
@@ -154,7 +154,7 @@ mod tests {
             "John',"
         );
         // MySQL Specific :
-        is_not_injection!(
+        not_injection!(
             "INSERT INTO `users` (name, surname) VALUES ('John', 'Doe')",
             "`users`",
             8
@@ -164,31 +164,31 @@ mod tests {
             "INTO `users`",
             8
         );
-        is_not_injection!("SELECT * FROM `comm` ents", "`comm`", 8);
+        not_injection!("SELECT * FROM `comm` ents", "`comm`", 8);
         is_injection!("SELECT * FROM `comm` ents", "`comm` ents", 8);
         is_injection!("SELECT * FROM `comm` ", "FROM `comm`", 8);
     }
 
     #[test]
     fn test_keywords() {
-        is_not_injection!(
+        not_injection!(
             "INSERT INTO users (name, surname) VALUES ('Alice', 'Bob')",
             "INSERT"
         );
-        is_not_injection!(
+        not_injection!(
             "INSERT INTO users (name, surname) VALUES ('Alice', 'Bob')",
             "INS"
         );
-        is_not_injection!(
+        not_injection!(
             "INSERT INTO users (name, surname) VALUES ('Alice', 'Bob')",
             "users"
         );
-        is_not_injection!(
+        not_injection!(
             "INSERT INTO users (name, surname) VALUES ('Alice', 'Bob')",
             "VALUES"
         );
 
-        is_not_injection!(
+        not_injection!(
             "INSERT INTO users (name, surname) VALUES ('Alice', 'Bob')",
             "INSERT INTO"
         );
@@ -204,23 +204,23 @@ mod tests {
 
     #[test]
     fn test_spaces_are_trimmed_from_input() {
-        is_not_injection!(
+        not_injection!(
             "INSERT INTO users (name, surname) VALUES ('Alice', 'Bob')",
             "VALUES "
         );
-        is_not_injection!(
+        not_injection!(
             "INSERT INTO users (name, surname) VALUES ('Alice', 'Bob')",
             " INTO"
         );
-        is_not_injection!(
+        not_injection!(
             "INSERT INTO users (name, surname) VALUES ('Alice', 'Bob')",
             " surname"
         );
-        is_not_injection!(
+        not_injection!(
             "INSERT INTO users (name, surname) VALUES ('Alice', 'Bob')",
             " VALUES "
         );
-        is_not_injection!(
+        not_injection!(
             "INSERT INTO users (name, surname) VALUES ('Alice', 'Bob')",
             "          VALUES             "
         )
@@ -234,24 +234,24 @@ mod tests {
         );
 
         // one character, after spaces removed cannot be injection :
-        is_not_injection!(
+        not_injection!(
             "INSERT INTO users (name, surname) VALUES ('Alice', 'Bob')",
             ", "
         );
-        is_not_injection!(
+        not_injection!(
             "INSERT INTO users (name, surname) VALUES ('Alice', 'Bob')          ;          ",
             "          ;          "
         );
-        is_not_injection!(
+        not_injection!(
             "INSERT INTO users (name, surname) VALUES ('Alice', 'Bob')          6          ",
             "          6          "
         );
 
-        is_not_injection!(
+        not_injection!(
             "INSERT  INTO users (name, surname) VALUES ('Alice', 'Bob')",
             "  "
         );
-        is_not_injection!(
+        not_injection!(
             "INSERT  INTO users (name, surname) VALUES ('Alice', 'Bob')",
             "                 "
         );
@@ -259,9 +259,9 @@ mod tests {
 
     #[test]
     fn test_auto_concat_strs() {
-        is_not_injection!("SELECT * FROM 'abc' 'abc'", "abc");
-        is_not_injection!("SELECT * FROM 'abc' 'abc'", "'abc'");
-        is_not_injection!("SELECT * FROM 'abc' 'def'", "abc");
+        not_injection!("SELECT * FROM 'abc' 'abc'", "abc");
+        not_injection!("SELECT * FROM 'abc' 'abc'", "'abc'");
+        not_injection!("SELECT * FROM 'abc' 'def'", "abc");
 
         is_injection!("SELECT * FROM 'abc' 'ebc' 'def'", "abc' 'ebc");
         is_injection!("SELECT * FROM 'abc' 'abc' 'abc'", "abc' 'abc");
@@ -270,8 +270,8 @@ mod tests {
     #[test]
     fn test_nokeyword_exemption() {
         is_injection!("SELECT * FROM hakuna matata", "hakuna matata");
-        is_not_injection!("SELECT * FROM hakuna matata", "hakuna ");
-        is_not_injection!("SELECT * FROM hakuna matata", "una ");
+        not_injection!("SELECT * FROM hakuna matata", "hakuna ");
+        not_injection!("SELECT * FROM hakuna matata", "una ");
 
         is_injection!(
             "SELECT * FROM hakuna matata theory",
@@ -282,7 +282,7 @@ mod tests {
         is_injection!("SELECT * FROM hakuna matata", "FROM h");
         is_injection!("SELECT * FROM hakuna matata", "FROM hakuna");
         is_injection!("SELECT * FROM hakuna matata", "FROM hakuna matata");
-        is_not_injection!(
+        not_injection!(
             "SELECT * FROM \"table_name\" WHERE comment = \"I\" \"m writting you\"",
             "\"table_name\" "
         )
@@ -290,18 +290,18 @@ mod tests {
 
     #[test]
     fn test_if_query_does_not_contain_user_input() {
-        is_not_injection!("SELECT * FROM users WHERE id = 1", "id = 'something else'");
+        not_injection!("SELECT * FROM users WHERE id = 1", "id = 'something else'");
     }
 
     #[test]
     fn test_escape_sequences() {
-        is_not_injection!("SELECT * FROM users WHERE id = 'users\\\\'", "users\\\\")
+        not_injection!("SELECT * FROM users WHERE id = 'users\\\\'", "users\\\\")
     }
 
     #[test]
     fn test_multiple_string_characters() {
         // Query 1 testing : INSERT INTO books (title, description) VALUES ('${title}', "Description set by the user: '${description}'")
-        is_not_injection!(
+        not_injection!(
             "INSERT INTO books (title, description) VALUES ('${title}', \"Description set by the user: ''), ('exploit',system_user());'\")",
         "'), ('exploit',system_user());");
         // Submission AIKIDO-OCRA7GFG :
@@ -317,112 +317,112 @@ mod tests {
 
     #[test]
     fn test_common_sql_combinations_are_not_flagged() {
-        is_not_injection!(
+        not_injection!(
             "SELECT * FROM users WHERE email = 'user@example.com';",
             "SELECT *"
         );
-        is_not_injection!(
+        not_injection!(
             "INSERT INTO orders (user_id, product_id, quantity) VALUES (1, 2, 3);",
             "INSERT INTO"
         );
-        is_not_injection!(
+        not_injection!(
             "SELECT users.first_name, users.last_name, orders.order_id
              FROM users
              INNER JOIN orders ON users.id = orders.user_id
              WHERE orders.status = 'completed'",
             "INNER JOIN"
         );
-        is_not_injection!(
+        not_injection!(
             "SELECT users.first_name, users.last_name, orders.order_id
              FROM users
              LEFT JOIN orders ON users.id = orders.user_id;",
             "LEFT JOIN"
         );
-        is_not_injection!(
+        not_injection!(
             "SELECT orders.order_id, users.first_name, users.last_name
              FROM orders
              RIGHT JOIN users ON orders.user_id = users.id;",
             "RIGHT JOIN"
         );
-        is_not_injection!(
+        not_injection!(
             "SELECT users.first_name, users.last_name, orders.order_id
              FROM users
              LEFT OUTER JOIN orders ON users.id = orders.user_id;",
             "LEFT OUTER JOIN"
         );
-        is_not_injection!(
+        not_injection!(
             "SELECT orders.order_id, users.first_name, users.last_name
              FROM orders
              RIGHT OUTER JOIN users ON orders.user_id = users.id;",
             "RIGHT OUTER JOIN"
         );
-        is_not_injection!(
+        not_injection!(
             "DELETE FROM sessions WHERE session_id = 'xyz123'",
             "DELETE FROM"
         );
-        is_not_injection!(
+        not_injection!(
             "SELECT first_name, last_name, created_at
              FROM users
              ORDER BY created_at DESC;",
             "ORDER BY"
         );
-        is_not_injection!(
+        not_injection!(
             "SELECT category_id, COUNT(*) AS total_products
              FROM products
              GROUP BY category_id;",
             "GROUP BY"
         );
-        is_not_injection!(
+        not_injection!(
             "SELECT category_id, COUNT(*) AS total_products
              FROM products
              GROUP BY category_id;",
             "group BY"
         );
-        is_not_injection!(
+        not_injection!(
             "SELECT category_id, COUNT(*) AS total_products
              FROM products
              group by category_id;",
             "GROUP BY"
         );
-        is_not_injection!(
+        not_injection!(
             "INSERT INTO wishlists (user_id, product_id) VALUES (1, 3) ON CONFLICT (user_id, product_id) DO NOTHING",
             "ON CONFLICT"
         );
-        is_not_injection!(
+        not_injection!(
             "INSERT INTO users (id, email, login_count)
              VALUES (1, 'user@example.com', 1)
              ON CONFLICT (id)
              DO UPDATE SET login_count = users.login_count + 1;",
             "DO UPDATE"
         );
-        is_not_injection!(
+        not_injection!(
             "INSERT INTO wishlists (user_id, product_id) VALUES (1, 3) ON CONFLICT (user_id, product_id) DO NOTHING",
             "DO NOTHING"
         );
-        is_not_injection!(
+        not_injection!(
             "INSERT INTO users (id, email)
              VALUES (1, 'user@example.com')
              ON DUPLICATE KEY UPDATE email = 'user@example.com';",
             "ON DUPLICATE KEY UPDATE"
         );
-        is_not_injection!(
+        not_injection!(
             "SELECT COUNT(*) FROM users WHERE status = 'active';",
             "SELECT COUNT(*)"
         );
-        is_not_injection!(
+        not_injection!(
             "SELECT COUNT(*) FROM users WHERE status = 'active';",
             "COUNT(*)"
         );
-        is_not_injection!("SELECT * FROM orders WHERE shipped_at IS NULL;", "IS NULL");
-        is_not_injection!(
+        not_injection!("SELECT * FROM orders WHERE shipped_at IS NULL;", "IS NULL");
+        not_injection!(
             "SELECT * FROM orders WHERE shipped_at IS NOT NULL;",
             "IS NOT NULL"
         );
-        is_not_injection!(
+        not_injection!(
             "SELECT * FROM users WHERE NOT EXISTS (SELECT 1 FROM orders WHERE users.id = orders.user_id);",
             "NOT EXISTS"
         );
-        is_not_injection!(
+        not_injection!(
             "SELECT DISTINCT ON (email) email, first_name, last_name
              FROM users
              ORDER BY email, created_at DESC;",
@@ -432,17 +432,17 @@ mod tests {
 
     #[test]
     fn test_common_sql_patterns_are_not_flagged() {
-        is_not_injection!("SELECT * FROM users ORDER BY name ASC", "name ASC");
-        is_not_injection!("SELECT * FROM users ORDER BY name DESC", "name DESC");
-        is_not_injection!(
+        not_injection!("SELECT * FROM users ORDER BY name ASC", "name ASC");
+        not_injection!("SELECT * FROM users ORDER BY name DESC", "name DESC");
+        not_injection!(
             "SELECT * FROM users ORDER BY created_at ASC",
             "created_at ASC"
         );
-        is_not_injection!(
+        not_injection!(
             "SELECT * FROM users ORDER BY created_at DESC",
             "created_at DESC"
         );
-        is_not_injection!(
+        not_injection!(
             "select `recommendations`.*, (select count(*) from `recommendation_click_events` where `recommendation_click_events`.`recommendation_id` = recommendations.id) as `count__clicks`, (select count(*) from `recommendation_subscribe_events` where `recommendation_subscribe_events`.`recommendation_id` = recommendations.id) as `count__subscribers` from `recommendations` order by created_at desc limit ?",
             "created_at desc"
         );
@@ -467,7 +467,7 @@ mod tests {
             "'OR 1=1--",
             dialect("postgresql")
         );
-        is_not_injection!(
+        not_injection!(
             r#"SELECT * FROM users WHERE id = E'\'OR 1=1--'"#,
             "'OR 1=1--",
             dialect("postgresql")
@@ -483,8 +483,8 @@ mod tests {
             WHERE views.business_id = ?
         "#;
 
-        is_not_injection!(query, "views.id");
-        is_not_injection!(query, "view_settings.user_id");
+        not_injection!(query, "views.id");
+        not_injection!(query, "view_settings.user_id");
 
         is_injection!(query, "= view_settings.view_id");
     }
@@ -495,7 +495,7 @@ mod tests {
             "SELECT * FROM users WHERE id = 187 AND VERSION()",
             "187 AND VERSION()"
         );
-        is_not_injection!(
+        not_injection!(
             "SELECT * FROM users WHERE id = '187 AND VERSION()'",
             "187 AND VERSION()"
         );
@@ -507,7 +507,7 @@ mod tests {
             "SELECT * FROM users WHERE id = 187 AND SLEEP(5)",
             "187 AND SLEEP(5)"
         );
-        is_not_injection!(
+        not_injection!(
             "SELECT * FROM users WHERE id = '187 AND SLEEP(5)'",
             "187 AND SLEEP(5)"
         );
@@ -524,7 +524,7 @@ mod tests {
             "1' OR 1=1 # ",
             dialect("mysql")
         );
-        is_not_injection!(
+        not_injection!(
             "SELECT * FROM users WHERE id = '1'' OR 1=1 # '",
             "1' OR 1=1 # ",
             dialect("mysql")
