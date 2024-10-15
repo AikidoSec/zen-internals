@@ -530,4 +530,59 @@ mod tests {
             dialect("mysql")
         );
     }
+
+    #[test]
+    fn test_with_sqlite_placeholders() {
+        // See https://github.com/WiseLibs/better-sqlite3/blob/master/docs/api.md#transactionfunction---function
+        is_injection!(
+            "INSERT INTO cats (name, age) VALUES (@name, @age)",
+            "(@name, @age)",
+            dialect("sqlite")
+        );
+    }
+
+    #[test]
+    fn test_with_pdo_placeholders() {
+        // See https://www.php.net/manual/en/pdo.prepare.php
+        is_injection!(
+            "INSERT INTO cats (name, age) VALUES (:name, :age)",
+            "(:name, :age)",
+            dialect("mysql")
+        );
+        is_injection!(
+            "INSERT INTO cats (name, age) VALUES (:name, :age)",
+            "(:name, :age)",
+            dialect("postgresql")
+        );
+    }
+
+    #[test]
+    fn test_with_percent_placeholders() {
+        // See https://www.psycopg.org/docs/usage.html#passing-parameters-to-sql-queries
+        is_injection!(
+            "INSERT INTO cats (name, age) VALUES (%s, %s)",
+            "(%s, %s)",
+            dialect("postgresql")
+        );
+    }
+
+    #[test]
+    fn test_with_dollar_placeholders() {
+        // See https://node-postgres.com/features/queries#parameterized-query
+        is_injection!(
+            "INSERT INTO cats (name, age) VALUES ($1, $2)",
+            "($1, $2)",
+            dialect("postgresql")
+        );
+    }
+
+    #[test]
+    fn test_with_pg_promise_placeholders() {
+        // See https://github.com/vitaly-t/pg-promise?tab=readme-ov-file#named-parameters
+        is_injection!(
+            "INSERT INTO cats (name, age) VALUES (${name}, ${age})",
+            "(${name}, ${age})",
+            dialect("postgresql")
+        );
+    }
 }
