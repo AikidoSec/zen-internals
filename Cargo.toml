@@ -23,4 +23,3 @@ rand = "0.8.5"
 strip = true
 opt-level = "s"
 lto = true
-panic = "abort"
