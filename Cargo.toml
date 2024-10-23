@@ -18,3 +18,9 @@ wasm-bindgen = "0.2"
 
 [dev-dependencies]
 rand = "0.8.5"
+
+[profile.release]
+strip = true
+opt-level = "s"
+lto = true
+panic = "abort"
