@@ -20,11 +20,10 @@ if __name__ == "__main__":
 ### Install
 
 ```bash
-$ npm install @aikidosec/zen-internals
-```
-
-```bash
-$ yarn add @aikidosec/zen-internals
+curl -L https://github.com/AikidoSec/zen-internals/releases/download/$VERSION/zen_internals.tgz -o zen_internals.tgz
+curl -L https://github.com/AikidoSec/zen-internals/releases/download/$VERSION/zen_internals.tgz.sha256sum -o zen_internals.tgz.sha256sum
+sha256sum -c zen_internals.tgz.sha256sum
+tar -xzf zen_internals.tgz some-directory
 ```
 
 ### API 
@@ -32,7 +31,7 @@ $ yarn add @aikidosec/zen-internals
 #### SQL injection detection
 
 ```js
-const { wasm_detect_sql_injection } = require("@aikidosec/zen-internals");
+const { wasm_detect_sql_injection } = require("./some-directory/zen_internals");
 
 const detected = wasm_detect_sql_injection(
     `SELECT * FROM users WHERE id = '' OR 1=1 -- '`, // query
