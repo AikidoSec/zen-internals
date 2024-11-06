@@ -14,9 +14,8 @@ jobs:
     needs:
       - tests
       - lint
-    runs-on: ubuntu-latest
-    # Use a container with GLIBC 2.17
-    container: quay.io/pypa/manylinux2014_x86_64
+    runs-on: ubuntu-20.04
+
     steps:
       - name: Checkout
         uses: actions/checkout@v1
@@ -50,9 +49,8 @@ jobs:
     needs:
       - tests
       - lint
-    runs-on: ubuntu-latest
-    # Use a container with GLIBC 2.17
-    container: quay.io/pypa/manylinux2014_aarch64
+    runs-on: ubuntu-20.04
+
     steps:
       - name: Checkout
         uses: actions/checkout@v1
