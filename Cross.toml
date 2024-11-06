@@ -1,3 +1,2 @@
-[build.zig]
-enable = true
-version = "2.17"
+[build]
+zig = "2.17" # Use GLIBC 2.17 for compatibility with older Linux distributions

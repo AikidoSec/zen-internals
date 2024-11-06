@@ -16,3 +16,8 @@ jobs:
           cargo install cross
           cross build --target x86_64-unknown-linux-gnu --release
           ls target/x86_64-unknown-linux-gnu/release
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: linux-binaries
+          path: target/x86_64-unknown-linux-gnu/release/libzen_internals.so
