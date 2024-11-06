@@ -1,2 +1,2 @@
 [build]
-image = "x86_64-unknown-linux-gnu:centos"
+zig = "2.17"
