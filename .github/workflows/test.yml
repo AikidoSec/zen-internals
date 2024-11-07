@@ -16,9 +16,16 @@ jobs:
           rustup update --no-self-update nightly
           rustup default nightly
           cargo install --locked cargo-zigbuild
-          cargo zigbuild --target x86_64-unknown-linux-gnu.2.17 --release
+          cargo run zigbuild --target x86_64-unknown-linux-gnu.2.17 --release
           ls target/x86_64-unknown-linux-gnu/release
           objdump -T target/x86_64-unknown-linux-gnu/release/libzen_internals.so | grep GLIBC
+
+      - uses: addnab/docker-run-action@v3
+        with:
+          image: centos:7
+          options: -v ${{ github.workspace }}:/io -w /io
+          run: |
+            ldd -r -v ./target/x86_64-unknown-linux-gnu/release/libzen_internals.so
 
       - uses: actions/upload-artifact@v3
         with:
