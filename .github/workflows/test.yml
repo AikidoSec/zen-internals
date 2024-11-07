@@ -27,6 +27,13 @@ jobs:
           run: |
             ldd -r -v ./target/x86_64-unknown-linux-gnu/release/libzen_internals.so
 
+      - uses: addnab/docker-run-action@v3
+        with:
+          image: amazonlinux:2
+          options: -v ${{ github.workspace }}:/io -w /io
+          run: |
+            ldd -r -v ./target/x86_64-unknown-linux-gnu/release/libzen_internals.so
+
       - uses: actions/upload-artifact@v3
         with:
           name: linux-binaries
