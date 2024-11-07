@@ -20,17 +20,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v1
 
-      - name: Install latest rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          default: true
-          target: x86_64-unknown-linux-gnu
-          override: true
+      - name: Install ziglang
+        uses: mlugg/setup-zig@v1
+
+      - name: Install latest rust and cargo-zigbuild
+        run: |
+          rustup update --no-self-update stable
+          rustup default stable
+          cargo install --locked cargo-zigbuild
 
       - name: Build for linux
         run:
-          cargo build --release --target x86_64-unknown-linux-gnu
+          cargo zigbuild --target x86_64-unknown-linux-gnu.2.17 --release
+
       - name: Prepare release
         run: |
           cd target/x86_64-unknown-linux-gnu/release
@@ -55,19 +57,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v1
 
-      - name: Install latest rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          default: true
-          target: aarch64-unknown-linux-gnu
-          override: true
+      - name: Install ziglang
+        uses: mlugg/setup-zig@v1
+
+      - name: Install latest rust and cargo-zigbuild
+        run: |
+          rustup update --no-self-update stable
+          rustup default stable
+          cargo install --locked cargo-zigbuild
 
       - name: Build for Linux
         run: |
-          sudo apt-get update && sudo apt-get upgrade -y
-          sudo apt-get install -y gcc-aarch64-linux-gnu
-          cargo build --release --target aarch64-unknown-linux-gnu
+          cargo zigbuild --target aarch64-unknown-linux-gnu.2.17 --release
 
       - name: Prepare release
         run: |
