@@ -6,6 +6,7 @@
 mod helpers;
 mod shell_injection;
 mod sql_injection;
+mod js_injection;
 
 // FFI Bindings :
 pub mod ffi_bindings;
