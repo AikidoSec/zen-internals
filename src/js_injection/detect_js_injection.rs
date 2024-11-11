@@ -1,6 +1,6 @@
 use super::have_comments_changed::have_comments_changed;
+use super::have_statements_changed::have_statements_changed;
 use super::helpers::select_sourcetype_based_on_enum::select_sourcetype_based_on_enum;
-use crate::diff_in_vec_len;
 use oxc::allocator::Allocator;
 use oxc::parser::{ParseOptions, Parser};
 use oxc::span::SourceType;
@@ -43,11 +43,10 @@ pub fn detect_js_injection_str(code: &str, userinput: &str, sourcetype: i32) -> 
         return false;
     }
 
-    if diff_in_vec_len!(
-        parser_result.program.body,
-        parser_result_without_input.program.body
+    if have_statements_changed(
+        &parser_result.program.body,
+        &parser_result_without_input.program.body,
     ) {
-        // If the number of statements is different, it's an injection.
         return true;
     }
 

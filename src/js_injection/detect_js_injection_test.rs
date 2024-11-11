@@ -45,4 +45,14 @@ mod tests {
             0
         );
     }
+
+    #[test]
+
+    fn mongodb_js() {
+        is_injection!(
+            "this.name === 'a' && sleep(2000) && 'b'",
+            "a' && sleep(2000) && 'b",
+            0
+        );
+    }
 }
