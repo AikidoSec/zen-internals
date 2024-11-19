@@ -609,6 +609,14 @@ mod tests {
            "#,
             "dashboard/groups"
         );
+
+        not_injection!("SELECT 1 -- some/input 😎", "some/input 😎");
+        not_injection!("SELECT 1 /* some/input 😎 */", "some/input 😎");
+        not_injection!(
+            "SELECT 1 # some/input 😎",
+            "some/input 😎",
+            dialect("mysql")
+        );
     }
 
     #[test]
@@ -629,6 +637,14 @@ mod tests {
         is_injection!("SELECT 1 /* some/input */", "1 /* some/input */");
         // # comments are not supported by generic dialect
         is_injection!("SELECT 1 # some/input", "1 # some/input", dialect("mysql"));
+
+        is_injection!("SELECT 1 -- some/input 😎", "1 -- some/input 😎");
+        is_injection!("SELECT 1 /* some/input 😎 */", "1 /* some/input 😎 */");
+        is_injection!(
+            "SELECT 1 # some/input 😎",
+            "1 # some/input 😎",
+            dialect("mysql")
+        );
     }
 
     #[test]
