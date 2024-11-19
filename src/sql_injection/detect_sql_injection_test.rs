@@ -593,7 +593,7 @@ mod tests {
         // # comments are not supported by generic dialect
         not_injection!("SELECT 1 # some/input", "some/input", dialect("mysql"));
         not_injection!(
-           r#"
+            r#"
                 SELECT 1 AS one
                 FROM "namespaces"
                 INNER JOIN "members"
@@ -607,7 +607,7 @@ mod tests {
                 LIMIT 1
                 /*application:web,correlation_id:01JD0F3EJ9C6G9ZZED0D4834EV,endpoint_id:Dashboard::GroupsController#index,db_config_database:gitlabhq_development,db_config_name:main,line:/app/views/dashboard/groups/index.html.haml:5:in `_app_views_dashboard_groups_index_html_haml__4608572397795655832_591200'*/
            "#,
-           "dashboard/groups"
+            "dashboard/groups"
         );
     }
 
@@ -616,7 +616,11 @@ mod tests {
         not_injection!("SELECT 'some/input' -- some/input", "some/input");
         not_injection!("SELECT 'some/input' /* some/input */", "some/input");
         // # comments are not supported by generic dialect
-        not_injection!("SELECT 'some/input' # some/input", "some/input", dialect("mysql"));
+        not_injection!(
+            "SELECT 'some/input' # some/input",
+            "some/input",
+            dialect("mysql")
+        );
     }
 
     #[test]
@@ -629,9 +633,19 @@ mod tests {
 
     #[test]
     fn test_it_does_flag_input_in_multiple_places() {
-        is_injection!("SELECT '1 -- some/input', 1 -- some/input", "1 -- some/input");
-        is_injection!("SELECT '1 /* some/input */', 1 /* some/input */", "1 /* some/input */");
+        is_injection!(
+            "SELECT '1 -- some/input', 1 -- some/input",
+            "1 -- some/input"
+        );
+        is_injection!(
+            "SELECT '1 /* some/input */', 1 /* some/input */",
+            "1 /* some/input */"
+        );
         // # comments are not supported by generic dialect
-        is_injection!("SELECT '1 # some/input', 1 # some/input", "1 # some/input", dialect("mysql"));
+        is_injection!(
+            "SELECT '1 # some/input', 1 # some/input",
+            "1 # some/input",
+            dialect("mysql")
+        );
     }
 }
