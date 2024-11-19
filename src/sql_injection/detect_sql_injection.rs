@@ -34,7 +34,10 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
         // If the trimmed userinput is one character or empty, no injection took place.
         return false;
     }
-    let query_without_input: &str = &query.replace(trimmed_userinput, "str");
+
+    // Replace user input with string of equal length and tokenize again :
+    let safe_replace_str = "a".repeat(trimmed_userinput.len());
+    let query_without_input: &str = &query.replace(trimmed_userinput, safe_replace_str.as_str());
     let tokens_without_input = tokenize_with_fallback(query_without_input, dialect);
 
     // Check delta for both comment tokens and all tokens in general :
