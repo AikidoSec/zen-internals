@@ -30,7 +30,8 @@ pub fn detect_js_injection_str(code: &str, userinput: &str, sourcetype: i32) -> 
         return false;
     }
 
-    let code_without_input: &str = &code.replace(userinput, "str");
+    let safe_replace_str = "a".repeat(userinput.len());
+    let code_without_input: &str = &code.replace(userinput, safe_replace_str.as_str());
 
     let parser_result_without_input = Parser::new(&allocator, &code_without_input, source_type)
         .with_options(ParseOptions {
@@ -43,18 +44,19 @@ pub fn detect_js_injection_str(code: &str, userinput: &str, sourcetype: i32) -> 
         return false;
     }
 
-    if have_statements_changed(
-        &parser_result.program.body,
-        &parser_result_without_input.program.body,
-    ) {
-        return true;
-    }
-
     if have_comments_changed(
         &parser_result.program.comments,
         &parser_result_without_input.program.comments,
     ) {
         // If the number of comments is different, it's an injection.
+        return true;
+    }
+
+    if have_statements_changed(
+        &parser_result.program,
+        &parser_result_without_input.program,
+        &allocator,
+    ) {
         return true;
     }
 
