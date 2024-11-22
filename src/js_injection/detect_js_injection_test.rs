@@ -44,15 +44,47 @@ mod tests {
             "admin' || 1 === 1) { return true; } //",
             0
         );
+        not_injection!(
+            "if(username === 'admin' || 1 === 1) { return true; }",
+            "admin",
+            0
+        );
+        is_injection!(
+            "if (username === 'admin' || 1 === 1) { return true; } //') {}",
+            "admin' || 1 === 1) { return true; } //",
+            0
+        );
     }
 
     #[test]
 
     fn mongodb_js() {
+        not_injection!("this.name === 'a' && sleep(2000) && 'b'", "a", 0);
+        not_injection!("this.group === 1", "1", 0);
         is_injection!(
             "this.name === 'a' && sleep(2000) && 'b'",
             "a' && sleep(2000) && 'b",
             0
         );
+        is_injection!("const test = this.group === 1 || 1 === 1;", "1 || 1 ===", 0);
+    }
+
+    #[test]
+    fn test_cjs_function() {
+        not_injection!("function test() { return 'Hello'; }", "Hello", 0);
+        is_injection!(
+            "function test() { return 'Hello'; } //';}",
+            "Hello'; } //",
+            0
+        );
+    }
+
+    #[test]
+    fn test_no_injection() {
+        not_injection!("Hello World!", "Hello World!", 0);
+        not_injection!("", "", 0);
+        not_injection!("", "Hello World!", 0);
+        not_injection!("Hello World!", "", 0);
+        not_injection!("const test = 123;", "123", 0);
     }
 }

@@ -6,13 +6,18 @@ use oxc::parser::{ParseOptions, Parser};
 use oxc::span::SourceType;
 
 pub fn detect_js_injection_str(code: &str, userinput: &str, sourcetype: i32) -> bool {
-    if !code.contains(userinput) {
-        // If the query does not contain the user input, it's not an injection.
+    if userinput.len() <= 1 {
+        // We assume that a single character cannot be an injection.
         return false;
     }
 
-    if userinput.len() <= 1 {
-        // We assume that a single character cannot be an injection.
+    if userinput.len() > code.len() {
+        // If the user input is longer than the code, it's not an injection.
+        return false;
+    }
+
+    if !code.contains(userinput) {
+        // If the query does not contain the user input, it's not an injection.
         return false;
     }
 
@@ -30,8 +35,10 @@ pub fn detect_js_injection_str(code: &str, userinput: &str, sourcetype: i32) -> 
         return false;
     }
 
-    let safe_replace_str = "a".repeat(userinput.len());
-    let code_without_input: &str = &code.replace(userinput, safe_replace_str.as_str());
+    // Todo: False positive if comment content is changed.
+    //let safe_replace_str = "a".repeat(userinput.len());
+    let safe_replace_str = "";
+    let code_without_input: &str = &code.replace(userinput, safe_replace_str);
 
     let parser_result_without_input = Parser::new(&allocator, &code_without_input, source_type)
         .with_options(ParseOptions {
@@ -59,7 +66,6 @@ pub fn detect_js_injection_str(code: &str, userinput: &str, sourcetype: i32) -> 
     ) {
         return true;
     }
-
     // Todo hashbang, directives
 
     return false;
