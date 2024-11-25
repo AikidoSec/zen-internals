@@ -14,11 +14,11 @@ pub fn have_comments_changed(comments1: &Vec<Comment>, comments2: &Vec<Comment>)
         let comment2 = &comments2[i];
 
         // Check if the length of each comment is the same
-        let comment1_len = comment1.span.end - comment1.span.start;
+        /*let comment1_len = comment1.span.end - comment1.span.start;
         let comment2_len = comment2.span.end - comment2.span.start;
         if comment1_len != comment2_len {
             return true;
-        }
+        }*/
     }
 
     return false;

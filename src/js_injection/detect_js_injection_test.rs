@@ -30,6 +30,11 @@ mod tests {
             0
         );
         is_injection!(
+            "const test = 'Hello World!'; console.log('injection'); // This is a comment'; // Test",
+            "Hello World!'; console.log('injection'); // This is a comment",
+            0
+        );
+        is_injection!(
             "const test = 'Hello World!'; // This is a comment'; // Test",
             "Hello World!'; // This is a comment",
             0
@@ -39,6 +44,7 @@ mod tests {
     #[test]
     fn test_cjs_if() {
         not_injection!("if (true) { return true; }", "true", 0);
+        not_injection!("if (1 > 5) { return true; }", "5", 0);
         is_injection!(
             "if(username === 'admin' || 1 === 1) { return true; } //');",
             "admin' || 1 === 1) { return true; } //",
@@ -54,6 +60,7 @@ mod tests {
             "admin' || 1 === 1) { return true; } //",
             0
         );
+        is_injection!("if (1 > 5 || 1 === 1) { return true; }", "5 || 1 === 1", 0);
     }
 
     #[test]
@@ -72,19 +79,26 @@ mod tests {
     #[test]
     fn test_cjs_function() {
         not_injection!("function test() { return 'Hello'; }", "Hello", 0);
+        not_injection!("test(\"arg1\", 0, true);", "arg1", 0);
         is_injection!(
             "function test() { return 'Hello'; } //';}",
             "Hello'; } //",
             0
         );
+        is_injection!(
+            "test(\"arg1\", 12, true); // \", 0, true);",
+            "arg1\", 12, true); // ",
+            0
+        );
     }
 
     #[test]
-    fn test_no_injection() {
+    fn test_no_js_injection() {
         not_injection!("Hello World!", "Hello World!", 0);
         not_injection!("", "", 0);
         not_injection!("", "Hello World!", 0);
         not_injection!("Hello World!", "", 0);
         not_injection!("const test = 123;", "123", 0);
+        not_injection!("// Reason: Test", "Test", 0);
     }
 }
