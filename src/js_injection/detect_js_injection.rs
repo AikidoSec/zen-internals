@@ -35,12 +35,10 @@ pub fn detect_js_injection_str(code: &str, userinput: &str, sourcetype: i32) -> 
         return false;
     }
 
-    // Todo: False positive if comment content is changed.
-    //let safe_replace_str = "a".repeat(userinput.len());
-    let safe_replace_str = "";
-    let code_without_input: &str = &code.replace(userinput, safe_replace_str);
+    let safe_replace_str = "a".repeat(userinput.len());
+    let mut code_without_input: String = code.replace(userinput, &safe_replace_str);
 
-    let parser_result_without_input = Parser::new(&allocator, &code_without_input, source_type)
+    let mut parser_result_without_input = Parser::new(&allocator, &code_without_input, source_type)
         .with_options(ParseOptions {
             allow_return_outside_function: true,
             ..ParseOptions::default()
@@ -48,7 +46,19 @@ pub fn detect_js_injection_str(code: &str, userinput: &str, sourcetype: i32) -> 
         .parse();
 
     if parser_result_without_input.panicked || parser_result_without_input.errors.len() > 0 {
-        return false;
+        // Try to parse by replacing the user input with a empty string.
+        code_without_input = code.replace(userinput, "");
+
+        parser_result_without_input = Parser::new(&allocator, &code_without_input, source_type)
+            .with_options(ParseOptions {
+                allow_return_outside_function: true,
+                ..ParseOptions::default()
+            })
+            .parse();
+
+        if parser_result_without_input.panicked || parser_result_without_input.errors.len() > 0 {
+            return false;
+        }
     }
 
     if have_comments_changed(

@@ -93,6 +93,58 @@ mod tests {
     }
 
     #[test]
+    fn test_cjs_object() {
+        not_injection!("const obj = { test: 'value', isAdmin: true };", "value", 0);
+        is_injection!(
+            "const obj = { test: 'value', isAdmin: true }; //'};",
+            "value', isAdmin: true }; //",
+            0
+        );
+        not_injection!("const obj = [1, 2, 3];", "1", 0);
+        is_injection!("const obj = [1, 4, 2, 3];", "1, 4,", 0);
+        not_injection!("const obj = { test: [1, 2, 3] };", "1", 0);
+        is_injection!("const obj = { test: [1, 4, 2, 3] };", "1, 4,", 0);
+    }
+
+    #[test]
+    fn test_ts_code() {
+        not_injection!("const obj: string = 'Hello World!';", "Hello World!", 1);
+        is_injection!(
+            "const obj: string = 'Hello World!'; console.log('Injected!'); //';",
+            "Hello World!'; console.log('Injected!'); //",
+            1
+        );
+        not_injection!("function test(): string { return 'Hello'; }", "Hello", 1);
+        is_injection!(
+            "function test(): string { return 'Hello'; } //';}",
+            "Hello'; } //",
+            1
+        );
+        // Not an injection because code can not be parsed as JavaScript.
+        not_injection!(
+            "function test(): string { return 'Hello'; } //';}",
+            "Hello'; } //",
+            0
+        );
+    }
+
+    #[test]
+    fn test_import() {
+        for sourcetype in 0..5 {
+            not_injection!(
+                "import { test } from 'module'; test('Hello');",
+                "Hello",
+                sourcetype
+            );
+            is_injection!(
+                "import { test } from 'module'; test('Hello'); console.log('Injected!'); //');",
+                "Hello'); console.log('Injected!'); //",
+                sourcetype
+            );
+        }
+    }
+
+    #[test]
     fn test_no_js_injection() {
         not_injection!("Hello World!", "Hello World!", 0);
         not_injection!("", "", 0);

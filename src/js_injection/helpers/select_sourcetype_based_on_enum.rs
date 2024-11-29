@@ -1,19 +1,21 @@
 use oxc::span::SourceType;
 
 /*
-0 -> CJS
-1 -> MJS
-2 -> TS
-3 -> TSX
-Default -> CJS
+0 -> JS, auto-detect CJS or ESM
+1 -> TypeScript (ESM)
+2 -> CJS
+3 -> MJS (ESM)
+4 -> TSX
+Default -> JS, auto-detect CJS or ESM
 */
 pub fn select_sourcetype_based_on_enum(enumerator: i32) -> SourceType {
     // 0 is generic type.
     match enumerator {
-        0 => SourceType::cjs(),
-        1 => SourceType::mjs(),
-        2 => SourceType::ts(),
-        3 => SourceType::tsx(),
-        _ => SourceType::cjs(),
+        0 => SourceType::unambiguous(),
+        1 => SourceType::ts(),
+        2 => SourceType::cjs(),
+        3 => SourceType::mjs(),
+        4 => SourceType::tsx(),
+        _ => SourceType::unambiguous(),
     }
 }
