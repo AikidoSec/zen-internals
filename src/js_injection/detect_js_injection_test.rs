@@ -153,4 +153,15 @@ mod tests {
         not_injection!("const test = 123;", "123", 0);
         not_injection!("// Reason: Test", "Test", 0);
     }
+
+    #[test]
+    fn invalid_js_without_userinput() {
+        // In this case the JS code will be invalid without user input, that's why it's not detected as an injection.
+        // The code author wrote bad code expecting the user input to contain js code.
+        not_injection!(
+            "const test = 'Hello World!'; console.log('Injected!');",
+            "Hello World!'; console.log('Injected!');",
+            0
+        );
+    }
 }
