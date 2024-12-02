@@ -5,4 +5,6 @@ pub mod have_comments_changed;
 
 pub mod have_statements_changed;
 
+pub mod is_common_js_input;
+
 pub mod helpers;

@@ -101,9 +101,13 @@ mod tests {
             0
         );
         not_injection!("const obj = [1, 2, 3];", "1", 0);
-        is_injection!("const obj = [1, 4, 2, 3];", "1, 4,", 0);
         not_injection!("const obj = { test: [1, 2, 3] };", "1", 0);
-        is_injection!("const obj = { test: [1, 4, 2, 3] };", "1, 4,", 0);
+        not_injection!("const obj = { test: [1, 4, 2, 3] };", "1, 4,", 0);
+        is_injection!(
+            "const obj = { test: [1, 4], test2: [2, 3] };",
+            "1, 4], test2: [2, 3",
+            0
+        );
     }
 
     #[test]
@@ -163,5 +167,12 @@ mod tests {
             "Hello World!'; console.log('Injected!');",
             0
         );
+    }
+
+    #[test]
+    fn test_js_allow_math() {
+        not_injection!("const test = 1 + 2;", "1 + 2", 0);
+        not_injection!("const test = 5 / 6 + 2;", "5 / 6 + 2", 0);
+        not_injection!("const test = 5 % 2 + 5.6;", "5 % 2 + 5.6", 0);
     }
 }

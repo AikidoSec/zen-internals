@@ -1,6 +1,7 @@
 use super::have_comments_changed::have_comments_changed;
 use super::have_statements_changed::have_statements_changed;
 use super::helpers::select_sourcetype_based_on_enum::select_sourcetype_based_on_enum;
+use super::is_common_js_input::is_common_js_input;
 use oxc::allocator::Allocator;
 use oxc::parser::{ParseOptions, Parser};
 use oxc::span::SourceType;
@@ -18,6 +19,11 @@ pub fn detect_js_injection_str(code: &str, userinput: &str, sourcetype: i32) -> 
 
     if !code.contains(userinput) {
         // If the query does not contain the user input, it's not an injection.
+        return false;
+    }
+
+    if is_common_js_input(userinput) {
+        // Ignore some non dangerous inputs, e.g. math
         return false;
     }
 
