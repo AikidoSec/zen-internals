@@ -4,6 +4,7 @@
  * - SQL Injection (WIP)
  */
 mod helpers;
+mod js_injection;
 mod shell_injection;
 mod sql_injection;
 
