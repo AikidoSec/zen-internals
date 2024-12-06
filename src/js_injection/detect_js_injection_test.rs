@@ -175,4 +175,27 @@ mod tests {
         not_injection!("const test = 5 / 6 + 2;", "5 / 6 + 2", 0);
         not_injection!("const test = 5 % 2 + 5.6;", "5 % 2 + 5.6", 0);
     }
+
+    #[test]
+    fn test_js_real_cve() {
+        // CVE-2024-21511
+        is_injection!(
+            "packet.readDateTimeString('abc'); process.exit(1); // ');",
+            "abc'); process.exit(1); //",
+            0
+        );
+        // GHSA-q849-wxrc-vqrp
+        is_injection!(
+            "const o = {}; o['x']= pt[0]; o['y']=1; process.exit(); return o;",
+            "1; process.exit()",
+            0
+        );
+        not_injection!("const o = {}; o['x']= pt[0]; o['y']=2; return o;", "2", 2);
+        // CVE-2021-21278
+        is_injection!(
+            "const window={}; alert('!'); return window.__NUXT__",
+            "alert('!');",
+            0
+        );
+    }
 }
