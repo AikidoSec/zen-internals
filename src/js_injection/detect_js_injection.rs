@@ -1,7 +1,7 @@
 use super::have_comments_changed::have_comments_changed;
 use super::have_statements_changed::have_statements_changed;
 use super::helpers::select_sourcetype_based_on_enum::select_sourcetype_based_on_enum;
-use super::is_common_js_input::is_common_js_input;
+use super::is_safe_js_input::is_safe_js_input;
 use oxc::allocator::Allocator;
 use oxc::parser::{ParseOptions, Parser};
 use oxc::span::SourceType;
@@ -22,13 +22,13 @@ pub fn detect_js_injection_str(code: &str, userinput: &str, sourcetype: i32) -> 
         return false;
     }
 
-    if is_common_js_input(userinput) {
+    let allocator = Allocator::default();
+    let source_type: SourceType = select_sourcetype_based_on_enum(sourcetype);
+
+    if is_safe_js_input(userinput, &allocator, source_type) {
         // Ignore some non dangerous inputs, e.g. math
         return false;
     }
-
-    let allocator = Allocator::default();
-    let source_type: SourceType = select_sourcetype_based_on_enum(sourcetype);
 
     let parser_result = Parser::new(&allocator, &code, source_type)
         .with_options(ParseOptions {

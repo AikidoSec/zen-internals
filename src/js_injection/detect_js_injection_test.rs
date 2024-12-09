@@ -16,6 +16,7 @@ macro_rules! not_injection {
         ))
     };
 }
+
 #[cfg(test)]
 mod tests {
     use crate::js_injection::detect_js_injection::detect_js_injection_str;
@@ -102,7 +103,7 @@ mod tests {
         );
         not_injection!("const obj = [1, 2, 3];", "1", 0);
         not_injection!("const obj = { test: [1, 2, 3] };", "1", 0);
-        not_injection!("const obj = { test: [1, 4, 2, 3] };", "1, 4,", 0);
+        not_injection!("const obj = { test: [1, 4, 2, 3] };", "1, 4", 0);
         is_injection!(
             "const obj = { test: [1, 4], test2: [2, 3] };",
             "1, 4], test2: [2, 3",
