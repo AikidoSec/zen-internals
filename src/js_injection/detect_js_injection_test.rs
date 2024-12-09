@@ -197,5 +197,47 @@ mod tests {
             "alert('!');",
             0
         );
+        // CVE-2023-34232
+        is_injection!(
+            "(\"[]\"); fetch('https://example.com/'); // \");",
+            "[]\"); fetch('https://example.com/'); //",
+            0
+        );
+        // CVE-2023-1283
+        is_injection!(
+            "(() => {
+                console.log(\"[+] Qwik RCE demo, by ohb00.\")
+                process.binding('spawn_sync').spawn({
+                    file: 'C:\\Windows\\System32\\cmd.exe',
+                    args: [
+                        'cmd', '/c', 'calc.exe'
+                    ],
+                    stdio: [
+                        {type:'pipe',readable:!0,writable:!1},
+                        {type:'pipe',readable:!1,writable:!0},
+                        {type:'pipe',readable:!1,writable:!0}
+                
+                    ]
+                })
+                return {}
+            })()",
+            "(() => {
+                console.log(\"[+] Qwik RCE demo, by ohb00.\")
+                process.binding('spawn_sync').spawn({
+                    file: 'C:\\Windows\\System32\\cmd.exe',
+                    args: [
+                        'cmd', '/c', 'calc.exe'
+                    ],
+                    stdio: [
+                        {type:'pipe',readable:!0,writable:!1},
+                        {type:'pipe',readable:!1,writable:!0},
+                        {type:'pipe',readable:!1,writable:!0}
+                
+                    ]
+                })
+                return {}
+            })()",
+            0
+        )
     }
 }
