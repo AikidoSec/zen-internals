@@ -46,19 +46,21 @@ impl<'a> Visit<'a> for ASTPass {
             | AstKind::NumericLiteral(_)
             | AstKind::ParenthesizedExpression(_)
             | AstKind::SequenceExpression(_) => {}
+            // Check if program comments, directives or hashbang are present
             AstKind::Program(p) => {
                 if p.comments.len() > 0 || p.directives.len() > 0 || p.hashbang.is_some() {
                     self.contains_only_safe_tokens = false;
                 }
             }
+            // Check if operator is allowed
             AstKind::BinaryExpression(b) => {
                 // Check if the binary operator is safe
                 if !SAFE_OPERATORS.contains(&b.operator) {
                     self.contains_only_safe_tokens = false;
                 }
             }
+            // Default to unsafe
             _ => {
-                println!("Kind: {:?}", kind);
                 self.contains_only_safe_tokens = false;
             }
         }
