@@ -240,4 +240,13 @@ mod tests {
             0
         )
     }
+
+    #[test]
+    fn test_js_return_without_function() {
+        is_injection!(
+            "return 'test'; console.log('injection'); //';",
+            "test'; console.log('injection'); //",
+            0
+        );
+    }
 }
