@@ -1,9 +1,12 @@
 # Zen Internals library.
-Zen Internals is a library that can be used via FFI in different languages. Contains algorithms to detect:
-- Shell Injections (WIP)
-- SQL Injections
 
-## Python FFI Example code : 
+Zen Internals is a library that can be used via FFI in different languages. Contains algorithms to detect:
+
+-   Shell Injections (WIP)
+-   SQL Injections
+
+## Python FFI Example code :
+
 ```py
 import ctypes
 zen_internals = ctypes.CDLL("target/release/libzen_internals.so")
@@ -26,7 +29,7 @@ sha256sum -c zen_internals.tgz.sha256sum
 tar -xzf zen_internals.tgz some-directory
 ```
 
-### API 
+### API
 
 #### SQL injection detection
 
@@ -43,3 +46,18 @@ console.log(detected); // 1
 ```
 
 See [list of dialects](https://github.com/AikidoSec/zen-internals/blob/main/src/sql_injection/helpers/select_dialect_based_on_enum.rs#L18)
+
+### JS injection detection
+
+```js
+const { wasm_detect_js_injection } = require("./some-directory/zen_internals");
+
+const detected = wasm_detect_js_injection(
+    `const x = 1; console.log(x); // ;`, // code
+    `1; console.log(x); // ` // user input
+);
+
+console.log(detected); // 1
+```
+
+By default the function expects the input to be JavaScript code (CJS or ESM), but e.g. TypeScript is supported as well. Simply pass the corrosponding [source type number](https://github.com/AikidoSec/zen-internals/blob/main/src/js_injection/helpers/select_sourcetype_based_on_enum.rs) as third argument.
