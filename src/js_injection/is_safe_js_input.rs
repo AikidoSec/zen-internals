@@ -41,11 +41,11 @@ struct ASTPass {
 impl<'a> Visit<'a> for ASTPass {
     fn enter_node(&mut self, kind: AstKind<'a>) {
         match kind {
-            // Allow without additional checks
-            AstKind::ExpressionStatement(_)
-            | AstKind::NumericLiteral(_)
-            | AstKind::ParenthesizedExpression(_)
-            | AstKind::SequenceExpression(_) => {}
+            // Allow without additional checks, all subnodes of the AST will still be checked, so e.g. a sequence of unsafe tokens will be caught
+            AstKind::ExpressionStatement(_) // Allow expressions, this contains the more specific expression type, like BinaryExpression
+            | AstKind::NumericLiteral(_) // Allow numbers (e.g. 1, 3.14, 5e8)
+            | AstKind::ParenthesizedExpression(_) // Allow parentheses
+            | AstKind::SequenceExpression(_) => {} // Allow sequences, like 1, 2, 3
             // Check if program comments, directives or hashbang are present
             AstKind::Program(p) => {
                 if p.comments.len() > 0 || p.directives.len() > 0 || p.hashbang.is_some() {
