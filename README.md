@@ -4,7 +4,7 @@ Zen Internals is a library that can be used via FFI in different languages. Cont
 
 -   Shell Injections (WIP)
 -   SQL Injections
-
+- JS Code Injections
 ## Python FFI Example code :
 
 ```py
