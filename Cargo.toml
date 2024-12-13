@@ -11,6 +11,7 @@ name = "zen_internals"
 crate-type = ["cdylib"]
 
 [dependencies]
+oxc = "0.38.0"
 regex = "1.10.6"
 sqlparser = { git = "https://github.com/AikidoSec/datafusion-sqlparser-rs.git", branch = "main" }
 url = "2.5.2"
