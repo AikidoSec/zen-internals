@@ -664,4 +664,13 @@ mod tests {
             dialect("mysql")
         );
     }
+
+    #[test]
+    fn test_sqlite_dollar_sign_is_null() {
+        is_injection!(
+            "SELECT * FROM users WHERE id = '1' OR $$ IS NULL -- '",
+            "1' OR $$ IS NULL -- ",
+            dialect("sqlite")
+        );
+    }
 }
