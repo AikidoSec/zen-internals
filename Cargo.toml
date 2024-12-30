@@ -18,9 +18,13 @@ url = "2.5.2"
 wasm-bindgen = "0.2"
 
 [dev-dependencies]
-rand = "0.8.5"
+criterion = { version = "0.5", features = ["html_reports"] }
 
 [profile.release]
 strip = true
 opt-level = "s"
 lto = true
+
+[[bench]]
+name = "sqli"
+harness = false
