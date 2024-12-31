@@ -1,4 +1,4 @@
-import { assertEquals, } from "https://deno.land/std/testing/asserts.ts";
+import { assertEquals } from "https://deno.land/std/testing/asserts.ts";
 
 const libSuffix = Deno.build.os == "darwin" ? "dylib" : "so";
 const fullTargetDir = `./target/release/libzen_internals.${libSuffix}`;
