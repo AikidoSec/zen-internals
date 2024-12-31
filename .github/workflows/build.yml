@@ -19,3 +19,15 @@ jobs:
 
       - name: Build
         run: cargo build --verbose
+
+      - run: cargo install wasm-pack
+      - run: wasm-pack build --target nodejs
+
+      - run: make bench
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: make smoketest

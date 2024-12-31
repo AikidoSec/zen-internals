@@ -1,38 +1,39 @@
-macro_rules! is_injection {
-    ($query:expr, $input:expr) => {
-        assert!(detect_sql_injection_str(
-            &$query.to_lowercase(),
-            &$input.to_lowercase(),
-            0
-        ))
-    };
-    ($query:expr, $input:expr, $dialect:expr) => {
-        assert!(detect_sql_injection_str(
-            &$query.to_lowercase(),
-            &$input.to_lowercase(),
-            $dialect
-        ))
-    };
-}
-macro_rules! not_injection {
-    ($query:expr, $input:expr) => {
-        assert!(!detect_sql_injection_str(
-            &$query.to_lowercase(),
-            &$input.to_lowercase(),
-            0
-        ))
-    };
-    ($query:expr, $input:expr, $dialect:expr) => {
-        assert!(!detect_sql_injection_str(
-            &$query.to_lowercase(),
-            &$input.to_lowercase(),
-            $dialect
-        ))
-    };
-}
 #[cfg(test)]
 mod tests {
     use crate::sql_injection::detect_sql_injection::detect_sql_injection_str;
+
+    macro_rules! is_injection {
+        ($query:expr, $input:expr) => {
+            assert!(detect_sql_injection_str(
+                &$query.to_lowercase(),
+                &$input.to_lowercase(),
+                0
+            ))
+        };
+        ($query:expr, $input:expr, $dialect:expr) => {
+            assert!(detect_sql_injection_str(
+                &$query.to_lowercase(),
+                &$input.to_lowercase(),
+                $dialect
+            ))
+        };
+    }
+    macro_rules! not_injection {
+        ($query:expr, $input:expr) => {
+            assert!(!detect_sql_injection_str(
+                &$query.to_lowercase(),
+                &$input.to_lowercase(),
+                0
+            ))
+        };
+        ($query:expr, $input:expr, $dialect:expr) => {
+            assert!(!detect_sql_injection_str(
+                &$query.to_lowercase(),
+                &$input.to_lowercase(),
+                $dialect
+            ))
+        };
+    }
 
     fn dialect(s: &str) -> i32 {
         match s {
