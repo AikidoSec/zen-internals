@@ -1,5 +1,5 @@
 [package]
-name = "zen-internals"
+name = "zen_internals"
 version = "0.0.0" # Will be replaced with npm version when publishing
 edition = "2021"
 authors = ["Aikido Security"]
@@ -8,7 +8,7 @@ license = "AGPL-3.0-or-later"
 
 [lib]
 name = "zen_internals"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 oxc = "0.38.0"
@@ -17,10 +17,15 @@ sqlparser = { git = "https://github.com/AikidoSec/datafusion-sqlparser-rs.git", 
 url = "2.5.2"
 wasm-bindgen = "0.2"
 
-[dev-dependencies]
-rand = "0.8.5"
-
 [profile.release]
 strip = true
 opt-level = "s"
 lto = true
+
+[features]
+benchmarking = []
+
+[workspace]
+members = [
+    "benchmarks",
+]

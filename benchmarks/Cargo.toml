@@ -1,0 +1,16 @@
+[package]
+name = "benchmarks"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+zen_internals = { path = "../", features = ["benchmarking"] }
+
+[[bench]]
+name = "sql_injection"
+harness = false
+
+[[bench]]
+name = "js_injection"
+harness = false

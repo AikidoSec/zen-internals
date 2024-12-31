@@ -1,25 +1,26 @@
-macro_rules! is_injection {
-    ($code:expr, $input:expr, $sourcetype:expr) => {
-        assert!(detect_js_injection_str(
-            &$code.to_lowercase(),
-            &$input.to_lowercase(),
-            $sourcetype
-        ))
-    };
-}
-macro_rules! not_injection {
-    ($code:expr, $input:expr, $sourcetype:expr) => {
-        assert!(!detect_js_injection_str(
-            &$code.to_lowercase(),
-            &$input.to_lowercase(),
-            $sourcetype
-        ))
-    };
-}
-
 #[cfg(test)]
 mod tests {
     use crate::js_injection::detect_js_injection::detect_js_injection_str;
+
+    macro_rules! is_injection {
+        ($code:expr, $input:expr, $sourcetype:expr) => {
+            assert!(detect_js_injection_str(
+                &$code.to_lowercase(),
+                &$input.to_lowercase(),
+                $sourcetype
+            ))
+        };
+    }
+
+    macro_rules! not_injection {
+        ($code:expr, $input:expr, $sourcetype:expr) => {
+            assert!(!detect_js_injection_str(
+                &$code.to_lowercase(),
+                &$input.to_lowercase(),
+                $sourcetype
+            ))
+        };
+    }
 
     #[test]
     fn test_cjs_const() {
@@ -65,7 +66,6 @@ mod tests {
     }
 
     #[test]
-
     fn mongodb_js() {
         not_injection!("this.name === 'a' && sleep(2000) && 'b'", "a", 0);
         not_injection!("this.group === 1", "1", 0);
@@ -217,7 +217,7 @@ mod tests {
                         {type:'pipe',readable:!0,writable:!1},
                         {type:'pipe',readable:!1,writable:!0},
                         {type:'pipe',readable:!1,writable:!0}
-                
+
                     ]
                 })
                 return {}
@@ -233,7 +233,7 @@ mod tests {
                         {type:'pipe',readable:!0,writable:!1},
                         {type:'pipe',readable:!1,writable:!0},
                         {type:'pipe',readable:!1,writable:!0}
-                
+
                     ]
                 })
                 return {}
