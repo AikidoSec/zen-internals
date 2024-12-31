@@ -11,8 +11,12 @@ fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| detect_sql_injection_str(black_box(sql), black_box(user), black_box(dialect)))
     });
 
+    let safeUserInput = "1";
+
     c.bench_function("is not injection", |b| {
-        b.iter(|| detect_sql_injection_str(black_box(sql), black_box("1"), black_box(dialect)))
+        b.iter(|| {
+            detect_sql_injection_str(black_box(sql), black_box(safeUserInput), black_box(dialect))
+        })
     });
 
     c.bench_function("big sql", |b| {
@@ -21,7 +25,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| {
             detect_sql_injection_str(
                 black_box(&sql),
-                black_box("hello world"),
+                black_box("hello world"), // user input
                 black_box(dialect),
             )
         });

@@ -17,7 +17,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| {
             detect_js_injection_str(
                 black_box(code),
-                black_box("Hello World!"),
+                black_box("Hello World!"), // user input
                 black_box(sourcetype),
             )
         })
@@ -28,7 +28,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| {
             detect_js_injection_str(
                 black_box(&code),
-                black_box("Hello World!"),
+                black_box("Hello World!"), // user input
                 black_box(sourcetype),
             )
         })

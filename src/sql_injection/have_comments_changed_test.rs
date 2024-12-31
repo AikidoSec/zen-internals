@@ -52,9 +52,9 @@ mod tests {
             "SELECT DISTINCT job_title FROM employees; --Ciao"
         );
         not_comments_changed!(
-            "UPDATE employees SET salary = salary * 1.10;--Ciao;
+            "UPDATE employees SET salary = salary * 1.10;--Ciao; 
             HERE department = 'Sales' -- Hello",
-            "SELECT DISTINCT job_title FROM employees; --Ciao;
+            "SELECT DISTINCT job_title FROM employees; --Ciao; 
             -- Hello"
         );
     }
