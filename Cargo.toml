@@ -24,7 +24,6 @@ lto = true
 
 [features]
 benchmarking = []
-wasm_bindgen_unstable_test_coverage = []
 
 [workspace]
 members = [
