@@ -1,8 +1,7 @@
 import { assertEquals, } from "https://deno.land/std/testing/asserts.ts";
 
 const libSuffix = Deno.build.os == "darwin" ? "dylib" : "so";
-const targetDir = Deno.build.os == "darwin" ? "aarch64-apple-darwin" : "x86_64-unknown-linux-gnu";
-const fullTargetDir = `./target/${targetDir}/release/libzen_internals.${libSuffix}`;
+const fullTargetDir = `./target/release/libzen_internals.${libSuffix}`;
 
 const lib = Deno.dlopen(
     fullTargetDir,
