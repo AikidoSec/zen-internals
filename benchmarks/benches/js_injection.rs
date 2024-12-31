@@ -26,7 +26,11 @@ fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("big code", |b| {
         let code = "const test = 'Hello World!';".repeat(1000);
         b.iter(|| {
-            detect_js_injection_str(black_box(&code), black_box("Hello World!"), black_box(sourcetype))
+            detect_js_injection_str(
+                black_box(&code),
+                black_box("Hello World!"),
+                black_box(sourcetype),
+            )
         })
     });
 }
