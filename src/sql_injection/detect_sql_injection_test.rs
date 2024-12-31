@@ -673,4 +673,13 @@ mod tests {
             dialect("sqlite")
         );
     }
+
+    #[test]
+    fn test_nested_comments() {
+        is_injection!(
+            "insert into cats_2 (petname) values ('foo'),/*/**/*/(version()||'');",
+            "foo'),/*/**/*/(version()||'",
+            dialect("postgresql")
+        );
+    }
 }
