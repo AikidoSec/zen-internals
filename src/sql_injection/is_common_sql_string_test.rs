@@ -177,7 +177,9 @@ mod tests {
     #[test]
     fn test_it_returns_false_if_its_not_an_integer() {
         assert_eq!(is_common_sql_string("--1"), false);
+        assert_eq!(is_common_sql_string("1--"), false);
         assert_eq!(is_common_sql_string("-1-"), false);
+        assert_eq!(is_common_sql_string("-1--"), false);
         assert_eq!(is_common_sql_string("-1.0"), false);
         assert_eq!(is_common_sql_string("-1 --"), false);
         assert_eq!(is_common_sql_string("-1 "), false);
