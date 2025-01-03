@@ -674,4 +674,21 @@ mod tests {
             dialect("sqlite")
         );
     }
+
+    #[test]
+    fn test_false_pos_integer_with_minus_sign() {
+        not_injection!("SELECT * FROM users WHERE id IN (-1,571,639)", "-1");
+        not_injection!("SELECT * FROM users WHERE id IN (-2,571,639)", "-2");
+    }
+
+    #[test]
+    fn test_injection_minus_sign() {
+        is_injection!("SELECT * FROM users WHERE id IN (-1) -- ", "-1) -- ");
+        is_injection!("SELECT * FROM users WHERE id IN (-1) -- -1", "-- -1");
+        is_injection!(
+            "SELECT * FROM users WHERE id IN (-1, 571, 639)",
+            "-1, 571, 639"
+        );
+        is_injection!("SELECT * FROM users WHERE id IN (-1,571,639)", "-1,571,639");
+    }
 }
