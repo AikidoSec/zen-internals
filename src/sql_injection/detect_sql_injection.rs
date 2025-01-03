@@ -23,7 +23,6 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
     // If the user input only contains comma separated numbers, it's not an injection.
     // `-1` is tokenized as separate tokens, the token amount will change after replacing user input.
     if is_safe_sql_string(userinput, dialect) {
-        // If the user input is safe for the given dialect, it's not an injection.
         return false;
     }
 
