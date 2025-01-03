@@ -674,4 +674,9 @@ mod tests {
             dialect("sqlite")
         );
     }
+
+    #[test]
+    fn test_false_pos_integer_with_minus_sign() {
+        not_injection!("SELECT * FROM users WHERE id IN (-1,571,639)", "-1");
+    }
 }

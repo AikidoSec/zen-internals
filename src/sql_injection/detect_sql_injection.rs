@@ -1,5 +1,6 @@
 use super::have_comments_changed::have_comments_changed;
 use super::is_common_sql_string::is_common_sql_string;
+use super::is_safe_sql_string::is_safe_sql_string;
 use super::tokenize_query::tokenize_query;
 use crate::diff_in_vec_len;
 use sqlparser::tokenizer::Token;
@@ -16,6 +17,13 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
     // "SELECT *", "INSERT INTO", ... will occur in most queries
     // If the user input is equal to any of these, we can assume it's not an injection.
     if is_common_sql_string(userinput) {
+        return false;
+    }
+
+    // If the user input only contains comma separated numbers, it's not an injection.
+    // `-1` is tokenized as separate tokens, the token amount will change after replacing user input.
+    if is_safe_sql_string(userinput, dialect) {
+        // If the user input is safe for the given dialect, it's not an injection.
         return false;
     }
 
@@ -45,6 +53,7 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
         // If a delta exists in all tokens, mark this as an injection.
         return true;
     }
+
     if have_comments_changed(tokens, tokens_without_input) {
         // This checks if structure of comments in the query is altered after removing user input.
         // It makes sure the lengths of all single line and multiline comments are all still the same
