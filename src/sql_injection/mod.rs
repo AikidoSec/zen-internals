@@ -13,6 +13,3 @@ pub mod filter_for_comment_tokens;
 
 pub mod have_comments_changed;
 pub mod have_comments_changed_test;
-
-pub mod is_safe_sql_string;
-pub mod is_safe_sql_string_test;

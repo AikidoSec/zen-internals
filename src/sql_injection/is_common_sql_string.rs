@@ -54,5 +54,13 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         return looks_like_table_column.is_match(user_input);
     }
 
+    // Allow integers like `1`, `-1` or `-2`
+    // We have to be careful with minus signs, as they can be used for SQL injections
+    let looks_like_int: Regex = Regex::new(r"^-?[0-9]+$").unwrap();
+
+    if looks_like_int.is_match(user_input) {
+        return true;
+    }
+
     return false;
 }

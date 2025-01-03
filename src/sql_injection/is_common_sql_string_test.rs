@@ -63,7 +63,6 @@ mod tests {
         assert_eq!(is_common_sql_string("desc 1"), false);
         assert_eq!(is_common_sql_string("1asc"), false);
         assert_eq!(is_common_sql_string("1desc"), false);
-        assert_eq!(is_common_sql_string("1"), false);
         assert_eq!(is_common_sql_string("1 "), false);
         assert_eq!(is_common_sql_string("1;"), false);
         assert_eq!(is_common_sql_string("1--"), false);
@@ -160,5 +159,37 @@ mod tests {
         assert_eq!(is_common_sql_string("table.column = 1 "), false);
         assert_eq!(is_common_sql_string("table.column table.column"), false);
         assert_eq!(is_common_sql_string("table.column,table.column"), false);
+    }
+
+    #[test]
+    fn test_negative_integers() {
+        assert_eq!(is_common_sql_string("-0"), true);
+        assert_eq!(is_common_sql_string("-1"), true);
+        assert_eq!(is_common_sql_string("-12"), true);
+        assert_eq!(is_common_sql_string("-123"), true);
+        assert_eq!(is_common_sql_string("-1234"), true);
+        assert_eq!(is_common_sql_string("1"), true);
+        assert_eq!(is_common_sql_string("12"), true);
+        assert_eq!(is_common_sql_string("123"), true);
+        assert_eq!(is_common_sql_string("0"), true);
+    }
+
+    #[test]
+    fn test_it_returns_false_for_negative_integers_false_positive() {
+        assert_eq!(is_common_sql_string("--1"), false);
+        assert_eq!(is_common_sql_string("-1-"), false);
+        assert_eq!(is_common_sql_string("-1.0"), false);
+        assert_eq!(is_common_sql_string("-1 --"), false);
+        assert_eq!(is_common_sql_string("-1 "), false);
+        assert_eq!(is_common_sql_string("-1;"), false);
+        assert_eq!(is_common_sql_string("-1\t"), false);
+        assert_eq!(is_common_sql_string("-1\n"), false);
+        assert_eq!(is_common_sql_string("-1\n;"), false);
+        assert_eq!(is_common_sql_string("--"), false);
+        assert_eq!(is_common_sql_string("-- -1"), false);
+        assert_eq!(is_common_sql_string("-1,"), false);
+        assert_eq!(is_common_sql_string("-1(--)"), false);
+        assert_eq!(is_common_sql_string("-1 /*"), false);
+        assert_eq!(is_common_sql_string("-1 /* abc */"), false);
     }
 }
