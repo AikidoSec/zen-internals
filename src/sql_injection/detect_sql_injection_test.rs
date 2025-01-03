@@ -681,4 +681,9 @@ mod tests {
         not_injection!("SELECT * FROM users WHERE id IN (-1, 571, 639)", "-1, 571, 639");
         not_injection!("SELECT * FROM users WHERE id IN (-1,571,639)", "-1,571,639");
     }
+
+    #[test]
+    fn test_injection_minus_sign() {
+        is_injection!("SELECT * FROM users WHERE id IN (-1) -- ", "-1) -- ");
+    }
 }
