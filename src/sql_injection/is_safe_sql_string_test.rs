@@ -56,6 +56,7 @@ mod tests {
 
     #[test]
     fn test_is_unsafe_sql_input() {
+        is_unsafe_for_every_dialect!("--");
         is_unsafe_for_every_dialect!("--1");
         is_unsafe_for_every_dialect!("-1--");
         is_unsafe_for_every_dialect!("---1");
