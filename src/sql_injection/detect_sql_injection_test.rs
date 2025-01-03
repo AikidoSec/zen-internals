@@ -688,5 +688,6 @@ mod tests {
     #[test]
     fn test_injection_minus_sign() {
         is_injection!("SELECT * FROM users WHERE id IN (-1) -- ", "-1) -- ");
+        is_injection!("SELECT * FROM users WHERE id IN (-1) -- -1", "-- -1");
     }
 }
