@@ -44,18 +44,25 @@ mod tests {
     #[test]
     fn test_is_safe_sql_input() {
         is_safe_for_every_dialect!("-1");
-        is_safe_for_every_dialect!("1");
-        is_safe_for_every_dialect!("1.2");
         is_safe_for_every_dialect!("-1.2");
-        is_safe_for_every_dialect!("1,2,3,4");
-        is_safe_for_every_dialect!("1\t,2,3,4");
-        is_safe_for_every_dialect!("1, 2, 3, 4");
-        is_safe_for_every_dialect!("1, 2, 3, -4");
-        is_safe_for_every_dialect!("1,-2,3,-4");
+        is_safe_for_every_dialect!("-1,2,3,4");
+        is_safe_for_every_dialect!("-1\t,2,3,4");
+        is_safe_for_every_dialect!("-1, 2, 3, 4");
+        is_safe_for_every_dialect!("-1, 2, 3, -4");
+        is_safe_for_every_dialect!("-1,-2,3,-4");
     }
 
     #[test]
     fn test_is_unsafe_sql_input() {
+        // Does not start with -
+        is_unsafe_for_every_dialect!("1");
+        is_unsafe_for_every_dialect!("1.2");
+        is_unsafe_for_every_dialect!("1,2,3,4");
+        is_unsafe_for_every_dialect!("1\t,2,3,4");
+        is_unsafe_for_every_dialect!("1, 2, 3, 4");
+        is_unsafe_for_every_dialect!("1, 2, 3, -4");
+        is_unsafe_for_every_dialect!("1,-2,3,-4");
+
         is_unsafe_for_every_dialect!("--");
         is_unsafe_for_every_dialect!("--1");
         is_unsafe_for_every_dialect!("-1--");

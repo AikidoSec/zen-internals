@@ -2,6 +2,10 @@ use crate::sql_injection::tokenize_query::tokenize_query;
 use sqlparser::tokenizer::{Token, Whitespace};
 
 pub fn is_safe_sql_string(user_input: &str, dialect: i32) -> bool {
+    if !user_input.starts_with("-") {
+        return false;
+    }
+
     let tokens = tokenize_query(user_input, dialect);
 
     if tokens.len() == 0 {
