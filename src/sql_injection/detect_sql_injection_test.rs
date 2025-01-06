@@ -691,4 +691,29 @@ mod tests {
         );
         is_injection!("SELECT * FROM users WHERE id IN (-1,571,639)", "-1,571,639");
     }
+
+    #[test]
+    fn test_partial_match_single_quote() {
+        let starts_with = r#"
+            SELECT "foo" WHERE "bar" = '''; sleep 15 ;"'
+        "#;
+
+        // r#"..."# is a raw string literal
+        not_injection!(starts_with, r#"'; sleep 15 ;""#);
+    }
+
+    #[test]
+    fn test_multiple_partial_match_single_quote() {
+        not_injection!("SELECT '''abc', '''abc' FROM table", "'abc");
+        not_injection!("SELECT 'abc''', 'abc''' FROM table", "abc'");
+        not_injection!("SELECT '''abc''', '''abc''' FROM table", "'abc'");
+    }
+
+    #[test]
+    fn test_multiple_partial_match_double_quote() {
+        // r#"..."# is a raw string literal
+        not_injection!(r#"SELECT """"abc", """"abc"" FROM table"#, r#""abc"#);
+        not_injection!(r#"SELECT "abc"""", "abc""" FROM table"#, r#"abc""#);
+        not_injection!(r#"SELECT """"abc""", """"abc"" FROM table"#, r#""abc"#);
+    }
 }
