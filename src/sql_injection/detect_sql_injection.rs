@@ -35,7 +35,7 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
     if userinput.contains("'") || userinput.contains('"') {
         let mut matches = find_all_matches(query, userinput).len();
 
-        fn is_quoted_match(input: &str, userinput: &str, quote: char) -> bool {
+        fn is_safely_escaped(input: &str, userinput: &str, quote: char) -> bool {
             let quoted_start = format!("{quote}{userinput}");
             let quoted_end = format!("{userinput}{quote}");
             let fully_quoted = format!("{quote}{userinput}{quote}");
@@ -45,14 +45,14 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
 
         for token in tokens.iter() {
             match token {
-                Token::SingleQuotedString(s) if is_quoted_match(s, userinput, '\'') => matches -= 1,
-                Token::DoubleQuotedString(s) if is_quoted_match(s, userinput, '"') => matches -= 1,
+                Token::SingleQuotedString(s) if is_safely_escaped(s, userinput, '\'') => matches -= 1,
+                Token::DoubleQuotedString(s) if is_safely_escaped(s, userinput, '"') => matches -= 1,
                 _ => {}
             }
         }
 
         if matches == 0 {
-            // All matches were found in strings, so it's not an injection.
+            // All matches are safely escaped, not an injection.
             return false;
         }
     }
