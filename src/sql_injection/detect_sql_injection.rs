@@ -33,34 +33,19 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
     // `'value` becomes `'''value'` in the query so we still find an exact match
     if userinput.contains("'") || userinput.contains(r#"""#) {
         let mut matches = find_all_matches(query, userinput).len();
+
+        fn is_quoted_match(input: &str, userinput: &str, quote: char) -> bool {
+            let quoted_start = format!("{quote}{userinput}");
+            let quoted_end = format!("{userinput}{quote}");
+            let fully_quoted = format!("{quote}{userinput}{quote}");
+
+            input == quoted_start || input == quoted_end || input == fully_quoted
+        }
+
         for token in tokens.iter() {
             match token {
-                Token::SingleQuotedString(s) => {
-                    let single_quoted_start = "'".to_owned() + userinput; // 'userinput
-                    let single_quoted_end = userinput.to_owned() + "'";   // userinput'
-                    let fully_quoted = "'".to_owned() + userinput + "'";  // 'userinput'
-
-                    if *s == single_quoted_start {
-                        matches -= 1;
-                    } else if *s == single_quoted_end {
-                        matches -= 1;
-                    } else if *s == fully_quoted {
-                        matches -= 1;
-                    }
-                },
-                Token::DoubleQuotedString(s) => {
-                    let double_quoted_start = r#"""#.to_owned() + userinput; // "userinput
-                    let double_quoted_end = userinput.to_owned() + r#"""#;   // userinput"
-                    let fully_quoted = r#"""#.to_owned() + userinput + r#"""#;  // "userinput"
-
-                    if *s == double_quoted_start {
-                        matches -= 1;
-                    } else if *s == double_quoted_end {
-                        matches -= 1;
-                    } else if *s == fully_quoted {
-                        matches -= 1;
-                    }
-                },
+                Token::SingleQuotedString(s) if is_quoted_match(s, userinput, '\'') => matches -= 1,
+                Token::DoubleQuotedString(s) if is_quoted_match(s, userinput, '"') => matches -= 1,
                 _ => {}
             }
         }
