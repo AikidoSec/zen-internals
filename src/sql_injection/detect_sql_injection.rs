@@ -45,8 +45,12 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
 
         for token in tokens.iter() {
             match token {
-                Token::SingleQuotedString(s) if is_safely_escaped(s, userinput, '\'') => matches -= 1,
-                Token::DoubleQuotedString(s) if is_safely_escaped(s, userinput, '"') => matches -= 1,
+                Token::SingleQuotedString(s) if is_safely_escaped(s, userinput, '\'') => {
+                    matches -= 1
+                }
+                Token::DoubleQuotedString(s) if is_safely_escaped(s, userinput, '"') => {
+                    matches -= 1
+                }
                 _ => {}
             }
         }
