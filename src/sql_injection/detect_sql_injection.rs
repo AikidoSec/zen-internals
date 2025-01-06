@@ -33,29 +33,26 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
     // `'value` becomes `'''value'` in the query so we still find an exact match
     // (vice versa for double quotes)
     if userinput.contains("'") || userinput.contains('"') {
-        let mut matches = find_all_matches(query, userinput).len();
-
-        fn is_safely_escaped(input: &str, userinput: &str, quote: char) -> bool {
-            let quoted_start = format!("{quote}{userinput}");
-            let quoted_end = format!("{userinput}{quote}");
-            let fully_quoted = format!("{quote}{userinput}{quote}");
-
-            input == quoted_start || input == quoted_end || input == fully_quoted
-        }
+        let matches = find_all_matches(query, userinput).len();
+        let mut safely_escaped = 0;
 
         for token in tokens.iter() {
             match token {
-                Token::SingleQuotedString(s) if is_safely_escaped(s, userinput, '\'') => {
-                    matches -= 1
+                Token::SingleQuotedString(s)
+                    if userinput.contains("'") && s.contains(userinput) =>
+                {
+                    safely_escaped += 1
                 }
-                Token::DoubleQuotedString(s) if is_safely_escaped(s, userinput, '"') => {
-                    matches -= 1
+                Token::DoubleQuotedString(s)
+                    if userinput.contains('"') && s.contains(userinput) =>
+                {
+                    safely_escaped += 1
                 }
                 _ => {}
             }
         }
 
-        if matches == 0 {
+        if matches == safely_escaped {
             // All matches are safely escaped, not an injection.
             return false;
         }
