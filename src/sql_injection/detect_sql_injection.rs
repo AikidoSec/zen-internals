@@ -31,7 +31,7 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
     // Normally if the user input is properly escaped, we wouldn't find an exact match in the query
     // However, if the user input is `'value` and single quote is used to escape
     // `'value` becomes `'''value'` in the query so we still find an exact match
-    if userinput.contains("'") || userinput.contains(r#"""#) {
+    if userinput.contains("'") || userinput.contains('"') {
         let mut matches = find_all_matches(query, userinput).len();
 
         fn is_quoted_match(input: &str, userinput: &str, quote: char) -> bool {
