@@ -685,6 +685,15 @@ mod tests {
     }
 
     #[test]
+    fn test_newline_single_line_comment() {
+        is_injection!(
+            "insert into cats_2 (petname) values ('foo'),--\r(version()||'\n');",
+            "foo'),--\r(version()||'\n",
+            dialect("postgresql")
+        );
+    }
+
+    #[test]
     fn test_false_pos_integer_with_minus_sign() {
         not_injection!("SELECT * FROM users WHERE id IN (-1,571,639)", "-1");
         not_injection!("SELECT * FROM users WHERE id IN (-2,571,639)", "-2");
