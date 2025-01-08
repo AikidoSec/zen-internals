@@ -699,10 +699,22 @@ mod tests {
         // r#"..."# is a raw string literal
         not_injection!(starts_with, r#"'; sleep 15 ;""#);
 
-        not_injection!("SELECT name FROM table WHERE id = ''' OR 1=1 --'", "' OR 1=1 --");
-        not_injection!("SELECT name FROM table WHERE id = 'before'' OR 1=1 --'", "' OR 1=1 --");
-        not_injection!("SELECT name FROM table WHERE id = ''' OR 1=1 --after'", "' OR 1=1 --");
-        not_injection!("SELECT name FROM table WHERE id = 'before'' OR 1=1 --after'", "' OR 1=1 --");
+        not_injection!(
+            "SELECT name FROM table WHERE id = ''' OR 1=1 --'",
+            "' OR 1=1 --"
+        );
+        not_injection!(
+            "SELECT name FROM table WHERE id = 'before'' OR 1=1 --'",
+            "' OR 1=1 --"
+        );
+        not_injection!(
+            "SELECT name FROM table WHERE id = ''' OR 1=1 --after'",
+            "' OR 1=1 --"
+        );
+        not_injection!(
+            "SELECT name FROM table WHERE id = 'before'' OR 1=1 --after'",
+            "' OR 1=1 --"
+        );
         not_injection!("SELECT name FROM table WHERE id = '''", "'");
         not_injection!("SELECT name FROM table WHERE id = '''''", "''");
 
@@ -716,22 +728,52 @@ mod tests {
         not_injection!("SELECT 'abc''', 'abc''' FROM table", "abc'");
         not_injection!("SELECT '''abc''', '''abc''' FROM table", "'abc'");
 
-        is_injection!("SELECT ''' OR 1=1 --' FROM table WHERE id = '' OR 1=1 --'", "' OR 1=1 --");
-        is_injection!("SELECT ''' OR 1=1 --' FROM table WHERE id = 'before' OR 1=1 --'", "' OR 1=1 --");
-        is_injection!("SELECT ''' OR 1=1 --' FROM table WHERE id = '' OR 1=1 --'after", "' OR 1=1 --");
-        is_injection!("SELECT ''' OR 1=1 --' FROM table WHERE id = 'before' OR 1=1 --'after", "' OR 1=1 --");
+        is_injection!(
+            "SELECT ''' OR 1=1 --' FROM table WHERE id = '' OR 1=1 --'",
+            "' OR 1=1 --"
+        );
+        is_injection!(
+            "SELECT ''' OR 1=1 --' FROM table WHERE id = 'before' OR 1=1 --'",
+            "' OR 1=1 --"
+        );
+        is_injection!(
+            "SELECT ''' OR 1=1 --' FROM table WHERE id = '' OR 1=1 --'after",
+            "' OR 1=1 --"
+        );
+        is_injection!(
+            "SELECT ''' OR 1=1 --' FROM table WHERE id = 'before' OR 1=1 --'after",
+            "' OR 1=1 --"
+        );
     }
 
     #[test]
     fn test_multiple_partial_match_double_quote() {
         // r#"..."# is a raw string literal
-        not_injection!(r#"    SELECT """"abc", """"abc"" FROM table    "#, r#""abc"#);
+        not_injection!(
+            r#"    SELECT """"abc", """"abc"" FROM table    "#,
+            r#""abc"#
+        );
         not_injection!(r#"    SELECT "abc"""", "abc""" FROM table    "#, r#"abc""#);
-        not_injection!(r#"    SELECT """"abc""", """"abc"" FROM table    "#, r#""abc"#);
+        not_injection!(
+            r#"    SELECT """"abc""", """"abc"" FROM table    "#,
+            r#""abc"#
+        );
 
-        is_injection!(r#"    SELECT "" OR 1=1 --" FROM table WHERE id = "" OR 1=1 --"    "#, r#"" OR 1=1 --"#);
-        is_injection!(r#"    SELECT "" OR 1=1 --" FROM table WHERE id = "before" OR 1=1 --"    "#, r#"" OR 1=1 --"#);
-        is_injection!(r#"    SELECT "" OR 1=1 --" FROM table WHERE id = "" OR 1=1 --"after    "#, r#"" OR 1=1 --"#);
-        is_injection!(r#"    SELECT "" OR 1=1 --" FROM table WHERE id = "before" OR 1=1 --"after    "#, r#"" OR 1=1 --"#);
+        is_injection!(
+            r#"    SELECT "" OR 1=1 --" FROM table WHERE id = "" OR 1=1 --"    "#,
+            r#"" OR 1=1 --"#
+        );
+        is_injection!(
+            r#"    SELECT "" OR 1=1 --" FROM table WHERE id = "before" OR 1=1 --"    "#,
+            r#"" OR 1=1 --"#
+        );
+        is_injection!(
+            r#"    SELECT "" OR 1=1 --" FROM table WHERE id = "" OR 1=1 --"after    "#,
+            r#"" OR 1=1 --"#
+        );
+        is_injection!(
+            r#"    SELECT "" OR 1=1 --" FROM table WHERE id = "before" OR 1=1 --"after    "#,
+            r#"" OR 1=1 --"#
+        );
     }
 }
