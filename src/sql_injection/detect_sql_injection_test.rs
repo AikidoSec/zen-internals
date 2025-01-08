@@ -760,19 +760,19 @@ mod tests {
         );
 
         is_injection!(
-            r#"    SELECT "" OR 1=1 --" FROM table WHERE id = "" OR 1=1 --"    "#,
+            r#"    SELECT """ OR 1=1 --" FROM table WHERE id = "" OR 1=1 --"    "#,
             r#"" OR 1=1 --"#
         );
         is_injection!(
-            r#"    SELECT "" OR 1=1 --" FROM table WHERE id = "before" OR 1=1 --"    "#,
+            r#"    SELECT """" OR 1=1 --" FROM table WHERE id = "before" OR 1=1 --"    "#,
             r#"" OR 1=1 --"#
         );
         is_injection!(
-            r#"    SELECT "" OR 1=1 --" FROM table WHERE id = "" OR 1=1 --"after    "#,
+            r#"    SELECT """" OR 1=1 --" FROM table WHERE id = "" OR 1=1 --"after    "#,
             r#"" OR 1=1 --"#
         );
         is_injection!(
-            r#"    SELECT "" OR 1=1 --" FROM table WHERE id = "before" OR 1=1 --"after    "#,
+            r#"    SELECT """" OR 1=1 --" FROM table WHERE id = "before" OR 1=1 --"after    "#,
             r#"" OR 1=1 --"#
         );
     }
