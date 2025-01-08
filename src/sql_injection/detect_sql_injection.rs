@@ -2,6 +2,7 @@ use super::have_comments_changed::have_comments_changed;
 use super::is_common_sql_string::is_common_sql_string;
 use super::tokenize_query::tokenize_query;
 use crate::diff_in_vec_len;
+use crate::helpers::find_all_matches::find_all_matches;
 use sqlparser::tokenizer::Token;
 
 const SPACE_CHAR: char = ' ';
@@ -24,6 +25,37 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
     if tokens.len() <= 0 {
         // Tokens are empty, probably a parsing issue with original query, return false.
         return false;
+    }
+
+    // Special case for single or double quotes at start and/or end of user input
+    // Normally if the user input is properly escaped, we wouldn't find an exact match in the query
+    // However, if the user input is `'value` and the single quote is escaped with another single quote
+    // `'value` becomes `'''value'` in the query so we still find an exact match
+    // (vice versa for double quotes)
+    if userinput.contains("'") || userinput.contains('"') {
+        let matches = find_all_matches(query, userinput).len();
+        let mut safely_escaped = 0;
+
+        for token in tokens.iter() {
+            match token {
+                Token::SingleQuotedString(s)
+                    if userinput.contains("'") && s.contains(userinput) =>
+                {
+                    safely_escaped += 1
+                }
+                Token::DoubleQuotedString(s)
+                    if userinput.contains('"') && s.contains(userinput) =>
+                {
+                    safely_escaped += 1
+                }
+                _ => {}
+            }
+        }
+
+        if matches == safely_escaped {
+            // All matches are safely escaped, not an injection.
+            return false;
+        }
     }
 
     // Remove leading and trailing spaces from userinput :
