@@ -709,4 +709,13 @@ mod tests {
         );
         is_injection!("SELECT * FROM users WHERE id IN (-1,571,639)", "-1,571,639");
     }
+
+    #[test]
+    fn test_dollar_quoted_string() {
+        is_injection!(
+            "insert into cats_2 (petname) values ('foo'||$t$a$$t$||version()||'');",
+            "foo'||$t$a$$t$||version()||'",
+            dialect("postgresql")
+        );
+    }
 }
