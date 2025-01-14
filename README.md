@@ -60,4 +60,4 @@ const detected = wasm_detect_js_injection(
 console.log(detected); // 1
 ```
 
-By default, the function expects the input to be JavaScript code (CJS or ESM). TypeScript is also supported—specify the appropriate type by passing the corresponding [source type number](https://github.com/AikidoSec/zen-internals/blob/main/src/js_injection/helpers/select_sourcetype_based_on_enum.rs) as the third argument.
+By default, the function expects the input to be JavaScript code (CJS or ESM). TypeScript is also supported by specifying the appropriate type as the third argument with corresponding [source type number](https://github.com/AikidoSec/zen-internals/blob/main/src/js_injection/helpers/select_sourcetype_based_on_enum.rs).
