@@ -19,10 +19,7 @@ jobs:
           rustup component add llvm-tools-preview
 
       - name: Install code coverage tool
-        run: cargo install cargo-llvm-cov
-
-      - name: Install code coverage tool
-        run: cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
 
       - name: Run tests
         run: cargo llvm-cov run
