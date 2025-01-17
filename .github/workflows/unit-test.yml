@@ -22,7 +22,7 @@ jobs:
         uses: taiki-e/install-action@cargo-llvm-cov
 
       - name: Run tests
-        run: cargo llvm-cov run
+        run: cargo llvm-cov
 
       - name: Generate coverage report
         run: cargo llvm-cov report --lcov --output-path target/lcov.info
