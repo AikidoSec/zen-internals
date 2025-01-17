@@ -3,7 +3,7 @@ name: Build and Create Release
 on:
   push:
     tags:
-      - 'v*.*.*'  # Matches tags like v1.0.0, v2.1.3, etc.
+      - "v*.*.*" # Matches tags like v1.0.0, v2.1.3, etc.
 jobs:
   tests:
     uses: ./.github/workflows/unit-test.yml
@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v1
+        uses: actions/checkout@v4
 
       - name: Install ziglang
         uses: mlugg/setup-zig@v1
@@ -30,8 +30,7 @@ jobs:
           cargo install --locked cargo-zigbuild
 
       - name: Build for linux
-        run:
-          cargo zigbuild --target x86_64-unknown-linux-gnu.2.17 --release
+        run: cargo zigbuild --target x86_64-unknown-linux-gnu.2.17 --release
 
       - name: Prepare release
         run: |
@@ -55,7 +54,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v1
+        uses: actions/checkout@v4
 
       - name: Install ziglang
         uses: mlugg/setup-zig@v1
@@ -93,15 +92,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v1
+        uses: actions/checkout@v4
 
       - name: Install latest rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          default: true
-          target: x86_64-pc-windows-gnu
-          override: true
+        run: |
+          rustup update --no-self-update stable
+          rustup default stable
+          rustup target add x86_64-pc-windows-gnu
 
       - name: Build for windows
         run: |
@@ -133,15 +130,13 @@ jobs:
       sha256sum: ${{ steps.prep.outputs.sha256sum }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v1
+        uses: actions/checkout@v4
 
       - name: Install latest rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          target: x86_64-apple-darwin
-          default: true
-          override: true
+        run: |
+          rustup update --no-self-update stable
+          rustup default stable
+          rustup target add x86_64-apple-darwin
 
       - name: Build for mac
         run: |
@@ -173,15 +168,13 @@ jobs:
       sha256sum: ${{ steps.prep.outputs.sha256sum }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v1
+        uses: actions/checkout@v4
 
       - name: Install latest rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          target: aarch64-apple-darwin
-          default: true
-          override: true
+        run: |
+          rustup update --no-self-update stable
+          rustup default stable
+          rustup target add aarch64-apple-darwin
 
       - name: Build for mac
         run: |
@@ -216,12 +209,10 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: "18.x"
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-          override-file: rust-toolchain
+      - name: Install latest rust toolchain
+        run: |
+          rustup update --no-self-update stable
+          rustup default stable
       - name: Install wasm-pack
         run: cargo install wasm-pack
       - name: Build with wasm-pack
@@ -239,10 +230,17 @@ jobs:
           path: pkg/zen_internals.tgz*
 
   create-github-release:
-    needs: [build-linux, build-linux-arm64, build-windows, build-mac, build-mac-arm64]
+    needs:
+      [
+        build-linux,
+        build-linux-arm64,
+        build-windows,
+        build-mac,
+        build-mac-arm64,
+      ]
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # Grant write access to contents
+      contents: write # Grant write access to contents
 
     steps:
       - name: Checkout code
