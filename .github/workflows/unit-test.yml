@@ -19,6 +19,9 @@ jobs:
           rustup component add llvm-tools-preview
 
       - name: Install code coverage tool
+        run: cargo install cargo-llvm-cov
+
+      - name: Install code coverage tool
         run: cargo-llvm-cov
 
       - name: Run tests
