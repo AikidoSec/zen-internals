@@ -10,13 +10,19 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable  # You can specify a version like '1.60.0' or 'nightly'
-          override: true
+        run: |
+          rustup toolchain install stable
+          rustup default stable
+          rustup component add llvm-tools-preview
+
+      - name: Install code coverage tool
+        run: cargo-llvm-cov
 
       - name: Run tests
-        run: cargo test
+        run: cargo llvm-cov run
+
+      - name: Generate coverage report
+        run: cargo llvm-cov report --lcov --output-path target/lcov.info
