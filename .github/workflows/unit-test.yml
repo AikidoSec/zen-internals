@@ -26,3 +26,10 @@ jobs:
 
       - name: Generate coverage report
         run: cargo llvm-cov report --lcov --output-path target/lcov.info
+
+      - name: Upload coverage report to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          fail_ci_if_error: true
+          files: ./target/lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
