@@ -24,7 +24,7 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
     if tokens.len() <= 0 {
         if dialect == 3 && has_multiple_statements(query, dialect) {
             // Clickhouse does not support multiple statements
-            // The first statement will still be executed if of the other statements is still valid
+            // The first statement will still be executed if the other statements are invalid
             // We'll assume the original query is valid
             // If the query with user input replaced is valid, we'll assume it's an injection because it created a new statement
             let query_without_input = replace_user_input_with_safe_str(query, userinput);
