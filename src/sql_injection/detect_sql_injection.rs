@@ -83,12 +83,7 @@ fn has_multiple_statements(query: &str, dialect: i32) -> bool {
                 if let Some(Token::SemiColon) = tokens_stripped.last() {
                     let remaining = &query[i + 1..];
 
-                    if remaining.trim().len() <= 0 {
-                        return false;
-                    }
-
-                    return true;
-                    //return tokenize_query(remaining, dialect).len() <= 0;
+                    return remaining.trim().len() > 0;
                 }
             }
         }
