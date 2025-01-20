@@ -19,14 +19,6 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
         return false;
     }
 
-    // Remove leading and trailing spaces from user input
-    let trimmed_userinput = userinput.trim_matches(SPACE_CHAR);
-
-    if trimmed_userinput.len() <= 1 {
-        // If the trimmed user input is one character or empty, no injection took place.
-        return false;
-    }
-
     // Tokenize query :
     let tokens = tokenize_with_fallback(query, dialect);
     if tokens.len() <= 0 {
@@ -45,6 +37,14 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
         }
 
         // Tokens are empty, probably a parsing issue with original query, return false.
+        return false;
+    }
+
+    // Remove leading and trailing spaces from user input
+    let trimmed_userinput = userinput.trim_matches(SPACE_CHAR);
+
+    if trimmed_userinput.len() <= 1 {
+        // If the trimmed user input is one character or empty, no injection took place.
         return false;
     }
 
