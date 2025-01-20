@@ -24,18 +24,12 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
 
     // Tokens are empty, this means that the query is invalid
     if tokens.len() <= 0 {
-        if dialect == 3 && has_multiple_statements(query, dialect) {
+        if dialect == 3 && extra_statement_was_created_by_user_input(query, userinput, dialect) {
             // Clickhouse does not support multiple statements
             // The first statement will still be executed if the other statements are invalid
             // We'll assume the original query is valid
             // If the query with user input replaced is valid, we'll assume it's an injection because it created a new statement
-            let query_without_input = replace_user_input_with_safe_str(query, userinput);
-            let tokens_without_input =
-                tokenize_with_fallback(query_without_input.as_str(), dialect);
-
-            if tokens_without_input.len() > 0 {
-                return true;
-            }
+            return true;
         }
 
         // If the query is invalid, we can't determine if it's an injection
@@ -64,6 +58,36 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
         // This checks if structure of comments in the query is altered after removing user input.
         // It makes sure the lengths of all single line and multiline comments are all still the same
         // And makes sure no extra comments were added or that the order was altered.
+        return true;
+    }
+
+    return false;
+}
+
+fn extra_statement_was_created_by_user_input(query: &str, userinput: &str, dialect: i32) -> bool {
+    if !has_multiple_statements(query, dialect) {
+        return false;
+    }
+
+    let query_without_input = replace_user_input_with_safe_str(query, userinput);
+    let tokens_without_input =
+        tokenize_with_fallback(query_without_input.as_str(), dialect);
+
+    if tokens_without_input.len() <= 0 {
+        // Invalid query without user input
+        return false;
+    }
+
+    return is_single_statement(&tokens_without_input);
+}
+
+fn is_single_statement(tokens: &Vec<Token>) -> bool {
+    let has_semicolon = tokens.iter().any(|x| matches!(x, Token::SemiColon));
+
+    if !has_semicolon
+        || (matches!(tokens.last(), Some(Token::SemiColon))
+        && has_semicolon)
+    {
         return true;
     }
 
