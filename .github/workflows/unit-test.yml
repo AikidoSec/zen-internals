@@ -10,13 +10,26 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable  # You can specify a version like '1.60.0' or 'nightly'
-          override: true
+        run: |
+          rustup toolchain install stable
+          rustup default stable
+          rustup component add llvm-tools-preview
+
+      - name: Install code coverage tool
+        uses: taiki-e/install-action@cargo-llvm-cov
 
       - name: Run tests
-        run: cargo test
+        run: cargo llvm-cov
+
+      - name: Generate coverage report
+        run: cargo llvm-cov report --lcov --output-path target/lcov.info
+
+      - name: Upload coverage report to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          fail_ci_if_error: true
+          files: ./target/lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}

@@ -1,11 +1,13 @@
-# Zen Internals library.
+# Zen Internals library
+
+[![Codecov](https://img.shields.io/codecov/c/github/AikidoSec/zen-internals?style=flat-square)](https://app.codecov.io/gh/aikidosec/zen-internals)
 
 Zen Internals is a library that can be used via FFI in different languages. Contains algorithms to detect:
 
--   Shell Injections (WIP)
--   SQL Injections
+- SQL Injections
 - JS Code Injections
-## Python FFI Example code :
+
+## Python FFI Example code
 
 ```py
 import ctypes
