@@ -2,7 +2,6 @@ use super::have_comments_changed::have_comments_changed;
 use super::is_common_sql_string::is_common_sql_string;
 use super::tokenize_query::tokenize_query;
 use crate::diff_in_vec_len;
-use sqlparser::tokenizer::Token;
 
 const SPACE_CHAR: char = ' ';
 
