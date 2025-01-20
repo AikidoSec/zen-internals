@@ -21,6 +21,8 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
 
     // Tokenize query :
     let tokens = tokenize_with_fallback(query, dialect);
+
+    // Tokens are empty, this means that the query is invalid
     if tokens.len() <= 0 {
         if dialect == 3 && has_multiple_statements(query, dialect) {
             // Clickhouse does not support multiple statements
@@ -36,7 +38,7 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
             }
         }
 
-        // Tokens are empty, probably a parsing issue with original query, return false.
+        // If the query is invalid, we can't determine if it's an injection
         return false;
     }
 
