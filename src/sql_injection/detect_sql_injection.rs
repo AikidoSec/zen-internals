@@ -75,12 +75,13 @@ fn has_multiple_statements(query: &str, dialect: i32) -> bool {
         return false;
     }
 
+    // Find the first valid statement and see if there's anything left
     for (i, c) in query.char_indices() {
         if c == ';' {
             let statement = &query[..i + 1];
-            let tokens_stripped = tokenize_with_fallback(statement, dialect);
-            if tokens_stripped.len() > 0 {
-                if let Some(Token::SemiColon) = tokens_stripped.last() {
+            let tokens = tokenize_with_fallback(statement, dialect);
+            if tokens.len() > 0 {
+                if let Some(Token::SemiColon) = tokens.last() {
                     let remaining = &query[i + 1..];
 
                     return remaining.trim().len() > 0;
