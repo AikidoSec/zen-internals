@@ -4,34 +4,40 @@ mod tests {
 
     macro_rules! is_injection {
         ($query:expr, $input:expr) => {
-            assert!(detect_sql_injection_str(
-                &$query.to_lowercase(),
-                &$input.to_lowercase(),
-                0
-            ))
+            assert!(
+                detect_sql_injection_str(&$query.to_lowercase(), &$input.to_lowercase(), 0),
+                "should be an injection\nquery: {}\ninput: {}",
+                $query,
+                $input
+            )
         };
         ($query:expr, $input:expr, $dialect:expr) => {
-            assert!(detect_sql_injection_str(
-                &$query.to_lowercase(),
-                &$input.to_lowercase(),
+            assert!(
+                detect_sql_injection_str(&$query.to_lowercase(), &$input.to_lowercase(), $dialect),
+                "should be an injection\nquery: {}\ninput: {}\ndialect: {}\n",
+                $query,
+                $input,
                 $dialect
-            ))
+            )
         };
     }
     macro_rules! not_injection {
         ($query:expr, $input:expr) => {
-            assert!(!detect_sql_injection_str(
-                &$query.to_lowercase(),
-                &$input.to_lowercase(),
-                0
-            ))
+            assert!(
+                !detect_sql_injection_str(&$query.to_lowercase(), &$input.to_lowercase(), 0),
+                "should not be an injection\nquery: {}\ninput: {}",
+                $query,
+                $input
+            )
         };
         ($query:expr, $input:expr, $dialect:expr) => {
-            assert!(!detect_sql_injection_str(
-                &$query.to_lowercase(),
-                &$input.to_lowercase(),
+            assert!(
+                !detect_sql_injection_str(&$query.to_lowercase(), &$input.to_lowercase(), $dialect),
+                "should not be an injection\nquery: {}\ninput: {}\ndialect: {}\n",
+                $query,
+                $input,
                 $dialect
-            ))
+            )
         };
     }
 
@@ -40,6 +46,7 @@ mod tests {
             "mysql" => 8,
             "postgresql" => 9,
             "sqlite" => 12,
+            "clickhouse" => 3,
             _ => panic!("Unknown dialect"),
         }
     }
@@ -716,6 +723,68 @@ mod tests {
             "insert into cats_2 (petname) values ('foo'||$t$a$$t$||version()||'');",
             "foo'||$t$a$$t$||version()||'",
             dialect("postgresql")
+        );
+    }
+
+    #[test]
+    fn test_clickhouse_semicolon() {
+        // Since clickhouse doesn't support multiple statements, this is an injection
+        // Only the first statement is valid in this case, the second statement is not
+        is_injection!(
+            "insert into cats_table (id, petname) values (null, 'foo'||version());');",
+            "foo'||version());",
+            dialect("clickhouse")
+        );
+        is_injection!(
+            "select '1; abc' from table_name WHERE id = 1; abc",
+            "1; abc",
+            dialect("clickhouse")
+        );
+        is_injection!(
+            "select '1;' from table_name WHERE id = 1;",
+            "1;",
+            dialect("clickhouse")
+        );
+        is_injection!(
+            "select /* 1; */ from table_name WHERE id = 1;",
+            "1;",
+            dialect("clickhouse")
+        );
+        is_injection!(
+            "select 'a;' from table_name WHERE id = a; abc",
+            "a;",
+            dialect("clickhouse")
+        );
+        is_injection!(
+            "select 'a;' from table_name WHERE id = a; select 'a;",
+            "a; select 'a;",
+            dialect("clickhouse")
+        );
+
+        not_injection!(
+            "insert into cats_table (id, petname) values (null, 'foo||version());')",
+            "foo||version());",
+            dialect("clickhouse")
+        );
+        not_injection!(
+            "select 'a;' from table_name WHERE id = 1",
+            "a;",
+            dialect("clickhouse")
+        );
+        not_injection!(
+            "select * from table_name WHERE id = 1;",
+            "table_name",
+            dialect("clickhouse")
+        );
+        not_injection!(
+            "select /* 'abc'; */ from table_name WHERE id = 1;",
+            "'abc';",
+            dialect("clickhouse")
+        );
+        not_injection!(
+            "select 'a;' from table_name WHERE id = 'a;'; select 'a;';",
+            "a;",
+            dialect("clickhouse")
         );
     }
 }
