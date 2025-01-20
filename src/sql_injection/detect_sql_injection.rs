@@ -22,7 +22,7 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
     // Tokenize query :
     let tokens = tokenize_with_fallback(query, dialect);
     if tokens.len() <= 0 {
-        if dialect == 3 && query.contains(';') && has_multiple_statements(query, dialect) {
+        if dialect == 3 && has_multiple_statements(query, dialect) {
             // Clickhouse does not support multiple statements
             // The first statement will still be executed if of the other statements is still valid
             // We'll assume the original query is valid
@@ -68,8 +68,12 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
     return false;
 }
 
+/// Check if the query has multiple statements
+/// The other statements can be invalid
 fn has_multiple_statements(query: &str, dialect: i32) -> bool {
-    assert!(query.contains(';'));
+    if !query.contains(';') {
+        return false;
+    }
 
     for (i, c) in query.char_indices() {
         if c == ';' {
