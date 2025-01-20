@@ -70,8 +70,7 @@ fn extra_statement_was_created_by_user_input(query: &str, userinput: &str, diale
     }
 
     let query_without_input = replace_user_input_with_safe_str(query, userinput);
-    let tokens_without_input =
-        tokenize_with_fallback(query_without_input.as_str(), dialect);
+    let tokens_without_input = tokenize_with_fallback(query_without_input.as_str(), dialect);
 
     if tokens_without_input.len() <= 0 {
         // Invalid query without user input
@@ -84,10 +83,7 @@ fn extra_statement_was_created_by_user_input(query: &str, userinput: &str, diale
 fn is_single_statement(tokens: &Vec<Token>) -> bool {
     let has_semicolon = tokens.iter().any(|x| matches!(x, Token::SemiColon));
 
-    if !has_semicolon
-        || (matches!(tokens.last(), Some(Token::SemiColon))
-        && has_semicolon)
-    {
+    if !has_semicolon || (matches!(tokens.last(), Some(Token::SemiColon)) && has_semicolon) {
         return true;
     }
 
