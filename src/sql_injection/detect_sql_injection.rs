@@ -27,7 +27,6 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
         if dialect == 3 && extra_statement_was_created_by_user_input(query, userinput, dialect) {
             // Clickhouse does not support multiple statements
             // The first statement will still be executed if the other statements are invalid
-            // We'll assume the original query is valid
             // If the query with user input replaced is valid, we'll assume it's an injection because it created a new statement
             return true;
         }
