@@ -83,11 +83,11 @@ fn extra_statement_was_created_by_user_input(query: &str, userinput: &str, diale
 fn is_single_statement(tokens: &Vec<Token>) -> bool {
     let has_semicolon = tokens.iter().any(|x| matches!(x, Token::SemiColon));
 
-    if !has_semicolon || (matches!(tokens.last(), Some(Token::SemiColon)) && has_semicolon) {
+    if !has_semicolon {
         return true;
     }
 
-    return false;
+    matches!(tokens.last(), Some(Token::SemiColon)) && has_semicolon
 }
 
 /// Check if the query has multiple statements
