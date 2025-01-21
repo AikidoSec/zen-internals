@@ -8,6 +8,7 @@ mod tests {
             "postgresql" => 9,
             "sqlite" => 12,
             "clickhouse" => 3,
+            "generic" => 0,
             _ => panic!("Unknown dialect"),
         }
     }
@@ -18,6 +19,7 @@ mod tests {
             dialect("postgresql"),
             dialect("sqlite"),
             dialect("clickhouse"),
+            dialect("generic"),
         ]
     }
 
