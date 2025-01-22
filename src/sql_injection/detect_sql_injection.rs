@@ -2,7 +2,6 @@ use super::have_comments_changed::have_comments_changed;
 use super::is_common_sql_string::is_common_sql_string;
 use super::tokenize_query::tokenize_query;
 use crate::diff_in_vec_len;
-use sqlparser::tokenizer::Token;
 
 const SPACE_CHAR: char = ' ';
 
@@ -20,7 +19,7 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
     }
 
     // Tokenize query :
-    let tokens = tokenize_with_fallback(query, dialect);
+    let tokens = tokenize_query(query, dialect);
     if tokens.len() <= 0 {
         // Tokens are empty, probably a parsing issue with original query, return false.
         return false;
@@ -38,7 +37,7 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
     // Replace user input with string of equal length and tokenize again :
     let safe_replace_str = "a".repeat(trimmed_userinput.len());
     let query_without_input: &str = &query.replace(trimmed_userinput, safe_replace_str.as_str());
-    let tokens_without_input = tokenize_with_fallback(query_without_input, dialect);
+    let tokens_without_input = tokenize_query(query_without_input, dialect);
 
     // Check delta for both comment tokens and all tokens in general :
     if diff_in_vec_len!(tokens, tokens_without_input) {
@@ -54,14 +53,4 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
     }
 
     return false;
-}
-
-fn tokenize_with_fallback(query: &str, dialect: i32) -> Vec<Token> {
-    let query_tokens = tokenize_query(query, dialect);
-    if query_tokens.len() <= 0 && dialect != 0 {
-        // Dialect is not generic and query_tokens are empty, make fallback
-        return tokenize_query(query, 0);
-    }
-
-    return query_tokens;
 }
