@@ -734,6 +734,15 @@ mod tests {
     }
 
     #[test]
+    fn test_postgres_national_string() {
+        is_injection!(
+            "insert into cats_2 (petname) values ('',(select n'''''\\' from (select pg_sleep(20) as e) x), 'foo');",
+            "',(select n'''''\\' from (select pg_sleep(20) as e) x), 'foo",
+            dialect("postgresql")
+        );
+    }
+
+    #[test]
     fn test_injection_minus_sign() {
         is_injection!("SELECT * FROM users WHERE id IN (-1) -- ", "-1) -- ");
         is_injection!("SELECT * FROM users WHERE id IN (-1) -- -1", "-- -1");
