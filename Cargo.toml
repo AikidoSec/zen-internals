@@ -13,7 +13,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 oxc = "0.46.0"
 regex = "1.10.6"
-sqlparser = { git = "https://github.com/AikidoSec/datafusion-sqlparser-rs.git", rev = "1fab7b252f9114dc5da889eb74db68c3a922ec03" }
+sqlparser = { git = "https://github.com/AikidoSec/datafusion-sqlparser-rs.git", rev = "e003b3e2b541909cfe163e966972a8e0145bef75" }
 url = "2.5.2"
 wasm-bindgen = "0.2"
 
