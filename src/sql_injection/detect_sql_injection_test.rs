@@ -761,4 +761,13 @@ mod tests {
             dialect("postgresql")
         );
     }
+
+    #[test]
+    fn test_mysql_string_escape_constant() {
+        is_injection!(
+            "insert into cats(a,b,c) values ('foo'),((select e'\\u' from (select version() as e from dual) x)),('bar');",
+            "foo'),((select e'\\u' from (select version() as e from dual) x)),('bar",
+            dialect("mysql")
+        );
+    }
 }
