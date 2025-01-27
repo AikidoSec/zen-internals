@@ -16,7 +16,12 @@ jobs:
         run: |
           rustup toolchain install stable
           rustup default stable
-          rustup component add rustfmt
+          rustup component add rustfmt clippy
 
+      # Formatting
       - name: Run rustfmt
         run: cargo fmt -- --check
+
+      # Linting
+      - name: Run clippy
+        run: cargo clippy

@@ -7,7 +7,7 @@ use std::panic;
 use std::str;
 
 #[no_mangle]
-pub extern "C" fn detect_shell_injection(
+pub unsafe extern "C" fn detect_shell_injection(
     command: *const c_char,
     userinput: *const c_char,
 ) -> c_int {
@@ -34,7 +34,7 @@ pub extern "C" fn detect_shell_injection(
 }
 
 #[no_mangle]
-pub extern "C" fn detect_sql_injection(
+pub unsafe extern "C" fn detect_sql_injection(
     query: *const c_char,
     userinput: *const c_char,
     dialect: c_int,
@@ -62,7 +62,7 @@ pub extern "C" fn detect_sql_injection(
 }
 
 #[no_mangle]
-pub extern "C" fn detect_js_injection(
+pub unsafe extern "C" fn detect_js_injection(
     code: *const c_char,
     userinput: *const c_char,
     sourcetype: c_int,
