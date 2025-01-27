@@ -7,7 +7,7 @@ on:
         description: 'Whether to upload coverage report to Codecov'
         required: false
         type: boolean
-        default: true
+        default: false
   push: {}
 
 jobs:
@@ -35,7 +35,7 @@ jobs:
 
       - name: Upload coverage report to Codecov
         uses: codecov/codecov-action@v4
-        if: ${{ inputs.upload_coverage == true }}
+        if: ${{ github.event.inputs == null || github.event.inputs.upload_coverage == true }}
         with:
           fail_ci_if_error: true
           files: ./target/lcov.info
