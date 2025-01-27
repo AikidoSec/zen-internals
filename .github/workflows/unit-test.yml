@@ -7,7 +7,7 @@ on:
         description: 'Whether to upload coverage report to Codecov'
         required: false
         type: boolean
-        default: true
+        default: false
   push: {}
 
 jobs:
