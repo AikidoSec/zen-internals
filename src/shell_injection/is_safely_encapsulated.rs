@@ -24,8 +24,8 @@ pub fn is_safely_encapsulated(command: &str, user_input: &str) -> bool {
         let char_before_user_input = current_segment.chars().last();
         let char_after_user_input = next_segment.chars().next();
 
-        let is_escape_char = char_before_user_input
-            .map_or(false, |c| ESCAPE_CHARS.contains(&c.to_string().as_str()));
+        let is_escape_char =
+            char_before_user_input.is_some_and(|c| ESCAPE_CHARS.contains(&c.to_string().as_str()));
 
         if !is_escape_char {
             return false;
@@ -35,7 +35,7 @@ pub fn is_safely_encapsulated(command: &str, user_input: &str) -> bool {
             return false;
         }
 
-        if char_before_user_input.map_or(false, |c| user_input.contains(c)) {
+        if char_before_user_input.is_some_and(|c| user_input.contains(c)) {
             return false;
         }
 

@@ -12,11 +12,11 @@ pub fn filter_for_comment_tokens(tokens: Vec<Token>) -> Vec<Whitespace> {
         if let Token::Whitespace(whitespace) = token {
             // Token is whitespace, if this token is singleline comment or multiline,
             // Add to comments_vector.
-            let whitespace_is_comment = match whitespace {
-                Whitespace::SingleLineComment { .. } => true,
-                Whitespace::MultiLineComment(_) => true,
-                _ => false,
-            };
+            let whitespace_is_comment = matches!(
+                whitespace,
+                Whitespace::SingleLineComment { .. } | Whitespace::MultiLineComment(_)
+            );
+
             if whitespace_is_comment {
                 comments_vector.push(whitespace);
             }

@@ -6,6 +6,9 @@ use std::os::raw::{c_char, c_int};
 use std::panic;
 use std::str;
 
+/// # Safety
+///
+/// This function should only be called with valid pointers to C strings.
 #[no_mangle]
 pub unsafe extern "C" fn detect_shell_injection(
     command: *const c_char,
@@ -33,6 +36,9 @@ pub unsafe extern "C" fn detect_shell_injection(
     .unwrap_or(2)
 }
 
+/// # Safety
+///
+/// This function should only be called with valid pointers to C strings.
 #[no_mangle]
 pub unsafe extern "C" fn detect_sql_injection(
     query: *const c_char,
@@ -61,6 +67,9 @@ pub unsafe extern "C" fn detect_sql_injection(
     .unwrap_or(2)
 }
 
+/// # Safety
+///
+/// This function should only be called with valid pointers to C strings.
 #[no_mangle]
 pub unsafe extern "C" fn detect_js_injection(
     code: *const c_char,
