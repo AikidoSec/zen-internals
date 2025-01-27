@@ -21,5 +21,5 @@ pub fn have_comments_changed(comments1: &Vec<Comment>, comments2: &Vec<Comment>)
         }
     }
 
-    return false;
+    false
 }

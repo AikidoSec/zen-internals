@@ -22,5 +22,5 @@ pub fn filter_for_comment_tokens(tokens: Vec<Token>) -> Vec<Whitespace> {
             }
         }
     }
-    return comments_vector;
+    comments_vector
 }

@@ -15,14 +15,14 @@ const SAFE_OPERATORS: [BinaryOperator; 6] = [
 ];
 
 pub fn is_safe_js_input(user_input: &str, allocator: &Allocator, source_type: SourceType) -> bool {
-    let parser_result = Parser::new(&allocator, &user_input, source_type)
+    let parser_result = Parser::new(allocator, user_input, source_type)
         .with_options(ParseOptions {
             allow_return_outside_function: true,
             ..ParseOptions::default()
         })
         .parse();
 
-    if parser_result.panicked || parser_result.errors.len() > 0 {
+    if parser_result.panicked || !parser_result.errors.is_empty() {
         return false;
     }
 
@@ -31,7 +31,7 @@ pub fn is_safe_js_input(user_input: &str, allocator: &Allocator, source_type: So
     };
     ast_pass.visit_program(&parser_result.program);
 
-    return ast_pass.contains_only_safe_tokens;
+    ast_pass.contains_only_safe_tokens
 }
 
 struct ASTPass {

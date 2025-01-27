@@ -34,7 +34,7 @@ pub fn have_comments_changed(tokens1: Vec<Token>, tokens2: Vec<Token>) -> bool {
         }
     }
 
-    return false;
+    false
 }
 
 /* Optimalization to keep in mind : We only check length of comments since in case of attack
@@ -59,7 +59,7 @@ fn comment_token_differs_from_singleline(
         return false;
     }
 
-    return true; // means this is another type
+    true // means this is another type
 }
 
 /* Optimalization to keep in mind : We only check length of comments since in case of attack
@@ -70,5 +70,5 @@ fn comment_token_differs_from_multiline(comment1: String, comment_token2: Whites
         // The length of both comments are not the same -> Strucutre is altered.
         return comment2.len().abs_diff(comment1.len()) != 0;
     }
-    return true; // So if it's a singleline whitespace for example.
+    true // So if it's a singleline whitespace for example.
 }

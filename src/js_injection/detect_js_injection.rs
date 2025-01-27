@@ -30,14 +30,14 @@ pub fn detect_js_injection_str(code: &str, userinput: &str, sourcetype: i32) -> 
         return false;
     }
 
-    let parser_result = Parser::new(&allocator, &code, source_type)
+    let parser_result = Parser::new(&allocator, code, source_type)
         .with_options(ParseOptions {
             allow_return_outside_function: true,
             ..ParseOptions::default()
         })
         .parse();
 
-    if parser_result.panicked || parser_result.errors.len() > 0 {
+    if parser_result.panicked || !parser_result.errors.is_empty() {
         return false;
     }
 
@@ -51,7 +51,7 @@ pub fn detect_js_injection_str(code: &str, userinput: &str, sourcetype: i32) -> 
         })
         .parse();
 
-    if parser_result_without_input.panicked || parser_result_without_input.errors.len() > 0 {
+    if parser_result_without_input.panicked || !parser_result_without_input.errors.is_empty() {
         // Try to parse by replacing the user input with a empty string.
         code_without_input = code.replace(userinput, "");
 
@@ -62,7 +62,7 @@ pub fn detect_js_injection_str(code: &str, userinput: &str, sourcetype: i32) -> 
             })
             .parse();
 
-        if parser_result_without_input.panicked || parser_result_without_input.errors.len() > 0 {
+        if parser_result_without_input.panicked || !parser_result_without_input.errors.is_empty() {
             return false;
         }
     }
@@ -83,5 +83,5 @@ pub fn detect_js_injection_str(code: &str, userinput: &str, sourcetype: i32) -> 
         return true;
     }
 
-    return false;
+    false
 }

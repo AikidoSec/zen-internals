@@ -40,13 +40,12 @@ pub fn is_safely_encapsulated(command: &str, user_input: &str) -> bool {
         }
 
         // Check for dangerous characters inside double quotes
-        if char_before_user_input == Some('"') {
-            if user_input
+        if char_before_user_input == Some('"')
+            && user_input
                 .chars()
                 .any(|c| DANGEROUS_CHARS_INSIDE_DOUBLE_QUOTES.contains(&c.to_string().as_str()))
-            {
-                return false;
-            }
+        {
+            return false;
         }
     }
 
