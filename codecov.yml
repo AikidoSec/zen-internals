@@ -1,0 +1,3 @@
+ignore:
+  - src/ffi_bindings/mod.rs
+  - src/wasm_bindings/mod.rs
