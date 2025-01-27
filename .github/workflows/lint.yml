@@ -18,10 +18,8 @@ jobs:
           rustup default stable
           rustup component add rustfmt clippy
 
-      # Formatting
-      - name: Run rustfmt
+      - name: Check formatting
         run: cargo fmt -- --check
 
-      # Linting
       - name: Lint code
         run: cargo clippy
