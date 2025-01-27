@@ -1,0 +1,5 @@
+# The exposed functions in these files cannot be covered by unit tests
+# We have smoke tests in place that test the exposed functions
+ignore:
+  - src/ffi_bindings/mod.rs # See smoketests/ffi.ts
+  - src/wasm_bindings/mod.rs # See smoketests/wasm.js
