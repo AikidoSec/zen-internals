@@ -5,7 +5,7 @@ on:
     inputs:
       upload_coverage:
         description: 'Whether to upload coverage report to Codecov'
-        required: 'false'
+        required: false
         type: string
         default: 'true'
   push: {}
