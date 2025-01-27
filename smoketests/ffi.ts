@@ -53,6 +53,10 @@ assertEquals(
     lib.symbols.detect_sql_injection(Deno.UnsafePointer.of(new Uint8Array([])), toCString("🔥"), 0),
     2
 );
+assertEquals(
+    lib.symbols.detect_sql_injection(null, toCString("🔥"), 0),
+    2
+);
 
 // Test JS injection
 assertEquals(
@@ -73,6 +77,10 @@ assertEquals(
 );
 assertEquals(
     lib.symbols.detect_js_injection(Deno.UnsafePointer.of(new Uint8Array([])), toCString("🔥"), 0),
+    2
+);
+assertEquals(
+    lib.symbols.detect_js_injection(null, toCString("🔥"), 0),
     2
 );
 
