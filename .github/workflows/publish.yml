@@ -8,7 +8,7 @@ jobs:
   tests:
     uses: ./.github/workflows/unit-test.yml
     with:
-      upload_coverage: false
+      upload_coverage: 'false'
   lint:
     uses: ./.github/workflows/lint.yml
 

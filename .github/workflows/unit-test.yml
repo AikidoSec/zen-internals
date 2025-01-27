@@ -5,9 +5,9 @@ on:
     inputs:
       upload_coverage:
         description: 'Whether to upload coverage report to Codecov'
-        required: false
-        type: boolean
-        default: true
+        required: 'false'
+        type: string
+        default: 'true'
   push: {}
 
 jobs:
