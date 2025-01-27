@@ -34,3 +34,31 @@ pub fn select_dialect_based_on_enum(enumerator: i32) -> Box<dyn Dialect> {
         _ => Box::new(GenericDialect {}),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::sql_injection::helpers::select_dialect_based_on_enum::select_dialect_based_on_enum;
+    use sqlparser::dialect::{
+        AnsiDialect, BigQueryDialect, ClickHouseDialect, DatabricksDialect, DuckDbDialect,
+        GenericDialect, HiveDialect, MsSqlDialect, MySqlDialect, PostgreSqlDialect,
+        RedshiftSqlDialect, SQLiteDialect, SnowflakeDialect,
+    };
+
+    #[test]
+    fn test_select_dialect_based_on_enum() {
+        assert!(select_dialect_based_on_enum(0).is::<GenericDialect>());
+        assert!(select_dialect_based_on_enum(1).is::<AnsiDialect>());
+        assert!(select_dialect_based_on_enum(2).is::<BigQueryDialect>());
+        assert!(select_dialect_based_on_enum(3).is::<ClickHouseDialect>());
+        assert!(select_dialect_based_on_enum(4).is::<DatabricksDialect>());
+        assert!(select_dialect_based_on_enum(5).is::<DuckDbDialect>());
+        assert!(select_dialect_based_on_enum(6).is::<HiveDialect>());
+        assert!(select_dialect_based_on_enum(7).is::<MsSqlDialect>());
+        assert!(select_dialect_based_on_enum(8).is::<MySqlDialect>());
+        assert!(select_dialect_based_on_enum(9).is::<PostgreSqlDialect>());
+        assert!(select_dialect_based_on_enum(10).is::<RedshiftSqlDialect>());
+        assert!(select_dialect_based_on_enum(11).is::<SnowflakeDialect>());
+        assert!(select_dialect_based_on_enum(12).is::<SQLiteDialect>());
+        assert!(select_dialect_based_on_enum(13).is::<GenericDialect>());
+    }
+}
