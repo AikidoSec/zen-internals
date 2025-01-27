@@ -23,5 +23,5 @@ jobs:
         run: cargo fmt -- --check
 
       # Linting
-      - name: Run clippy
+      - name: Lint code
         run: cargo clippy
