@@ -33,6 +33,10 @@ jobs:
       - name: Generate coverage report
         run: cargo llvm-cov report --lcov --output-path target/lcov.info
 
+      - run: echo "$INPUTS"
+        env:
+          INPUTS: ${{ toJson(github.event.inputs) }}
+
       - name: Upload coverage report to Codecov
         uses: codecov/codecov-action@v4
         if: ${{ github.event.inputs.upload_coverage == true }}
