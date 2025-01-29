@@ -20,4 +20,6 @@ jobs:
           curl -L -o llvm-mingw.tar.xz https://github.com/mstorsjo/llvm-mingw/releases/download/20250114/llvm-mingw-20250114-ucrt-ubuntu-20.04-x86_64.tar.xz
           tar -xf llvm-mingw.tar.xz
           export PATH=$PWD/llvm-mingw-20250114-ucrt-ubuntu-20.04-x86_64/bin:$PATH
-          cargo build --all --release --target aarch64-pc-windows-gnullvm
+      - name: Build
+        run: cargo build --release --target aarch64-pc-windows-gnullvm
+      - run: ls -l target/aarch64-pc-windows-gnullvm/release

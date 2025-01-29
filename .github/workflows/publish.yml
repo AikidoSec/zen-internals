@@ -104,7 +104,7 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get upgrade -y
           sudo apt-get install -y g++-mingw-w64-x86-64
-          cargo build --all --release --target x86_64-pc-windows-gnu
+          cargo build --release --target x86_64-pc-windows-gnu
 
       - name: Prepare release
         run: |
