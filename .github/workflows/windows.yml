@@ -23,3 +23,8 @@ jobs:
       - name: Build
         run: cargo build --release --target aarch64-pc-windows-gnullvm
       - run: ls -l target/aarch64-pc-windows-gnullvm/release
+      - name: Store the .dll file
+        uses: actions/upload-artifact@v3
+        with:
+          name: windows-binaries
+          path: target/aarch64-pc-windows-gnullvm/release/libzen_internals_*
