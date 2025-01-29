@@ -1,0 +1,23 @@
+name: Windows
+
+on:
+  push: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Rust
+        run: |
+          rustup update --no-self-update stable
+          rustup default stable
+          rustup target add aarch64-pc-windows-gnullvm
+      - name: Build for windows
+        run: |
+          # Install LLVM MinGW toolchain
+          curl -L -o https://github.com/mstorsjo/llvm-mingw/releases/download/20250114/llvm-mingw-20250114-ucrt-ubuntu-20.04-x86_64.tar.xz
+          tar -xf llvm-mingw-20250114-ucrt-ubuntu-20.04-x86_64.tar.xz
+          export PATH=$PATH:$(pwd)/llvm-mingw-20250114-ucrt-ubuntu-20.04-x86_64/bin
+          cargo build --all --release --target aarch64-pc-windows-gnullvm
