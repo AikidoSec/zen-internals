@@ -26,4 +26,4 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: windows-binaries
-          path: target/aarch64-pc-windows-gnullvm/release/libzen_internals_*
+          path: target/aarch64-pc-windows-gnullvm/release/zen_internals.dll
