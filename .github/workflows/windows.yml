@@ -17,7 +17,7 @@ jobs:
       - name: Build for windows
         run: |
           # Install LLVM MinGW toolchain
-          curl -L -o https://github.com/mstorsjo/llvm-mingw/releases/download/20250114/llvm-mingw-20250114-ucrt-ubuntu-20.04-x86_64.tar.xz
-          tar -xf llvm-mingw-20250114-ucrt-ubuntu-20.04-x86_64.tar.xz
-          export PATH=$PATH:$(pwd)/llvm-mingw-20250114-ucrt-ubuntu-20.04-x86_64/bin
+          curl -L -o llvm-mingw.tar.xz https://github.com/mstorsjo/llvm-mingw/releases/download/20250114/llvm-mingw-20250114-ucrt-ubuntu-20.04-x86_64.tar.xz
+          tar -xf llvm-mingw.tar.xz
+          export PATH=$PWD/llvm-mingw-20250114-ucrt-ubuntu-20.04-x86_64/bin:$PATH
           cargo build --all --release --target aarch64-pc-windows-gnullvm
