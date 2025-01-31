@@ -25,7 +25,7 @@ jobs:
           rustup component add llvm-tools-preview
 
       - name: Install code coverage tool
-        uses: taiki-e/install-action@cargo-llvm-cov
+        uses: taiki-e/install-action@11f460a4042c6aedd95853e41f4eb4f10459fc5d # cargo-llvm-cov
 
       - name: Run tests
         run: cargo llvm-cov
@@ -34,7 +34,7 @@ jobs:
         run: cargo llvm-cov report --lcov --output-path target/lcov.info
 
       - name: Upload coverage report to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4
         if: ${{ github.event.inputs == null || github.event.inputs.upload_coverage == true }}
         with:
           fail_ci_if_error: true
