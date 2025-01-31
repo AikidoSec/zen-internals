@@ -41,7 +41,7 @@ jobs:
           sudo sha256sum "${FILE}.so" > ${FILE}.so.sha256sum
 
       - name: Store the .so file and the sha256sum file
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: linux-binaries
           path: target/x86_64-unknown-linux-gnu/release/libzen_internals_*
@@ -79,7 +79,7 @@ jobs:
           sudo sha256sum "${FILE}.so" > ${FILE}.so.sha256sum
 
       - name: Store the .so file and the sha256sum file
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: linux-binaries-arm64
           path: target/aarch64-unknown-linux-gnu/release/libzen_internals_*
@@ -115,7 +115,7 @@ jobs:
           sudo sha256sum "${FILE}" > ${FILE}.sha256sum
 
       - name: Store the .dll file and sha256sum file
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: windows-binaries
           path: target/x86_64-pc-windows-gnu/release/libzen_internals_*
@@ -153,7 +153,7 @@ jobs:
           printf "::set-output name=%s::%s\n" sha256sum "${CHECKSUM}"
 
       - name: Store the .dylib file and the sha256sum file
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: mac-binaries
           path: target/x86_64-apple-darwin/release/libzen_internals_*
@@ -191,7 +191,7 @@ jobs:
           printf "::set-output name=%s::%s\n" sha256sum "${CHECKSUM}"
 
       - name: Store the .dylib file and the sha256sum file
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: mac-binaries-arm64
           path: target/aarch64-apple-darwin/release/libzen_internals_*
@@ -205,8 +205,8 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "18.x"
       - name: Install latest rust toolchain
@@ -224,7 +224,7 @@ jobs:
           sudo touch ${FILE}.sha256sum && sudo chmod 777 ${FILE}.sha256sum
           sudo sha256sum "${FILE}" > ${FILE}.sha256sum
       - name: Store the .tgz file and the sha256sum file
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: wasm-binaries
           path: pkg/zen_internals.tgz*
@@ -244,7 +244,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Create Release
         uses: actions/create-release@v1
@@ -258,7 +258,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
       # Add Linux binary and sha file to release :
       - name: Download Linux binaries
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: linux-binaries
           path: ./artifacts/linux
@@ -283,7 +283,7 @@ jobs:
 
       # Add Linux arm64 binary and sha file to release :
       - name: Download Linux binaries (arm64)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: linux-binaries-arm64
           path: ./artifacts/linux-arm64
@@ -308,7 +308,7 @@ jobs:
 
       # Add Windows binary and sha file to release :
       - name: Download Windows binaries
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: windows-binaries
           path: ./artifacts/windows
@@ -333,7 +333,7 @@ jobs:
 
       # Add Mac binary and sha file to release :
       - name: Download Mac OS X binaries
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: mac-binaries
           path: ./artifacts/mac
@@ -358,7 +358,7 @@ jobs:
 
       # Add Mac arm64 binary and sha file to release :
       - name: Download Mac OS X binaries (arm64)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: mac-binaries-arm64
           path: ./artifacts/mac-arm64
@@ -383,7 +383,7 @@ jobs:
 
       # Add WASM binary and sha file to release :
       - name: Download WASM binaries
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: wasm-binaries
           path: ./artifacts/wasm
