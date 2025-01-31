@@ -140,12 +140,14 @@ jobs:
         run: cargo build --release --target aarch64-pc-windows-msvc
 
       - name: Prepare release
+        shell: pwsh
         run: |
-          cd target/aarch64-pc-windows-msvc/release
-          FILE=libzen_internals_aarch64-pc-windows-msvc.dll
-          sudo mv zen_internals.dll ${FILE}
-          sudo touch ${FILE}.sha256sum && sudo chmod 777 ${FILE}.sha256sum
-          sudo sha256sum "${FILE}" > ${FILE}.sha256sum
+          Set-Location target/aarch64-pc-windows-msvc/release
+          $FILE = "libzen_internals_aarch64-pc-windows-msvc.dll"
+          Move-Item "zen_internals.dll" $FILE
+          New-Item -ItemType File -Path "$FILE.sha256sum" | Out-Null
+          Set-ItemProperty -Path "$FILE.sha256sum" -Name IsReadOnly -Value $false
+          Get-FileHash -Algorithm SHA256 -Path $FILE | ForEach-Object { "$($_.Hash) $FILE" } > "$FILE.sha256sum"
 
       - name: Store the .dll file and sha256sum file
         uses: actions/upload-artifact@v4
