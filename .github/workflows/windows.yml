@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: windows-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -13,17 +13,12 @@ jobs:
         run: |
           rustup update --no-self-update stable
           rustup default stable
-          rustup target add aarch64-pc-windows-gnullvm
+          rustup target add aarch64-pc-windows-msvc
       - name: Build for windows
-        run: |
-          # Install LLVM MinGW toolchain
-          curl -L -o llvm-mingw.tar.xz https://github.com/mstorsjo/llvm-mingw/releases/download/20250114/llvm-mingw-20250114-ucrt-ubuntu-20.04-x86_64.tar.xz
-          tar -xf llvm-mingw.tar.xz
-          export PATH=$PWD/llvm-mingw-20250114-ucrt-ubuntu-20.04-x86_64/bin:$PATH
-          cargo build --release --target aarch64-pc-windows-gnullvm
-      - run: ls -l target/aarch64-pc-windows-gnullvm/release
+        run: cargo build --release --target aarch64-pc-windows-msvc
+      - run: ls -l target/aarch64-pc-windows-msvc/release
       - name: Store the .dll file
         uses: actions/upload-artifact@v3
         with:
           name: windows-binaries
-          path: target/aarch64-pc-windows-gnullvm/release/zen_internals.dll
+          path: target/aarch64-pc-windows-msvc/release/zen_internals.dll
