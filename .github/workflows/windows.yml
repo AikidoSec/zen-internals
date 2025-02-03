@@ -27,7 +27,10 @@ jobs:
           Move-Item "zen_internals.dll" $FILE
           New-Item -ItemType File -Path "$FILE.sha256sum" | Out-Null
           Set-ItemProperty -Path "$FILE.sha256sum" -Name IsReadOnly -Value $false
+          # Generate SHA256 checksum and write it in lowercase
           Get-FileHash -Algorithm SHA256 -Path $FILE | ForEach-Object { "$($_.Hash.ToLower()) $FILE" } > "$FILE.sha256sum"
+          # Fix line endings to ensure compatibility with Unix/macOS
+          (Get-Content "$FILE.sha256sum") -replace "`r`n", "`n" | Set-Content "$FILE.sha256sum" -NoNewline
       - name: Store the .dll file and sha256sum file
         uses: actions/upload-artifact@v4
         with:
