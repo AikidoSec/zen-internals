@@ -104,7 +104,7 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get upgrade -y
           sudo apt-get install -y g++-mingw-w64-x86-64
-          cargo build --all --release --target x86_64-pc-windows-gnu
+          cargo build --release --target x86_64-pc-windows-gnu
 
       - name: Prepare release
         run: |
@@ -119,6 +119,44 @@ jobs:
         with:
           name: windows-binaries
           path: target/x86_64-pc-windows-gnu/release/libzen_internals_*
+
+  build-windows-arm:
+    needs:
+      - tests
+      - lint
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install latest rust toolchain
+        run: |
+          rustup update --no-self-update stable
+          rustup default stable
+          rustup target add aarch64-pc-windows-msvc
+
+      - name: Build for windows arm
+        run: cargo build --release --target aarch64-pc-windows-msvc
+
+      - name: Prepare release
+        shell: pwsh
+        run: |
+          Set-Location target/aarch64-pc-windows-msvc/release
+          $FILE = "libzen_internals_aarch64-pc-windows-msvc.dll"
+          Move-Item "zen_internals.dll" $FILE
+          New-Item -ItemType File -Path "$FILE.sha256sum" | Out-Null
+          Set-ItemProperty -Path "$FILE.sha256sum" -Name IsReadOnly -Value $false
+          # Generate SHA256 checksum and write it in lowercase
+          Get-FileHash -Algorithm SHA256 -Path $FILE | ForEach-Object { "$($_.Hash.ToLower())  $FILE" } > "$FILE.sha256sum"
+          # Fix line endings
+          (Get-Content "$FILE.sha256sum") -replace "`r`n", "`n`n" | Set-Content "$FILE.sha256sum" -NoNewline
+
+      - name: Store the .dll file and sha256sum file
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-binaries-arm
+          path: target/aarch64-pc-windows-msvc/release/libzen_internals_*
 
   build-mac:
     needs:
@@ -237,6 +275,7 @@ jobs:
         build-windows,
         build-mac,
         build-mac-arm64,
+        build-windows-arm,
       ]
     runs-on: ubuntu-latest
     permissions:
@@ -327,6 +366,31 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./artifacts/windows/libzen_internals_x86_64-pc-windows-gnu.dll.sha256sum
           asset_name: libzen_internals_x86_64-pc-windows-gnu.dll.sha256sum
+          asset_content_type: text/plain
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      # Add Windows ARM binary and sha file to release :
+      - name: Download Windows ARM binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-binaries-arm
+          path: ./artifacts/windows-arm
+      - name: Upload Windows binary to Release
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/windows-arm/libzen_internals_aarch64-pc-windows-msvc.dll
+          asset_name: libzen_internals_aarch64-pc-windows-msvc.dll
+          asset_content_type: application/octet-stream
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Upload Windows ARM binary sha256sum
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/windows-arm/libzen_internals_aarch64-pc-windows-msvc.dll.sha256sum
+          asset_name: libzen_internals_aarch64-pc-windows-msvc.dll.sha256sum
           asset_content_type: text/plain
         env:
           GITHUB_TOKEN: ${{ github.token }}
