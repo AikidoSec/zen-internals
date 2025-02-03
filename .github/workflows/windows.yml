@@ -4,26 +4,32 @@ on:
   push: {}
 
 jobs:
-  build:
-    runs-on: ubuntu-20.04
+  build-windows-arm:
+    runs-on: windows-latest
+
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
-      - name: Set up Rust
+
+      - name: Install latest rust toolchain
         run: |
           rustup update --no-self-update stable
           rustup default stable
-          rustup target add aarch64-pc-windows-gnullvm
-      - name: Build for windows
+          rustup target add aarch64-pc-windows-msvc
+      - name: Build for windows arm
+        run: cargo build --release --target aarch64-pc-windows-msvc
+
+      - name: Prepare release
+        shell: pwsh
         run: |
-          # Install LLVM MinGW toolchain
-          curl -L -o llvm-mingw.tar.xz https://github.com/mstorsjo/llvm-mingw/releases/download/20250114/llvm-mingw-20250114-ucrt-ubuntu-20.04-x86_64.tar.xz
-          tar -xf llvm-mingw.tar.xz
-          export PATH=$PWD/llvm-mingw-20250114-ucrt-ubuntu-20.04-x86_64/bin:$PATH
-          cargo build --release --target aarch64-pc-windows-gnullvm
-      - run: ls -l target/aarch64-pc-windows-gnullvm/release
-      - name: Store the .dll file
-        uses: actions/upload-artifact@v3
+          Set-Location target/aarch64-pc-windows-msvc/release
+          $FILE = "libzen_internals_aarch64-pc-windows-msvc.dll"
+          Move-Item "zen_internals.dll" $FILE
+          New-Item -ItemType File -Path "$FILE.sha256sum" | Out-Null
+          Set-ItemProperty -Path "$FILE.sha256sum" -Name IsReadOnly -Value $false
+          Get-FileHash -Algorithm SHA256 -Path $FILE | ForEach-Object { "$($_.Hash) $FILE" } > "$FILE.sha256sum"
+      - name: Store the .dll file and sha256sum file
+        uses: actions/upload-artifact@v4
         with:
-          name: windows-binaries
-          path: target/aarch64-pc-windows-gnullvm/release/zen_internals.dll
+          name: windows-binaries-arm
+          path: target/aarch64-pc-windows-msvc/release/libzen_internals_*
