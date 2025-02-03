@@ -27,7 +27,7 @@ jobs:
           Move-Item "zen_internals.dll" $FILE
           New-Item -ItemType File -Path "$FILE.sha256sum" | Out-Null
           Set-ItemProperty -Path "$FILE.sha256sum" -Name IsReadOnly -Value $false
-          Get-FileHash -Algorithm SHA256 -Path $FILE | ForEach-Object { "$($_.Hash) $FILE" } > "$FILE.sha256sum"
+          Get-FileHash -Algorithm SHA256 -Path $FILE | ForEach-Object { "$($_.Hash.ToLower()) $FILE" } > "$FILE.sha256sum"
       - name: Store the .dll file and sha256sum file
         uses: actions/upload-artifact@v4
         with:
