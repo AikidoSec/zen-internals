@@ -154,18 +154,18 @@ pub fn contains_shell_syntax(command: &str, user_input: &str) -> bool {
         };
 
         // Check surrounding characters
-        if char_before.map_or(false, |c| SEPARATORS.contains(&c.to_string().as_str()))
-            && char_after.map_or(false, |c| SEPARATORS.contains(&c.to_string().as_str()))
+        if char_before.is_some_and(|c| SEPARATORS.contains(&c.to_string().as_str()))
+            && char_after.is_some_and(|c| SEPARATORS.contains(&c.to_string().as_str()))
         {
             return true; // e.g. `<separator>rm<separator>`
         }
-        if char_before.map_or(false, |c| SEPARATORS.contains(&c.to_string().as_str()))
+        if char_before.is_some_and(|c| SEPARATORS.contains(&c.to_string().as_str()))
             && char_after.is_none()
         {
             return true; // e.g. `<separator>rm`
         }
         if char_before.is_none()
-            && char_after.map_or(false, |c| SEPARATORS.contains(&c.to_string().as_str()))
+            && char_after.is_some_and(|c| SEPARATORS.contains(&c.to_string().as_str()))
         {
             return true; // e.g. `rm<separator>`
         }

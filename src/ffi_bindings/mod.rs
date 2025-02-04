@@ -6,13 +6,16 @@ use std::os::raw::{c_char, c_int};
 use std::panic;
 use std::str;
 
+/// # Safety
+///
+/// This function should only be called with valid pointers to C strings.
 #[no_mangle]
-pub extern "C" fn detect_shell_injection(
+pub unsafe extern "C" fn detect_shell_injection(
     command: *const c_char,
     userinput: *const c_char,
 ) -> c_int {
     // Returns an integer value, representing a boolean (1 = true, 0 = false, 2 = error)
-    return panic::catch_unwind(|| {
+    panic::catch_unwind(|| {
         // Check if the pointers are null
         if command.is_null() || userinput.is_null() {
             return 2;
@@ -28,19 +31,22 @@ pub extern "C" fn detect_shell_injection(
             return 1;
         }
 
-        return 0;
+        0
     })
-    .unwrap_or(2);
+    .unwrap_or(2)
 }
 
+/// # Safety
+///
+/// This function should only be called with valid pointers to C strings.
 #[no_mangle]
-pub extern "C" fn detect_sql_injection(
+pub unsafe extern "C" fn detect_sql_injection(
     query: *const c_char,
     userinput: *const c_char,
     dialect: c_int,
 ) -> c_int {
     // Returns an integer value, representing a boolean (1 = true, 0 = false, 2 = error)
-    return panic::catch_unwind(|| {
+    panic::catch_unwind(|| {
         // Check if the pointers are null
         if query.is_null() || userinput.is_null() {
             return 2;
@@ -56,19 +62,22 @@ pub extern "C" fn detect_sql_injection(
             return 1;
         }
 
-        return 0;
+        0
     })
-    .unwrap_or(2);
+    .unwrap_or(2)
 }
 
+/// # Safety
+///
+/// This function should only be called with valid pointers to C strings.
 #[no_mangle]
-pub extern "C" fn detect_js_injection(
+pub unsafe extern "C" fn detect_js_injection(
     code: *const c_char,
     userinput: *const c_char,
     sourcetype: c_int,
 ) -> c_int {
     // Returns an integer value, representing a boolean (1 = true, 0 = false, 2 = error)
-    return panic::catch_unwind(|| {
+    panic::catch_unwind(|| {
         // Check if the pointers are null
         if code.is_null() || userinput.is_null() {
             return 2;
@@ -84,7 +93,7 @@ pub extern "C" fn detect_js_injection(
             return 1;
         }
 
-        return 0;
+        0
     })
-    .unwrap_or(2);
+    .unwrap_or(2)
 }

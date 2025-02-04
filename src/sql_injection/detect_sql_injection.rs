@@ -20,7 +20,7 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
 
     // Tokenize query :
     let tokens = tokenize_query(query, dialect);
-    if tokens.len() <= 0 {
+    if tokens.is_empty() {
         // Tokens are empty, probably a parsing issue with original query, return false.
         return false;
     }
@@ -52,5 +52,5 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
         return true;
     }
 
-    return false;
+    false
 }

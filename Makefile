@@ -8,6 +8,10 @@ test:
 
 .PHONY: lint
 lint:
+	cargo clippy 
+
+.PHONY: format
+format:
 	cargo fmt
 
 .PHONY: smoketest

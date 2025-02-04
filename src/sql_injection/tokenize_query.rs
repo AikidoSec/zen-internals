@@ -10,6 +10,8 @@ pub fn tokenize_query(sql: &str, dialect: i32) -> Vec<Token> {
     the escaping" ~ https://github.com/sqlparser-rs/sqlparser-rs/blob/main/src/tokenizer.rs#L591-L620
     */
     let mut tokenizer = Tokenizer::new(dialect.as_ref(), sql).with_unescape(false);
+
+    #[allow(clippy::manual_unwrap_or_default)]
     match tokenizer.tokenize() {
         Ok(tokens) => tokens, // Return the tokens if successful
         Err(_e) => {
