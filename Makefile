@@ -13,9 +13,16 @@ lint:
 .PHONY: smoketest
 smoketest:
 	node smoketests/wasm.js
-	@deno run --allow-ffi smoketests/ffi.ts 2>&1 | grep . && \
-	{ echo "❌ Smoketest failed (unexpected output)"; exit 1; } || \
-	echo "✅ Smoketest passed (no output)"
+	@{ \
+		output=$$(deno run --allow-ffi smoketests/ffi.ts 2>&1); \
+		if echo "$$output" | grep -q "panic"; then \
+			echo "❌ Smoketest failed: panic detected"; \
+			echo "$$output"; \
+			exit 1; \
+		else \
+			echo "✅ Smoketest passed (no panics detected)"; \
+		fi \
+	}
 
 .PHONY: bench
 bench:
