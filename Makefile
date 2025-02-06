@@ -13,7 +13,9 @@ lint:
 .PHONY: smoketest
 smoketest:
 	node smoketests/wasm.js
-	deno run --allow-ffi smoketests/ffi.ts
+	@deno run --allow-ffi smoketests/ffi.ts 2>&1 | grep . && \
+	{ echo "❌ Smoketest failed (unexpected output)"; exit 1; } || \
+	echo "✅ Smoketest passed (no output)"
 
 .PHONY: bench
 bench:
