@@ -47,10 +47,16 @@ pub extern "C" fn detect_sql_injection(
         }
 
         let query_bytes = unsafe { CStr::from_ptr(query).to_bytes() };
-        let userinput_bytes = unsafe { CStr::from_ptr(userinput).to_bytes() };
+        let query_str = match str::from_utf8(query_bytes) {
+            Ok(s) => s,
+            Err(_) => return 2, // Return error code if invalid UTF-8
+        };
 
-        let query_str = str::from_utf8(query_bytes).unwrap();
-        let userinput_str = str::from_utf8(userinput_bytes).unwrap();
+        let userinput_bytes = unsafe { CStr::from_ptr(userinput).to_bytes() };
+        let userinput_str = match str::from_utf8(userinput_bytes) {
+            Ok(s) => s,
+            Err(_) => return 2, // Return error code if invalid UTF-8
+        };
 
         if detect_sql_injection_str(query_str, userinput_str, dialect) {
             return 1;
@@ -75,10 +81,16 @@ pub extern "C" fn detect_js_injection(
         }
 
         let code_bytes = unsafe { CStr::from_ptr(code).to_bytes() };
-        let userinput_bytes = unsafe { CStr::from_ptr(userinput).to_bytes() };
+        let code_str = match str::from_utf8(code_bytes) {
+            Ok(s) => s,
+            Err(_) => return 2, // Return error code if invalid UTF-8
+        };
 
-        let code_str = str::from_utf8(code_bytes).unwrap();
-        let userinput_str = str::from_utf8(userinput_bytes).unwrap();
+        let userinput_bytes = unsafe { CStr::from_ptr(userinput).to_bytes() };
+        let userinput_str = match str::from_utf8(userinput_bytes) {
+            Ok(s) => s,
+            Err(_) => return 2, // Return error code if invalid UTF-8
+        };
 
         if detect_js_injection_str(code_str, userinput_str, sourcetype) {
             return 1;
