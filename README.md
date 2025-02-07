@@ -14,9 +14,9 @@ import ctypes
 zen_internals = ctypes.CDLL("target/release/libzen_internals.so")
 
 if __name__ == "__main__":
-    command = "whoami | shell".encode("utf-8")
-    userinput = "whoami".encode("utf-8")
-    result = zen_internals.detect_shell_injection(command, userinput)
+    query = "SELECT * FROM users WHERE id = '' OR 1=1 -- '".encode("utf-8")
+    userinput = "' OR 1=1 -- ".encode("utf-8")
+    result = zen_internals.detect_sql_injection(command, userinput)
     print("Result", bool(result))
 ```
 

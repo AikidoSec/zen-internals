@@ -1,5 +1,4 @@
 use crate::js_injection::detect_js_injection::detect_js_injection_str;
-use crate::shell_injection::detect_shell_injection::detect_shell_injection_stringified;
 use crate::sql_injection::detect_sql_injection::detect_sql_injection_str;
 use wasm_bindgen::prelude::*;
 
