@@ -4,7 +4,6 @@
  * - SQL Injection
  */
 mod helpers;
-mod shell_injection;
 
 // FFI Bindings
 pub mod ffi_bindings;
