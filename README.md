@@ -16,11 +16,14 @@ zen_internals = ctypes.CDLL("target/release/libzen_internals.so")
 if __name__ == "__main__":
     query = "SELECT * FROM users WHERE id = '' OR 1=1 -- '".encode("utf-8")
     userinput = "' OR 1=1 -- ".encode("utf-8")
-    result = zen_internals.detect_sql_injection(command, userinput)
+    dialect = 9 # MySQL dialect
+    result = zen_internals.detect_sql_injection(command, userinput, dialect)
     print("Result", bool(result))
 ```
 
-## Node.js bindings
+See [list of dialects](https://github.com/AikidoSec/zen-internals/blob/main/src/sql_injection/helpers/select_dialect_based_on_enum.rs#L18)
+
+## Node.js bindings (using WASM)
 
 ### Install
 
