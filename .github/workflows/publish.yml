@@ -57,6 +57,43 @@ jobs:
           name: linux-binaries
           path: target/x86_64-unknown-linux-gnu/release/libzen_internals_*
 
+  build-linux-musl:
+    needs:
+      - tests
+      - lint
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install ziglang
+        uses: mlugg/setup-zig@a67e68dc5c8281d9608136d3d7ca1b282213e4ac # v1
+
+      - name: Install latest rust and cargo-zigbuild
+        run: |
+          rustup update --no-self-update stable
+          rustup default stable
+          rustup target add x86_64-unknown-linux-musl
+          cargo install --locked cargo-zigbuild
+
+      - name: Build for linux
+        run: RUSTFLAGS="-C target-feature=-crt-static" cargo zigbuild --target x86_64-unknown-linux-musl --release
+
+      - name: Prepare release
+        run: |
+          cd target/x86_64-unknown-linux-musl/release
+          FILE=libzen_internals_x86_64-unknown-linux-musl
+          sudo mv libzen_internals.so ${FILE}.so
+          sudo touch ${FILE}.so.sha256sum && sudo chmod 777 ${FILE}.so.sha256sum
+          sudo sha256sum "${FILE}.so" > ${FILE}.so.sha256sum
+
+      - name: Store the .so file and the sha256sum file
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-binaries-musl
+          path: target/x86_64-unknown-linux-musl/release/libzen_internals_*
+
   build-linux-arm64:
     needs:
       - tests
@@ -94,6 +131,44 @@ jobs:
         with:
           name: linux-binaries-arm64
           path: target/aarch64-unknown-linux-gnu/release/libzen_internals_*
+
+  build-linux-arm64-musl:
+    needs:
+      - tests
+      - lint
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install ziglang
+        uses: mlugg/setup-zig@v1
+
+      - name: Install latest rust and cargo-zigbuild
+        run: |
+          rustup update --no-self-update stable
+          rustup default stable
+          rustup target add aarch64-unknown-linux-musl
+          cargo install --locked cargo-zigbuild
+
+      - name: Build for Linux
+        run: |
+          RUSTFLAGS="-C target-feature=-crt-static" cargo zigbuild --target aarch64-unknown-linux-musl --release
+
+      - name: Prepare release
+        run: |
+          cd target/aarch64-unknown-linux-musl/release
+          FILE=libzen_internals_aarch64-unknown-linux-musl
+          sudo mv libzen_internals.so ${FILE}.so
+          sudo touch ${FILE}.so.sha256sum && sudo chmod 777 ${FILE}.so.sha256sum
+          sudo sha256sum "${FILE}.so" > ${FILE}.so.sha256sum
+
+      - name: Store the .so file and the sha256sum file
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-binaries-arm64-musl
+          path: target/aarch64-unknown-linux-musl/release/libzen_internals_*
 
   build-windows:
     needs:
@@ -331,6 +406,31 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
+      # Add Linux musl binary and sha file to release :
+      - name: Download Linux binaries (musl)
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-binaries-musl
+          path: ./artifacts/linux-musl
+      - name: Upload Linux binary tar
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/linux-musl/libzen_internals_x86_64-unknown-linux-musl.so
+          asset_name: libzen_internals_x86_64-unknown-linux-musl.so
+          asset_content_type: application/octet-stream
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Upload Linux binary sha256sum
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/linux-musl/libzen_internals_x86_64-unknown-linux-musl.so.sha256sum
+          asset_name: libzen_internals_x86_64-unknown-linux-musl.so.sha256sum
+          asset_content_type: text/plain
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
       # Add Linux arm64 binary and sha file to release :
       - name: Download Linux binaries (arm64)
         uses: actions/download-artifact@v4
@@ -352,6 +452,31 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./artifacts/linux-arm64/libzen_internals_aarch64-unknown-linux-gnu.so.sha256sum
           asset_name: libzen_internals_aarch64-unknown-linux-gnu.so.sha256sum
+          asset_content_type: text/plain
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      # Add Linux arm64 musl binary and sha file to release :
+      - name: Download Linux binaries (arm64, musl)
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-binaries-arm64-musl
+          path: ./artifacts/linux-arm64-musl
+      - name: Upload Linux binary tar (arm64)
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/linux-arm64-musl/libzen_internals_aarch64-unknown-linux-musl.so
+          asset_name: libzen_internals_aarch64-unknown-linux-musl.so
+          asset_content_type: application/octet-stream
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Upload Linux binary sha256sum (arm64)
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/linux-arm64-musl/libzen_internals_aarch64-unknown-linux-musl.so.sha256sum
+          asset_name: libzen_internals_aarch64-unknown-linux-musl.so.sha256sum
           asset_content_type: text/plain
         env:
           GITHUB_TOKEN: ${{ github.token }}
