@@ -1,8 +1,9 @@
 use oxc::allocator::Allocator;
 use oxc::ast::ast::BinaryOperator;
-use oxc::ast::{AstKind, Visit};
+use oxc::ast::AstKind;
 use oxc::parser::{ParseOptions, Parser};
 use oxc::span::SourceType;
+use oxc_ast_visit::Visit;
 
 // Safe operators
 const SAFE_OPERATORS: [BinaryOperator; 6] = [
