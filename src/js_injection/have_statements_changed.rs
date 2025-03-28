@@ -1,7 +1,8 @@
 use crate::diff_in_vec_len;
 use oxc::allocator::{Allocator, Vec};
 use oxc::ast::ast::Program;
-use oxc::ast::{AstKind, Visit};
+use oxc::ast::AstKind;
+use oxc_ast_visit::Visit;
 
 pub fn have_statements_changed(
     program1: &Program,
