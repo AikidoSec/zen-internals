@@ -84,4 +84,14 @@ assertEquals(
     2
 );
 
+function toCStringInvalidUtf8(): Deno.PointerValue {
+    const buffer = new Uint8Array([0xc3, 0x28]); // Invalid UTF-8 sequence
+    return Deno.UnsafePointer.of(buffer);
+}
+
+assertEquals(lib.symbols.detect_sql_injection(toCStringInvalidUtf8(), toCString("test"), 0), 2);
+assertEquals(lib.symbols.detect_sql_injection(toCString("test"), toCStringInvalidUtf8(), 0), 2);
+assertEquals(lib.symbols.detect_js_injection(toCStringInvalidUtf8(), toCString("test"), 0), 2);
+assertEquals(lib.symbols.detect_js_injection(toCString("test"), toCStringInvalidUtf8(), 0), 2);
+
 lib.close();
