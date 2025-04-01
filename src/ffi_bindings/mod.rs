@@ -1,5 +1,5 @@
 use crate::js_injection::detect_js_injection::detect_js_injection_str;
-use crate::sql_injection::detect_sql_injection::detect_sql_injection_str;
+use crate::sql_injection::detect_sql_injection::{detect_sql_injection_str, DetectionReason};
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_int};
 use std::panic;
@@ -30,10 +30,14 @@ pub extern "C" fn detect_sql_injection(
             Err(_) => return 2, // Return error code if invalid UTF-8
         };
 
-        if detect_sql_injection_str(query_str, userinput_str, dialect) {
+        let detection_results = detect_sql_injection_str(query_str, userinput_str, dialect);
+        if let DetectionReason::FailedToTokenizeQuery = detection_results.reason {
+            // make a special exception for failing to tokenize query (report code 3)
+            return 3;
+        }
+        if detection_results.detected {
             return 1;
         }
-
         return 0;
     })
     .unwrap_or(2);
