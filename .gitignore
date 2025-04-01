@@ -25,4 +25,4 @@ pkg/
 .DS_Store
 
 # Editors
-.idea*
+.idea/
