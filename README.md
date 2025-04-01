@@ -7,6 +7,15 @@ Zen Internals is a library that can be used via FFI in different languages. Cont
 - SQL Injections
 - JS Code Injections
 
+## Return codes
+
+| Return Code | Description                       |
+|-------------|-----------------------------------|
+| `0`         | Successful, no injection detected |
+| `1`         | Successful, injection detected    |
+| `2`         | Error occurred                    |
+| `3`         | Failed to tokenize SQL            |
+
 ## Python FFI Example code
 
 ```py
