@@ -4,25 +4,53 @@ use super::tokenize_query::tokenize_query;
 use crate::diff_in_vec_len;
 
 const SPACE_CHAR: char = ' ';
+pub struct SqlInjectionDetectionResult {
+    pub detected: bool,
+    pub reason: DetectionReason,
+}
+pub enum DetectionReason {
+    // not an injection
+    UserInputNotInQuery,
+    CommonSQLString,
+    FailedToTokenizeQuery,
+    UserInputTooSmall,
+    NoChangesFound,
+    // injection
+    TokensHaveDelta,
+    CommentStructureAltered,
+}
 
 // `userinput` and `query` provided to this function should already be lowercase.
-pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> bool {
+pub fn detect_sql_injection_str(
+    query: &str,
+    userinput: &str,
+    dialect: i32,
+) -> SqlInjectionDetectionResult {
     if !query.contains(userinput) {
         // If the query does not contain the user input, it's not an injection.
-        return false;
+        return SqlInjectionDetectionResult {
+            detected: false,
+            reason: DetectionReason::UserInputNotInQuery,
+        };
     }
 
     // "SELECT *", "INSERT INTO", ... will occur in most queries
     // If the user input is equal to any of these, we can assume it's not an injection.
     if is_common_sql_string(userinput) {
-        return false;
+        return SqlInjectionDetectionResult {
+            detected: false,
+            reason: DetectionReason::CommonSQLString,
+        };
     }
 
     // Tokenize query :
     let tokens = tokenize_query(query, dialect);
     if tokens.len() <= 0 {
         // Tokens are empty, probably a parsing issue with original query, return false.
-        return false;
+        return SqlInjectionDetectionResult {
+            detected: false,
+            reason: DetectionReason::FailedToTokenizeQuery,
+        };
     }
 
     // Remove leading and trailing spaces from userinput :
@@ -31,7 +59,10 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
     // Tokenize query without user input :
     if trimmed_userinput.len() <= 1 {
         // If the trimmed userinput is one character or empty, no injection took place.
-        return false;
+        return SqlInjectionDetectionResult {
+            detected: false,
+            reason: DetectionReason::UserInputTooSmall,
+        };
     }
 
     // Replace user input with string of equal length and tokenize again :
@@ -42,15 +73,24 @@ pub fn detect_sql_injection_str(query: &str, userinput: &str, dialect: i32) -> b
     // Check delta for both comment tokens and all tokens in general :
     if diff_in_vec_len!(tokens, tokens_without_input) {
         // If a delta exists in all tokens, mark this as an injection.
-        return true;
+        return SqlInjectionDetectionResult {
+            detected: true,
+            reason: DetectionReason::TokensHaveDelta,
+        };
     }
 
     if have_comments_changed(tokens, tokens_without_input) {
         // This checks if structure of comments in the query is altered after removing user input.
         // It makes sure the lengths of all single line and multiline comments are all still the same
         // And makes sure no extra comments were added or that the order was altered.
-        return true;
+        return SqlInjectionDetectionResult {
+            detected: true,
+            reason: DetectionReason::CommentStructureAltered,
+        };
     }
 
-    return false;
+    return SqlInjectionDetectionResult {
+        detected: false,
+        reason: DetectionReason::NoChangesFound,
+    };
 }
