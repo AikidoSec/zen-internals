@@ -1,11 +1,9 @@
-name: 🧹 Linting check
-
+name: 📊 Benchmarks
 on:
-  workflow_call: {}
   push: {}
 
 jobs:
-  rustfmt:
+  benchmark:
     runs-on: ubuntu-latest
 
     steps:
@@ -16,7 +14,8 @@ jobs:
         run: |
           rustup toolchain install stable
           rustup default stable
-          rustup component add rustfmt
 
-      - name: Run rustfmt
-        run: cargo fmt -- --check
+      - name: Build
+        run: cargo build --release
+
+      - run: make bench
