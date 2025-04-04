@@ -58,6 +58,12 @@ assertEquals(
     2
 );
 
+// Test tokenization failure
+assertEquals(
+    lib.symbols.detect_sql_injection(toCString("SELECT unicorns fly over the \"rainbow"), toCString("rainbow"), 0),
+    3
+)
+
 // Test JS injection
 assertEquals(
     lib.symbols.detect_js_injection(toCString("const test = 'Hello World!'; //';"), toCString("Hello World!'; //"), 0),

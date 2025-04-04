@@ -4,7 +4,7 @@ use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 pub fn wasm_detect_sql_injection(query: &str, userinput: &str, dialect: i32) -> bool {
-    detect_sql_injection_str(query, userinput, dialect)
+    detect_sql_injection_str(query, userinput, dialect).detected
 }
 
 #[wasm_bindgen]
