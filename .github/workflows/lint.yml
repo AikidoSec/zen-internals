@@ -1,4 +1,4 @@
-name: Linting check
+name: 🧹 Linting check
 
 on:
   workflow_call: {}

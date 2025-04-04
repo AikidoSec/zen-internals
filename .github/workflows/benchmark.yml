@@ -16,6 +16,6 @@ jobs:
           rustup default stable
 
       - name: Build
-        run: cargo build
+        run: cargo build --release
 
       - run: make bench

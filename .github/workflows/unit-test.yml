@@ -1,4 +1,4 @@
-name: Rust Unit Tests
+name: 🧪 Unit Tests
 
 on:
   workflow_call: {}
