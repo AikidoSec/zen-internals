@@ -13,7 +13,7 @@ lint:
 .PHONY: smoketest
 smoketest:
 	node smoketests/wasm.js
-	# Deno doesn't change the exit code when a panic occurs, so we have to check the output
+# Deno doesn't change the exit code when a panic occurs, so we have to check the output
 	@{ \
 		output=$$(deno run --allow-ffi smoketests/ffi.ts 2>&1); \
 		if echo "$$output" | grep -q "panic"; then \
