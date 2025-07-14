@@ -41,14 +41,14 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
     // SELECT * FROM users WHERE users.activaa 1
     // The structure of the query will not be the same
     // it's very difficult to exploit a query using just "e=" as the user input.
-    let alpha_followed_by_equal: Regex = Regex::new(r"(?i)^[a-z]=*$").unwrap();
+    let alpha_followed_by_equal: Regex = Regex::new(r"(?i)^[a-z]=$").unwrap();
 
     if user_input.len() == 2
         && user_input.ends_with("=")
         && alpha_followed_by_equal.is_match(user_input)
     {
         // If the user input is just a single letter followed by an equal sign, it's not an injection.
-        return false;
+        return true;
     }
 
     if user_input.contains("asc") || user_input.contains("desc") {
