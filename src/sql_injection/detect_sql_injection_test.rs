@@ -767,6 +767,15 @@ mod tests {
     }
 
     #[test]
+    fn test_e_equal() {
+        not_injection!(
+            "select column form table where table.a = 1 AND table.active= 1",
+            "e=",
+            dialect("mysql")
+        );
+    }
+
+    #[test]
     fn test_mysql_string_escape_constant() {
         is_injection!(
             "insert into cats(a,b,c) values ('foo'),((select e'\\u' from (select version() as e from dual) x)),('bar');",
