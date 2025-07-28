@@ -235,4 +235,24 @@ assertEquals(
     0
 );
 
+// It detects injection with a null terminator
+assertEquals(
+    lib.symbols.detect_sql_injection(
+        ...getBufferAndLength(
+            "SELECT * FROM users WHERE id = '\0' OR 1=1 -- '"
+        ),
+        ...getBufferAndLength("\0' OR 1=1 -- "),
+        0
+    ),
+    1
+);
+assertEquals(
+    lib.symbols.detect_js_injection(
+        ...getBufferAndLength("const test = '\0Hello World!'; //';"),
+        ...getBufferAndLength("\0Hello World!'; //"),
+        0
+    ),
+    1
+);
+
 lib.close();
