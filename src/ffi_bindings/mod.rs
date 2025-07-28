@@ -1,14 +1,15 @@
 use crate::js_injection::detect_js_injection::detect_js_injection_str;
 use crate::sql_injection::detect_sql_injection::{detect_sql_injection_str, DetectionReason};
-use std::ffi::CStr;
-use std::os::raw::{c_char, c_int};
+use std::os::raw::c_int;
 use std::panic;
 use std::str;
 
 #[no_mangle]
 pub extern "C" fn detect_sql_injection(
-    query: *const c_char,
-    userinput: *const c_char,
+    query: *const u8,
+    query_len: usize,
+    userinput: *const u8,
+    userinput_len: usize,
     dialect: c_int,
 ) -> c_int {
     // Returns an integer value, representing a boolean (1 = true, 0 = false, 2 = error)
@@ -18,13 +19,17 @@ pub extern "C" fn detect_sql_injection(
             return 2;
         }
 
-        let query_bytes = unsafe { CStr::from_ptr(query).to_bytes() };
+        if query_len == 0 || userinput_len == 0 {
+            return 2;
+        }
+
+        let query_bytes = unsafe { std::slice::from_raw_parts(query, query_len) };
         let query_str = match str::from_utf8(query_bytes) {
             Ok(s) => s,
             Err(_) => return 2, // Return error code if invalid UTF-8
         };
 
-        let userinput_bytes = unsafe { CStr::from_ptr(userinput).to_bytes() };
+        let userinput_bytes = unsafe { std::slice::from_raw_parts(userinput, userinput_len) };
         let userinput_str = match str::from_utf8(userinput_bytes) {
             Ok(s) => s,
             Err(_) => return 2, // Return error code if invalid UTF-8
@@ -45,8 +50,10 @@ pub extern "C" fn detect_sql_injection(
 
 #[no_mangle]
 pub extern "C" fn detect_js_injection(
-    code: *const c_char,
-    userinput: *const c_char,
+    code: *const u8,
+    code_len: usize,
+    userinput: *const u8,
+    userinput_len: usize,
     sourcetype: c_int,
 ) -> c_int {
     // Returns an integer value, representing a boolean (1 = true, 0 = false, 2 = error)
@@ -56,13 +63,17 @@ pub extern "C" fn detect_js_injection(
             return 2;
         }
 
-        let code_bytes = unsafe { CStr::from_ptr(code).to_bytes() };
+        if code_len == 0 || userinput_len == 0 {
+            return 2;
+        }
+
+        let code_bytes = unsafe { std::slice::from_raw_parts(code, code_len) };
         let code_str = match str::from_utf8(code_bytes) {
             Ok(s) => s,
             Err(_) => return 2, // Return error code if invalid UTF-8
         };
 
-        let userinput_bytes = unsafe { CStr::from_ptr(userinput).to_bytes() };
+        let userinput_bytes = unsafe { std::slice::from_raw_parts(userinput, userinput_len) };
         let userinput_str = match str::from_utf8(userinput_bytes) {
             Ok(s) => s,
             Err(_) => return 2, // Return error code if invalid UTF-8
