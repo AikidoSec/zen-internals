@@ -4,13 +4,13 @@
 
 Zen Internals is a library that can be used via FFI in different languages. Contains algorithms to detect:
 
-- SQL Injections
-- JS Code Injections
+-   SQL Injections
+-   JS Code Injections
 
 ## Return codes
 
 | Return Code | Description                       |
-|-------------|-----------------------------------|
+| ----------- | --------------------------------- |
 | `0`         | Successful, no injection detected |
 | `1`         | Successful, injection detected    |
 | `2`         | Error occurred                    |
@@ -20,14 +20,18 @@ Zen Internals is a library that can be used via FFI in different languages. Cont
 
 ```py
 import ctypes
+
 zen_internals = ctypes.CDLL("target/release/libzen_internals.so")
 
 if __name__ == "__main__":
     query = "SELECT * FROM users WHERE id = '' OR 1=1 -- '".encode("utf-8")
     userinput = "' OR 1=1 -- ".encode("utf-8")
-    dialect = 9 # MySQL dialect
-    result = zen_internals.detect_sql_injection(command, userinput, dialect)
-    print("Result", bool(result))
+    dialect = 9  # MySQL dialect
+
+    result = zen_internals.detect_sql_injection(
+        query, len(query), userinput, len(userinput), dialect
+    )
+    print("Result", result)
 ```
 
 See [list of dialects](https://github.com/AikidoSec/zen-internals/blob/main/src/sql_injection/helpers/select_dialect_based_on_enum.rs#L18)
