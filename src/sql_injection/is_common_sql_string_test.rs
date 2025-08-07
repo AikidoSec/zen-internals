@@ -194,4 +194,12 @@ mod tests {
         assert_eq!(is_common_sql_string("-1 /*"), false);
         assert_eq!(is_common_sql_string("-1 /* abc */"), false);
     }
+
+    #[test]
+    fn test_stringified_arrays() {
+        assert_eq!(is_common_sql_string("[]"), true);
+        assert_eq!(is_common_sql_string("[ ]"), false);
+        assert_eq!(is_common_sql_string("[1]"), false);
+        assert_eq!(is_common_sql_string("[[]]"), false);
+    }
 }
