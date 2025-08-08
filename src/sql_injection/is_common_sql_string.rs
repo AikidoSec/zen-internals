@@ -1,6 +1,6 @@
 use regex::Regex;
 
-pub const COMMON_SQL_STRINGS: [&str; 23] = [
+pub const COMMON_SQL_STRINGS: [&str; 24] = [
     "SELECT *",
     "SELECT COUNT(*)",
     "INSERT INTO",
@@ -24,6 +24,7 @@ pub const COMMON_SQL_STRINGS: [&str; 23] = [
     "IS NOT NULL",
     "NOT EXISTS",
     "DISTINCT ON",
+    "[]",
 ];
 
 pub fn is_common_sql_string(user_input: &str) -> bool {
