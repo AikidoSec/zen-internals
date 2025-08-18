@@ -63,11 +63,16 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
     }
 
     if user_input.contains(".") {
-        // Allow table.column, table., and .column patterns
+        // Check if the user input looks like a table.column pattern
         // e.g. SELECT * FROM table WHERE table.redirect_uri = 'value'
         // If the payload is `.r` the replaced query will be
         // SELECT * FROM table WHERE tableaaedirect_uri = 'value'
         // The structure changes from table.column_name to just column_name
+        //
+        // This pattern catches:
+        // - `table.column`
+        // - `table.`
+        // - `.column`
         let looks_like_table_column: Regex = Regex::new(
             r"(?i)^(\.[a-zA-Z_][a-zA-Z0-9_]*|[a-zA-Z_][a-zA-Z0-9_]*\.|[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*)$"
         ).unwrap();
