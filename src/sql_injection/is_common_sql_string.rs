@@ -63,7 +63,7 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
     }
 
     if user_input.contains(".") {
-        // Allow table.column pattern and .column
+        // Allow table.column and .column pattern
         // e.g. SELECT * FROM table WHERE table.redirect_uri = 'value'
         // If the payload is `.r` the replaced query will be
         // SELECT * FROM table WHERE tableaaedirect_uri = 'value'
