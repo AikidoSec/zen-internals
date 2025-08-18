@@ -526,9 +526,10 @@ mod tests {
         not_injection!(query, "view_settings.user_id");
         not_injection!(query, ".u");
         not_injection!(query, ".user_id");
+        not_injection!(query, "s.");
+        not_injection!(query, "view_settings.");
 
         is_injection!(query, "= view_settings.view_id");
-        is_injection!(query, "view_settings.");
     }
 
     #[test]

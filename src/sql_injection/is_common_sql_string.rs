@@ -63,15 +63,19 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
     }
 
     if user_input.contains(".") {
-        // Allow table.column and .column pattern
+        // Allow table.column, table., and .column patterns
         // e.g. SELECT * FROM table WHERE table.redirect_uri = 'value'
         // If the payload is `.r` the replaced query will be
         // SELECT * FROM table WHERE tableaaedirect_uri = 'value'
         // The structure changes from table.column_name to just column_name
+        let starts_with_dot: Regex = Regex::new(r"(?i)^\.[a-zA-Z_][a-zA-Z0-9_]*$").unwrap();
+        let ends_with_dot: Regex = Regex::new(r"(?i)^[a-zA-Z_][a-zA-Z0-9_]*\.$").unwrap();
         let looks_like_table_column: Regex =
-            Regex::new(r"(?i)^([a-zA-Z_][a-zA-Z0-9_]*)?\.[a-zA-Z_][a-zA-Z0-9_]*$").unwrap();
+            Regex::new(r"(?i)^[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*$").unwrap();
 
-        return looks_like_table_column.is_match(user_input);
+        return looks_like_table_column.is_match(user_input)
+            || starts_with_dot.is_match(user_input)
+            || ends_with_dot.is_match(user_input);
     }
 
     // Allow integers like `1`, `-1` or `-2`
