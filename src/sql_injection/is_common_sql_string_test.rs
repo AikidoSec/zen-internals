@@ -141,6 +141,9 @@ mod tests {
         assert_eq!(is_common_sql_string("table_name.column_name_1_2"), true);
         assert_eq!(is_common_sql_string("table_name.column_1_name"), true);
         assert_eq!(is_common_sql_string("table_name.column_name_name_1"), true);
+        assert_eq!(is_common_sql_string(".r"), true);
+        assert_eq!(is_common_sql_string(".id"), true);
+        assert_eq!(is_common_sql_string(".id_"), true);
     }
 
     #[test]
