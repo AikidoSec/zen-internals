@@ -16,8 +16,8 @@ jobs:
           rustup toolchain install stable
           rustup default stable
 
-      - run: cargo install wasm-pack
-      - run: wasm-pack build --target nodejs
+      - name: Build WebAssembly
+        run: ./build-wasm.sh
 
       - uses: actions/setup-node@v4
         with:
