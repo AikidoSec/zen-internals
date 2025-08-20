@@ -146,6 +146,8 @@ mod tests {
         assert_eq!(is_common_sql_string(".id_"), true);
         assert_eq!(is_common_sql_string("r."), true);
         assert_eq!(is_common_sql_string("r_."), true);
+        assert_eq!(is_common_sql_string("r.r.r"), false);
+        assert_eq!(is_common_sql_string(".test.test"), false);
     }
 
     #[test]
