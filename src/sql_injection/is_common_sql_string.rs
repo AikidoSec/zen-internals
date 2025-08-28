@@ -63,7 +63,7 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
     }
 
     if user_input.contains(".") {
-        // Check if it is just a decimal
+        // Check if it is just a decimal (e.g. `16.2`)
         let looks_like_decimal: Regex = Regex::new(r"^-?\d+\.\d+$").unwrap();
 
         if looks_like_decimal.is_match(user_input) {
