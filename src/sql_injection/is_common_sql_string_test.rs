@@ -187,7 +187,6 @@ mod tests {
         assert_eq!(is_common_sql_string("1--"), false);
         assert_eq!(is_common_sql_string("-1-"), false);
         assert_eq!(is_common_sql_string("-1--"), false);
-        assert_eq!(is_common_sql_string("-1.0"), false);
         assert_eq!(is_common_sql_string("-1 --"), false);
         assert_eq!(is_common_sql_string("-1 "), false);
         assert_eq!(is_common_sql_string("-1;"), false);
@@ -208,5 +207,22 @@ mod tests {
         assert_eq!(is_common_sql_string("[ ]"), false);
         assert_eq!(is_common_sql_string("[1]"), false);
         assert_eq!(is_common_sql_string("[[]]"), false);
+    }
+
+    #[test]
+    fn test_decimals() {
+        assert_eq!(is_common_sql_string("1.0"), true);
+        assert_eq!(is_common_sql_string("0.1"), true);
+        assert_eq!(is_common_sql_string("-1.0"), true);
+        assert_eq!(is_common_sql_string("-0.1"), true);
+        assert_eq!(is_common_sql_string("1.5265654651"), true);
+    }
+
+    #[test]
+    fn test_non_decimals() {
+        assert_eq!(is_common_sql_string("1."), false);
+        assert_eq!(is_common_sql_string(".1"), false);
+        assert_eq!(is_common_sql_string("1.0.0"), false);
+        assert_eq!(is_common_sql_string("."), false);
     }
 }

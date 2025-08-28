@@ -63,6 +63,13 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
     }
 
     if user_input.contains(".") {
+        // Check if it is just a decimal
+        let looks_like_decimal: Regex = Regex::new(r"^-?\d+\.\d+$").unwrap();
+
+        if looks_like_decimal.is_match(user_input) {
+            return true;
+        }
+
         // Check if the user input looks like a table.column pattern
         // e.g. SELECT * FROM table WHERE table.redirect_uri = 'value'
         // If the payload is `.r` the replaced query will be
