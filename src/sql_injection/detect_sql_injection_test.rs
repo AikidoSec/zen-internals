@@ -787,4 +787,41 @@ mod tests {
             dialect("mysql")
         );
     }
+
+    #[test]
+    fn test_decimals() {
+        is_injection!("with test as (
+            select distinct 
+                a.id,
+                case when b.test = 14 then 1268.251 when b.test = 42 then 1416.28542 when b.test = 25 end as test_abc_e -- when a.test = 1 end as test_abc_e,
+                b.test
+            from test a
+            join other_table b on a.id = b.key
+        )", "16.28542 when b.test = 25 end as test_abc_e --");
+        is_injection!(
+            "SELECT CASE WHEN age > 18 THEN 121.25 ELSE 1 END AS status FROM users;",
+            "121.25 ELSE 1"
+        );
+
+        not_injection!(
+            "SELECT CASE WHEN age > 18.0 THEN 'adult' ELSE 'minor' END AS status FROM users;",
+            "18.0"
+        );
+        not_injection!(
+            "SELECT CASE WHEN age > 118.05 THEN 'adult' ELSE 'minor' END AS status FROM users;",
+            "18.0"
+        );
+        not_injection!(
+            "SELECT CASE WHEN age > 18 THEN 121.25 ELSE 1 END AS status FROM users;",
+            "1.2"
+        );
+        not_injection!("with test as (
+            select distinct 
+                a.id,
+                case when b.test = 14 then 1268.251 when b.test = 42 then 1416.28542 when b.test = 25 end as test_abc_e,
+                b.test
+            from test a
+            join other_table b on a.id = b.key
+        )", "16.2")
+    }
 }
