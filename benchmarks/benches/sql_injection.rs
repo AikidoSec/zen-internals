@@ -35,11 +35,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         let sql = "SELECT * FROM users WHERE users.redirect_uri = 'value'";
         let user_input = ".r";
         b.iter(|| {
-            detect_sql_injection_str(
-                black_box(sql),
-                black_box(user_input),
-                black_box(dialect),
-            )
+            detect_sql_injection_str(black_box(sql), black_box(user_input), black_box(dialect))
         });
     });
 }
