@@ -833,10 +833,12 @@ mod tests {
         // If the user input is `'value` and the single quote is escaped with another single quote
         // `'value` becomes `'''value'` in the query so we still find an exact match
         // ========================================================
-        let starts_with = r#"    SELECT "foo" WHERE "bar" = '''; sleep 15 ;"'    "#;
 
         // r#"..."# is a raw string literal
-        is_injection!(starts_with, r#"'; sleep 15 ;""#);
+        is_injection!(
+            r#"    SELECT "foo" WHERE "bar" = '''; sleep 15 ;"'    "#,
+            r#"'; sleep 15 ;""#
+        );
 
         is_injection!("SELECT '''abc''', '''abc''' FROM table", "'abc'");
 
