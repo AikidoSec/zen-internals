@@ -237,5 +237,8 @@ mod tests {
         assert_eq!(is_common_sql_string("aa'"), false);
         assert_eq!(is_common_sql_string("'00"), false);
         assert_eq!(is_common_sql_string("'aa"), false);
+
+        assert_eq!(is_common_sql_string("';"), false);
+        assert_eq!(is_common_sql_string(";'"), false);
     }
 }
