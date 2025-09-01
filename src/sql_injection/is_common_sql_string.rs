@@ -62,6 +62,24 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         return looks_like_order_by.is_match(user_input);
     }
 
+    // e.g. 'a or '1
+    if user_input.starts_with("'") {
+        let looks_like_single_quote_start: Regex = Regex::new(r"(?i)^'[a-z0-9]$").unwrap();
+
+        if looks_like_single_quote_start.is_match(user_input) {
+            return true;
+        }
+    }
+
+    // e.g. a' or 1'
+    if user_input.ends_with("'") {
+        let looks_like_single_quote_end: Regex = Regex::new(r"(?i)^[a-z0-9]'$").unwrap();
+
+        if looks_like_single_quote_end.is_match(user_input) {
+            return true;
+        }
+    }
+
     if user_input.contains(".") {
         // Check if it is just a decimal (e.g. `16.2`)
         let looks_like_decimal: Regex = Regex::new(r"^-?\d+\.\d+$").unwrap();

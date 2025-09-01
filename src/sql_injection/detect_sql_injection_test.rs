@@ -824,4 +824,13 @@ mod tests {
             join other_table b on a.id = b.key
         )", "16.2")
     }
+
+    #[test]
+    fn test_start_or_end_with_single_quote() {
+        not_injection!("SELECT name FROM table WHERE id IN ('abc_1')", "1'");
+        not_injection!("SELECT name FROM table WHERE id IN ('abc_1')", "'a");
+
+        is_injection!("SELECT name FROM table WHERE id IN ('abc_1')", "_1'");
+        is_injection!("SELECT name FROM table WHERE id IN ('abc_1')", "'ab");
+    }
 }
