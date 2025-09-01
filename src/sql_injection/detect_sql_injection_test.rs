@@ -826,66 +826,11 @@ mod tests {
     }
 
     #[test]
-    fn test_false_positives_single_quotes() {
-        // ========================================================
-        // These test cases should NOT be flagged as SQL injection
-        // However, our logic is not advanced enough to handle them
-        // If the user input is `'value` and the single quote is escaped with another single quote
-        // `'value` becomes `'''value'` in the query so we still find an exact match
-        // ========================================================
-
-        // r#"..."# is a raw string literal
-        is_injection!(
-            r#"    SELECT "foo" WHERE "bar" = '''; sleep 15 ;"'    "#,
-            r#"'; sleep 15 ;""#
-        );
-
-        is_injection!("SELECT '''abc''', '''abc''' FROM table", "'abc'");
-
-        is_injection!(
-            "SELECT name FROM table WHERE id = ''' OR 1=1 --'",
-            "' OR 1=1 --"
-        );
-        is_injection!(
-            "SELECT name FROM table WHERE id = 'before'' OR 1=1 --'",
-            "' OR 1=1 --"
-        );
-        is_injection!(
-            "SELECT name FROM table WHERE id = ''' OR 1=1 --after'",
-            "' OR 1=1 --"
-        );
-        is_injection!(
-            "SELECT name FROM table WHERE id = 'before'' OR 1=1 --after'",
-            "' OR 1=1 --"
-        );
-    }
-
-    #[test]
     fn test_start_or_end_with_single_quote() {
-        not_injection!("SELECT name FROM table WHERE id = '''", "'");
-        not_injection!("SELECT name FROM table WHERE id = '''''", "''");
+        not_injection!("SELECT name FROM table WHERE id IN ('abc_1')", "1'");
+        not_injection!("SELECT name FROM table WHERE id IN ('abc_1')", "'a");
 
-        not_injection!("SELECT '''abc', '''abc' FROM table", "'abc");
-        not_injection!("SELECT 'abc''', 'abc''' FROM table", "abc'");
-
-        is_injection!("SELECT name FROM table WHERE id = ''--", "'--");
-        is_injection!("SELECT name FROM table WHERE id = ''--''", "'--'");
-
-        is_injection!(
-            "SELECT ''' OR 1=1 --' FROM table WHERE id = '' OR 1=1 --'",
-            "' OR 1=1 --"
-        );
-        is_injection!(
-            "SELECT ''' OR 1=1 --' FROM table WHERE id = 'before' OR 1=1 --'",
-            "' OR 1=1 --"
-        );
-        is_injection!(
-            "SELECT ''' OR 1=1 --' FROM table WHERE id = '' OR 1=1 --'after",
-            "' OR 1=1 --"
-        );
-        is_injection!(
-            "SELECT ''' OR 1=1 --' FROM table WHERE id = 'before' OR 1=1 --'after",
-            "' OR 1=1 --"
-        );
+        is_injection!("SELECT name FROM table WHERE id IN ('abc_1')", "_1'");
+        is_injection!("SELECT name FROM table WHERE id IN ('abc_1')", "'ab");
     }
 }

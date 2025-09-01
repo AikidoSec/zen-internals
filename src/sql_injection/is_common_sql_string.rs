@@ -62,19 +62,18 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         return looks_like_order_by.is_match(user_input);
     }
 
-    // Special case for single quotes at start and/or end of user input
-    // Normally if the user input is properly escaped, we wouldn't find an exact match in the query
-    // However, if the user input is `'value` and the single quote is escaped with another single quote
-    // `'value` becomes `'''value'` in the query so we still find an exact match
+    // e.g. 'a or '1
     if user_input.starts_with("'") {
-        let looks_like_single_quote_start: Regex = Regex::new(r"(?i)^'[a-z0-9]+$").unwrap();
+        let looks_like_single_quote_start: Regex = Regex::new(r"(?i)^'[a-z0-9]$").unwrap();
 
         if looks_like_single_quote_start.is_match(user_input) {
             return true;
         }
     }
+
+    // e.g. a' or 1'
     if user_input.ends_with("'") {
-        let looks_like_single_quote_end: Regex = Regex::new(r"(?i)^[a-z0-9]+'$").unwrap();
+        let looks_like_single_quote_end: Regex = Regex::new(r"(?i)^[a-z0-9]'$").unwrap();
 
         if looks_like_single_quote_end.is_match(user_input) {
             return true;
