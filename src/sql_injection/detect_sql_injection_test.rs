@@ -849,6 +849,22 @@ mod tests {
         );
 
         is_injection!(
+            "SELECT * FROM product WHERE p_ID = 'product 123'",
+            "'product 123"
+        );
+        is_injection!(
+            "SELECT * FROM product WHERE p_ID = 'product 123'",
+            "product 123'"
+        );
+        is_injection!(
+            "SELECT * FROM product WHERE p_ID = 'product\\123'",
+            "'product\\123"
+        );
+        is_injection!(
+            "SELECT * FROM product WHERE p_ID = 'product\\123'",
+            "product\\123'"
+        );
+        is_injection!(
             "SELECT * FROM product WHERE p_ID = 'payload--drop'",
             "payload--drop'"
         );
