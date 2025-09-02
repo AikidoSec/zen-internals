@@ -260,6 +260,10 @@ mod tests {
         assert_eq!(is_common_sql_string("'item_abc-def"), false);
         assert_eq!(is_common_sql_string("item_abc-def'"), false);
 
+        // spaces are not allowed
+        assert_eq!(is_common_sql_string("'user -id-456"), false);
+        assert_eq!(is_common_sql_string("user -id-456'"), false);
+
         assert_eq!(
             is_common_sql_string(&format!("{}'{}", "a".repeat(63), "")),
             true
