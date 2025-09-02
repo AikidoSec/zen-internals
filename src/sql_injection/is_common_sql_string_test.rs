@@ -265,19 +265,19 @@ mod tests {
         assert_eq!(is_common_sql_string("user -id-456'"), false);
 
         assert_eq!(
-            is_common_sql_string(&format!("{}'{}", "a".repeat(63), "")),
+            is_common_sql_string(&format!("{}'{}", "a".repeat(199), "")),
             true
         );
         assert_eq!(
-            is_common_sql_string(&format!("{}'{}", "a".repeat(64), "")),
+            is_common_sql_string(&format!("{}'{}", "a".repeat(200), "")),
             false
         );
         assert_eq!(
-            is_common_sql_string(&format!("'{}{}", "a".repeat(63), "")),
+            is_common_sql_string(&format!("'{}{}", "a".repeat(199), "")),
             true
         );
         assert_eq!(
-            is_common_sql_string(&format!("'{}{}", "a".repeat(64), "")),
+            is_common_sql_string(&format!("'{}{}", "a".repeat(200), "")),
             false
         );
     }
