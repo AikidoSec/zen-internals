@@ -842,14 +842,6 @@ mod tests {
             "product-123'"
         );
         not_injection!(
-            "SELECT * FROM items WHERE item_id = 'item_abc-def'",
-            "'item_abc-def"
-        );
-        not_injection!(
-            "SELECT * FROM items WHERE item_id = 'item_abc-def'",
-            "item_abc-def'"
-        );
-        not_injection!(
             "SELECT * FROM users WHERE user_name = 'user-id-456'",
             "'user-id-456"
         );

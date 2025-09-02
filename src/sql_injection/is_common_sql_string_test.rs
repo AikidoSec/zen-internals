@@ -247,8 +247,6 @@ mod tests {
 
         assert_eq!(is_common_sql_string("'product-123"), true);
         assert_eq!(is_common_sql_string("product-123'"), true);
-        assert_eq!(is_common_sql_string("'item_abc-def"), true);
-        assert_eq!(is_common_sql_string("item_abc-def'"), true);
         assert_eq!(is_common_sql_string("'user-id-456"), true);
         assert_eq!(is_common_sql_string("user-id-456'"), true);
 
@@ -257,6 +255,10 @@ mod tests {
 
         assert_eq!(is_common_sql_string("';"), false);
         assert_eq!(is_common_sql_string(";'"), false);
+
+        // underscore has special meaning in MySQL LIKE operator, so we don't allow it here
+        assert_eq!(is_common_sql_string("'item_abc-def"), false);
+        assert_eq!(is_common_sql_string("item_abc-def'"), false);
 
         assert_eq!(
             is_common_sql_string(&format!("{}'{}", "a".repeat(63), "")),

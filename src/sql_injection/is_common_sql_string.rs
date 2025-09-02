@@ -64,7 +64,7 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
 
     // e.g. 'a or '1 or 'product-id-123
     if user_input.starts_with("'") && user_input.len() <= 64 && !user_input.contains("--") {
-        let looks_like_single_quote_start: Regex = Regex::new(r"(?i)^'[a-z0-9-_]+$").unwrap();
+        let looks_like_single_quote_start: Regex = Regex::new(r"(?i)^'[a-z0-9-]+$").unwrap();
 
         if looks_like_single_quote_start.is_match(user_input) {
             return true;
@@ -73,7 +73,7 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
 
     // e.g. a' or 1' or product-id-123'
     if user_input.ends_with("'") && user_input.len() <= 64 && !user_input.contains("--") {
-        let looks_like_single_quote_end: Regex = Regex::new(r"(?i)^[a-z0-9-_]+'$").unwrap();
+        let looks_like_single_quote_end: Regex = Regex::new(r"(?i)^[a-z0-9-]+'$").unwrap();
 
         if looks_like_single_quote_end.is_match(user_input) {
             return true;
