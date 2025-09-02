@@ -833,14 +833,38 @@ mod tests {
         not_injection!("SELECT name FROM table WHERE id IN ('abc_1')", "_1'");
         not_injection!("SELECT name FROM table WHERE id IN ('abc_1')", "'ab");
 
-        not_injection!("SELECT * FROM product WHERE p_ID = 'product-123'", "'product-123");
-        not_injection!("SELECT * FROM product WHERE p_ID = 'product-123'", "product-123'");
-        not_injection!("SELECT * FROM items WHERE item_id = 'item_abc-def'", "'item_abc-def");
-        not_injection!("SELECT * FROM items WHERE item_id = 'item_abc-def'", "item_abc-def'");
-        not_injection!("SELECT * FROM users WHERE user_name = 'user-id-456'", "'user-id-456");
-        not_injection!("SELECT * FROM users WHERE user_name = 'user-id-456'", "user-id-456'");
+        not_injection!(
+            "SELECT * FROM product WHERE p_ID = 'product-123'",
+            "'product-123"
+        );
+        not_injection!(
+            "SELECT * FROM product WHERE p_ID = 'product-123'",
+            "product-123'"
+        );
+        not_injection!(
+            "SELECT * FROM items WHERE item_id = 'item_abc-def'",
+            "'item_abc-def"
+        );
+        not_injection!(
+            "SELECT * FROM items WHERE item_id = 'item_abc-def'",
+            "item_abc-def'"
+        );
+        not_injection!(
+            "SELECT * FROM users WHERE user_name = 'user-id-456'",
+            "'user-id-456"
+        );
+        not_injection!(
+            "SELECT * FROM users WHERE user_name = 'user-id-456'",
+            "user-id-456'"
+        );
 
-        is_injection!("SELECT * FROM product WHERE p_ID = 'payload--drop'", "payload--drop'");
-        is_injection!("SELECT * FROM product WHERE p_ID = 'payload--drop'", "'payload--drop");
+        is_injection!(
+            "SELECT * FROM product WHERE p_ID = 'payload--drop'",
+            "payload--drop'"
+        );
+        is_injection!(
+            "SELECT * FROM product WHERE p_ID = 'payload--drop'",
+            "'payload--drop"
+        );
     }
 }

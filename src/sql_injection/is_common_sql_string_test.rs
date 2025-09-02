@@ -258,9 +258,21 @@ mod tests {
         assert_eq!(is_common_sql_string("';"), false);
         assert_eq!(is_common_sql_string(";'"), false);
 
-        assert_eq!(is_common_sql_string(&format!("{}'{}", "a".repeat(63), "")), true);
-        assert_eq!(is_common_sql_string(&format!("{}'{}", "a".repeat(64), "")), false);
-        assert_eq!(is_common_sql_string(&format!("'{}{}", "a".repeat(63), "")), true);
-        assert_eq!(is_common_sql_string(&format!("'{}{}", "a".repeat(64), "")), false);
+        assert_eq!(
+            is_common_sql_string(&format!("{}'{}", "a".repeat(63), "")),
+            true
+        );
+        assert_eq!(
+            is_common_sql_string(&format!("{}'{}", "a".repeat(64), "")),
+            false
+        );
+        assert_eq!(
+            is_common_sql_string(&format!("'{}{}", "a".repeat(63), "")),
+            true
+        );
+        assert_eq!(
+            is_common_sql_string(&format!("'{}{}", "a".repeat(64), "")),
+            false
+        );
     }
 }
