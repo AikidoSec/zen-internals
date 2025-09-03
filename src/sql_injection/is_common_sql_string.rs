@@ -62,18 +62,18 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         return looks_like_order_by.is_match(user_input);
     }
 
-    // e.g. 'a or '1
-    if user_input.starts_with("'") {
-        let looks_like_single_quote_start: Regex = Regex::new(r"(?i)^'[a-z0-9]$").unwrap();
+    // e.g. 'a or '1 or 'product-id-123
+    if user_input.starts_with("'") && user_input.len() <= 200 && !user_input.contains("--") {
+        let looks_like_single_quote_start: Regex = Regex::new(r"(?i)^'[a-z0-9-]+$").unwrap();
 
         if looks_like_single_quote_start.is_match(user_input) {
             return true;
         }
     }
 
-    // e.g. a' or 1'
-    if user_input.ends_with("'") {
-        let looks_like_single_quote_end: Regex = Regex::new(r"(?i)^[a-z0-9]'$").unwrap();
+    // e.g. a' or 1' or product-id-123'
+    if user_input.ends_with("'") && user_input.len() <= 200 && !user_input.contains("--") {
+        let looks_like_single_quote_end: Regex = Regex::new(r"(?i)^[a-z0-9-]+'$").unwrap();
 
         if looks_like_single_quote_end.is_match(user_input) {
             return true;

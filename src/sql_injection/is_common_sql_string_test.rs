@@ -227,18 +227,58 @@ mod tests {
     }
 
     #[test]
+    fn test_single_line_comment_with_single_quote() {
+        assert_eq!(is_common_sql_string("--"), false);
+        assert_eq!(is_common_sql_string("--'"), false);
+        assert_eq!(is_common_sql_string("'--"), false);
+    }
+
+    #[test]
     fn test_single_quote_start_end() {
         assert_eq!(is_common_sql_string("'a"), true);
         assert_eq!(is_common_sql_string("'0"), true);
         assert_eq!(is_common_sql_string("a'"), true);
         assert_eq!(is_common_sql_string("0'"), true);
 
-        assert_eq!(is_common_sql_string("00'"), false);
-        assert_eq!(is_common_sql_string("aa'"), false);
-        assert_eq!(is_common_sql_string("'00"), false);
-        assert_eq!(is_common_sql_string("'aa"), false);
+        assert_eq!(is_common_sql_string("00'"), true);
+        assert_eq!(is_common_sql_string("aa'"), true);
+        assert_eq!(is_common_sql_string("'00"), true);
+        assert_eq!(is_common_sql_string("'aa"), true);
+
+        assert_eq!(is_common_sql_string("'product-123"), true);
+        assert_eq!(is_common_sql_string("product-123'"), true);
+        assert_eq!(is_common_sql_string("'user-id-456"), true);
+        assert_eq!(is_common_sql_string("user-id-456'"), true);
+
+        assert_eq!(is_common_sql_string("'payload--drop"), false);
+        assert_eq!(is_common_sql_string("payload--drop'"), false);
 
         assert_eq!(is_common_sql_string("';"), false);
         assert_eq!(is_common_sql_string(";'"), false);
+
+        // underscore has special meaning in MySQL LIKE operator, so we don't allow it here
+        assert_eq!(is_common_sql_string("'item_abc-def"), false);
+        assert_eq!(is_common_sql_string("item_abc-def'"), false);
+
+        // spaces are not allowed
+        assert_eq!(is_common_sql_string("'user -id-456"), false);
+        assert_eq!(is_common_sql_string("user -id-456'"), false);
+
+        assert_eq!(
+            is_common_sql_string(&format!("{}'{}", "a".repeat(199), "")),
+            true
+        );
+        assert_eq!(
+            is_common_sql_string(&format!("{}'{}", "a".repeat(200), "")),
+            false
+        );
+        assert_eq!(
+            is_common_sql_string(&format!("'{}{}", "a".repeat(199), "")),
+            true
+        );
+        assert_eq!(
+            is_common_sql_string(&format!("'{}{}", "a".repeat(200), "")),
+            false
+        );
     }
 }

@@ -829,8 +829,58 @@ mod tests {
     fn test_start_or_end_with_single_quote() {
         not_injection!("SELECT name FROM table WHERE id IN ('abc_1')", "1'");
         not_injection!("SELECT name FROM table WHERE id IN ('abc_1')", "'a");
+        not_injection!("SELECT name FROM table WHERE id IN ('abc_1')", "'ab");
 
+        not_injection!(
+            "SELECT * FROM product WHERE p_ID = 'product-123'",
+            "'product-123"
+        );
+        not_injection!(
+            "SELECT * FROM product WHERE p_ID = 'product-123'",
+            "product-123'"
+        );
+        not_injection!(
+            "SELECT * FROM users WHERE user_name = 'user-id-456'",
+            "'user-id-456"
+        );
+        not_injection!(
+            "SELECT * FROM users WHERE user_name = 'user-id-456'",
+            "user-id-456'"
+        );
+
+        is_injection!(
+            "SELECT * FROM product WHERE p_ID = 'product;123'",
+            "'product;123"
+        );
+        is_injection!(
+            "SELECT * FROM product WHERE p_ID = 'product;123'",
+            "product;123'"
+        );
+        is_injection!(
+            "SELECT * FROM product WHERE p_ID = 'product 123'",
+            "'product 123"
+        );
+        is_injection!(
+            "SELECT * FROM product WHERE p_ID = 'product 123'",
+            "product 123'"
+        );
+        is_injection!(
+            "SELECT * FROM product WHERE p_ID = 'product\\123'",
+            "'product\\123"
+        );
+        is_injection!(
+            "SELECT * FROM product WHERE p_ID = 'product\\123'",
+            "product\\123'"
+        );
+        is_injection!(
+            "SELECT * FROM product WHERE p_ID = 'payload--drop'",
+            "payload--drop'"
+        );
+        is_injection!(
+            "SELECT * FROM product WHERE p_ID = 'payload--drop'",
+            "'payload--drop"
+        );
         is_injection!("SELECT name FROM table WHERE id IN ('abc_1')", "_1'");
-        is_injection!("SELECT name FROM table WHERE id IN ('abc_1')", "'ab");
+        is_injection!("SELECT name FROM table WHERE id IN ('_1')", "'_1");
     }
 }
