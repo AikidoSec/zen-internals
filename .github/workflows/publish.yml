@@ -364,6 +364,9 @@ jobs:
         build-mac,
         build-mac-arm64,
         build-windows-arm,
+        build-linux-musl,
+        build-linux-arm64-musl,
+        build-wasm,
       ]
     runs-on: ubuntu-latest
     steps:
