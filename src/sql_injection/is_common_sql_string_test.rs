@@ -234,7 +234,7 @@ mod tests {
     }
 
     #[test]
-    fn test_alphanumerical_with_spaces() {
+    fn test_alpha_with_spaces() {
         assert_eq!(is_common_sql_string("is n"), true);
         assert_eq!(is_common_sql_string("is nu"), true);
         assert_eq!(is_common_sql_string("is nul"), true);
