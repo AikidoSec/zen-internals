@@ -237,6 +237,10 @@ mod tests {
     fn test_alpha_with_spaces() {
         assert_eq!(is_common_sql_string("is n"), true);
 
+        assert_eq!(is_common_sql_string("OR"), false);
+        assert_eq!(is_common_sql_string(" OR "), false);
+        assert_eq!(is_common_sql_string("TRUE OR TRUE IS TRUE"), false);
+        assert_eq!(is_common_sql_string("TRUE OR TRUE"), false);
         assert_eq!(is_common_sql_string("is nu"), false);
         assert_eq!(is_common_sql_string("is nul"), false);
         assert_eq!(is_common_sql_string("is null abc"), false);
