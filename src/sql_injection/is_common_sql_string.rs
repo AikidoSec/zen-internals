@@ -1,4 +1,5 @@
 use regex::Regex;
+use once_cell::sync::Lazy;
 
 pub const COMMON_SQL_STRINGS: [&str; 24] = [
     "SELECT *",
@@ -27,6 +28,16 @@ pub const COMMON_SQL_STRINGS: [&str; 24] = [
     "[]",
 ];
 
+// Macro to create a static regex that is compiled only once.
+macro_rules! regex {
+    ($re:expr $(,)?) => {{
+        static RE: Lazy<Regex> = Lazy::new(|| {
+            Regex::new($re).expect("invalid regex")
+        });
+        &*RE
+    }};
+}
+
 pub fn is_common_sql_string(user_input: &str) -> bool {
     let is_common_sql_string = COMMON_SQL_STRINGS
         .iter()
@@ -37,8 +48,7 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         return true;
     }
 
-    let alpha_with_spaces = Regex::new(r"(?i)^[a-z ]+$").unwrap();
-    if user_input.len() <= 4 && alpha_with_spaces.is_match(user_input) {
+    if user_input.len() <= 4 && regex!(r"(?i)^[a-z ]+$").is_match(user_input) {
         // It's very difficult to exploit a query using a short string of only letters and spaces.
         return true;
     }
@@ -48,11 +58,9 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
     // SELECT * FROM users WHERE users.activaa 1
     // The structure of the query will not be the same
     // it's very difficult to exploit a query using just "e=" as the user input.
-    let alpha_followed_by_equal: Regex = Regex::new(r"(?i)^[a-z]=$").unwrap();
-
     if user_input.len() == 2
         && user_input.ends_with("=")
-        && alpha_followed_by_equal.is_match(user_input)
+        && regex!(r"(?i)^[a-z]=$").is_match(user_input)
     {
         // If the user input is just a single letter followed by an equal sign, it's not an injection.
         return true;
@@ -62,35 +70,26 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         // Check if the user input is a common SQL pattern like "column_name ASC"
         // e.g. https://ghost.org/docs/content-api/#order (Ghost validates the order parameter)
         // SQL identifiers can't start with a number
-        let looks_like_order_by: Regex =
-            Regex::new(r"(?i)^[a-zA-Z_][a-zA-Z0-9_]* +(ASC|DESC)$").unwrap();
-
-        return looks_like_order_by.is_match(user_input);
+        return regex!(r"(?i)^[a-zA-Z_][a-zA-Z0-9_]* +(ASC|DESC)$").is_match(user_input);
     }
 
     // e.g. 'a or '1 or 'product-id-123
     if user_input.starts_with("'") && user_input.len() <= 200 && !user_input.contains("--") {
-        let looks_like_single_quote_start: Regex = Regex::new(r"(?i)^'[a-z0-9-]+$").unwrap();
-
-        if looks_like_single_quote_start.is_match(user_input) {
+        if regex!(r"(?i)^'[a-z0-9-]+$").is_match(user_input) {
             return true;
         }
     }
 
     // e.g. a' or 1' or product-id-123'
     if user_input.ends_with("'") && user_input.len() <= 200 && !user_input.contains("--") {
-        let looks_like_single_quote_end: Regex = Regex::new(r"(?i)^[a-z0-9-]+'$").unwrap();
-
-        if looks_like_single_quote_end.is_match(user_input) {
+        if regex!(r"(?i)^[a-z0-9-]+'$").is_match(user_input) {
             return true;
         }
     }
 
     if user_input.contains(".") {
         // Check if it is just a decimal (e.g. `16.2`)
-        let looks_like_decimal: Regex = Regex::new(r"^-?\d+\.\d+$").unwrap();
-
-        if looks_like_decimal.is_match(user_input) {
+        if regex!(r"^-?\d+\.\d+$").is_match(user_input) {
             return true;
         }
 
@@ -104,18 +103,12 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         // - `table.column`
         // - `table.`
         // - `.column`
-        let looks_like_table_column: Regex = Regex::new(
-            r"(?i)^(\.[a-zA-Z_][a-zA-Z0-9_]*|[a-zA-Z_][a-zA-Z0-9_]*\.|[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*)$"
-        ).unwrap();
-
-        return looks_like_table_column.is_match(user_input);
+        return regex!(r"(?i)^(\.[a-zA-Z_][a-zA-Z0-9_]*|[a-zA-Z_][a-zA-Z0-9_]*\.|[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*)$").is_match(user_input);
     }
 
     // Allow integers like `1`, `-1` or `-2`
     // We have to be careful with minus signs, as they can be used for SQL injections
-    let looks_like_int: Regex = Regex::new(r"^-?[0-9]+$").unwrap();
-
-    if looks_like_int.is_match(user_input) {
+    if regex!(r"^-?[0-9]+$").is_match(user_input) {
         return true;
     }
 
