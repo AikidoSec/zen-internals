@@ -37,6 +37,12 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         return true;
     }
 
+    let alpha_with_spaces = Regex::new(r"(?i)^[0-9a-z ]+$").unwrap();
+    if user_input.len() <= 8 && alpha_with_spaces.is_match(user_input) {
+        // It's very difficult to exploit a query using a short string of only letters and spaces.
+        return true;
+    }
+
     // e.g. SELECT * FROM users WHERE users.active= 1
     // If the payload is `e=` the replaced query will be
     // SELECT * FROM users WHERE users.activaa 1

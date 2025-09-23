@@ -57,18 +57,18 @@ mod tests {
             is_common_sql_string("column_name desc, column_name2 desc limit 1"),
             false
         );
-        assert_eq!(is_common_sql_string("asc1"), false);
-        assert_eq!(is_common_sql_string("desc1"), false);
-        assert_eq!(is_common_sql_string("asc 1"), false);
-        assert_eq!(is_common_sql_string("desc 1"), false);
-        assert_eq!(is_common_sql_string("1asc"), false);
-        assert_eq!(is_common_sql_string("1desc"), false);
-        assert_eq!(is_common_sql_string("1 "), false);
+        assert_eq!(is_common_sql_string("asc1"), true);
+        assert_eq!(is_common_sql_string("desc1"), true);
+        assert_eq!(is_common_sql_string("asc 1"), true);
+        assert_eq!(is_common_sql_string("desc 1"), true);
+        assert_eq!(is_common_sql_string("1asc"), true);
+        assert_eq!(is_common_sql_string("1desc"), true);
+        assert_eq!(is_common_sql_string("1 "), true);
         assert_eq!(is_common_sql_string("1;"), false);
         assert_eq!(is_common_sql_string("1--"), false);
         assert_eq!(is_common_sql_string("1/*"), false);
-        assert_eq!(is_common_sql_string("1 asc"), false);
-        assert_eq!(is_common_sql_string("1 desc"), false);
+        assert_eq!(is_common_sql_string("1 asc"), true);
+        assert_eq!(is_common_sql_string("1 desc"), true);
         assert_eq!(is_common_sql_string("1name asc"), false);
         assert_eq!(is_common_sql_string("1name desc"), false);
         assert_eq!(is_common_sql_string("1_name asc"), false);
@@ -231,6 +231,17 @@ mod tests {
         assert_eq!(is_common_sql_string("--"), false);
         assert_eq!(is_common_sql_string("--'"), false);
         assert_eq!(is_common_sql_string("'--"), false);
+    }
+
+    #[test]
+    fn test_alphanumerical_with_spaces() {
+        assert_eq!(is_common_sql_string("is n"), true);
+        assert_eq!(is_common_sql_string("is nu"), true);
+        assert_eq!(is_common_sql_string("is nul"), true);
+        assert_eq!(is_common_sql_string("is null"), true);
+
+        assert_eq!(is_common_sql_string("is null abc"), false);
+        assert_eq!(is_common_sql_string("%is n%"), false);
     }
 
     #[test]

@@ -318,7 +318,8 @@ mod tests {
         );
         is_injection!("SELECT * FROM hakuna matata theory", "kuna matata theo");
 
-        is_injection!("SELECT * FROM hakuna matata", "FROM h");
+        not_injection!("SELECT * FROM hakuna matata", "FROM h");
+        is_injection!("SELECT * FROM hakuna matata", "FROM hakun");
         is_injection!("SELECT * FROM hakuna matata", "FROM hakuna");
         is_injection!("SELECT * FROM hakuna matata", "FROM hakuna matata");
         not_injection!(
@@ -882,5 +883,17 @@ mod tests {
         );
         is_injection!("SELECT name FROM table WHERE id IN ('abc_1')", "_1'");
         is_injection!("SELECT name FROM table WHERE id IN ('_1')", "'_1");
+    }
+
+    #[test]
+    fn test_safely_escape_wildcard() {
+        not_injection!("SELECT * FROM users WHERE status ILIKE '%is n%'", "is n");
+    }
+
+    #[test]
+    fn test_alphanumerical_with_space() {
+        not_injection!("SELECT * FROM users WHERE status IS NULL", "IS N");
+
+        is_injection!("SELECT * FROM users WHERE status IS NULL", "s IS NULL");
     }
 }
