@@ -318,7 +318,7 @@ mod tests {
         );
         is_injection!("SELECT * FROM hakuna matata theory", "kuna matata theo");
 
-        not_injection!("SELECT * FROM hakuna matata", "FROM h");
+        is_injection!("SELECT * FROM hakuna matata", "FROM h");
         is_injection!("SELECT * FROM hakuna matata", "FROM hakun");
         is_injection!("SELECT * FROM hakuna matata", "FROM hakuna");
         is_injection!("SELECT * FROM hakuna matata", "FROM hakuna matata");
@@ -893,8 +893,8 @@ mod tests {
     #[test]
     fn test_alpha_with_spaces() {
         not_injection!("SELECT * FROM users WHERE status IS NULL", "IS N");
-        not_injection!("SELECT * FROM users WHERE status IS NULL", "s IS N");
 
+        is_injection!("SELECT * FROM users WHERE status IS NULL", "s IS N");
         is_injection!("SELECT * FROM users WHERE status IS NULL", "s IS NULL");
         is_injection!("SELECT * FROM users WHERE status = 1 OR TRUE", "1 OR TRUE");
         is_injection!("SELECT * FROM users WHERE status = TRUE OR TRUE", "TRUE OR TRUE");
