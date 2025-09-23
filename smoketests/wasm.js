@@ -7,7 +7,7 @@ test("wasm_detect_sql_injection", () => {
  deepStrictEqual(internals.wasm_detect_sql_injection("SELECT * FROM users WHERE id = 'hello world'", 'hello world'), 0);
 
  // Tokenize error
- deepStrictEqual(internals.wasm_detect_sql_injection("SELECT * FROM yo WHERE id = '", 'yo'), 3);
+ deepStrictEqual(internals.wasm_detect_sql_injection('SELECT unicorns fly over the "rainbow', "rainbow"), 3);
 });
 
 test("wasm_detect_js_injection", () => {
