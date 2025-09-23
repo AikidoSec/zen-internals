@@ -896,6 +896,10 @@ mod tests {
         not_injection!("SELECT * FROM users WHERE status IS NULL", "s IS N");
 
         is_injection!("SELECT * FROM users WHERE status IS NULL", "s IS NULL");
+        is_injection!("SELECT * FROM users WHERE status = 1 OR TRUE", "1 OR TRUE");
+        is_injection!("SELECT * FROM users WHERE status = TRUE OR TRUE", "TRUE OR TRUE");
+        is_injection!("SELECT * FROM users WHERE status = '' OR TRUE", "'' OR TRUE");
+        is_injection!("SELECT * FROM users WHERE status = NULL OR TRUE", "NULL OR TRUE");
     }
 
     #[test]
