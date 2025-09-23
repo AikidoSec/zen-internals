@@ -900,6 +900,9 @@ mod tests {
 
     #[test]
     fn test_alpha_numerical_with_spaces() {
-        is_injection!("SELECT * FROM users WHERE status = 1 OR 1 IS 1", "1 OR 1 IS 1");
+        is_injection!(
+            "SELECT * FROM users WHERE status = 1 OR 1 IS 1",
+            "1 OR 1 IS 1"
+        );
     }
 }
