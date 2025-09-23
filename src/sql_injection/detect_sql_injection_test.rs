@@ -891,7 +891,7 @@ mod tests {
     }
 
     #[test]
-    fn test_alphanumerical_with_space() {
+    fn test_alpha_with_space() {
         not_injection!("SELECT * FROM users WHERE status IS NULL", "IS N");
 
         is_injection!("SELECT * FROM users WHERE status IS NULL", "s IS NULL");
