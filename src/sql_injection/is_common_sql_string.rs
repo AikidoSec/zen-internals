@@ -1,5 +1,5 @@
-use regex::Regex;
 use once_cell::sync::Lazy;
+use regex::Regex;
 
 pub const COMMON_SQL_STRINGS: [&str; 24] = [
     "SELECT *",
@@ -31,9 +31,7 @@ pub const COMMON_SQL_STRINGS: [&str; 24] = [
 // Macro to create a static regex that is compiled only once.
 macro_rules! regex {
     ($re:expr $(,)?) => {{
-        static RE: Lazy<Regex> = Lazy::new(|| {
-            Regex::new($re).expect("invalid regex")
-        });
+        static RE: Lazy<Regex> = Lazy::new(|| Regex::new($re).expect("invalid regex"));
         &*RE
     }};
 }
