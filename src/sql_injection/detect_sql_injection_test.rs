@@ -883,4 +883,20 @@ mod tests {
         is_injection!("SELECT name FROM table WHERE id IN ('abc_1')", "_1'");
         is_injection!("SELECT name FROM table WHERE id IN ('_1')", "'_1");
     }
+
+    #[test]
+    fn test_hex_values_with_single_quotes() {
+        not_injection!(
+            "SELECT * FROM items WHERE name ILIKE '%0xabc123def456%' ORDER BY similarity(name, '0xabc123def456') DESC",
+            "0xabc123def456'"
+        );
+        not_injection!(
+            "SELECT * FROM items WHERE name ILIKE '%0xabc123def456%' ORDER BY similarity(name, '0xabc123def456') DESC",
+            "0xabc123def456"
+        );
+        not_injection!(
+            "SELECT * FROM items WHERE name ILIKE '%0xabc123def456%' ORDER BY similarity(name, '0xabc123def456') DESC",
+            "'0xabc123def456"
+        );
+    }
 }
