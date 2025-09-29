@@ -38,7 +38,7 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
     }
 
     let alpha_with_space = Regex::new(r"(?i)^[a-z]+ [a-z]+$").unwrap();
-    if user_input.len() <= 4 && alpha_with_space.is_match(user_input) {
+    if user_input.len() <= 5 && alpha_with_space.is_match(user_input) {
         // It's very difficult to exploit a query using a short string of only letters and space.
         return true;
     }
