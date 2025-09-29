@@ -909,7 +909,9 @@ mod tests {
     #[test]
     fn test_alpha_with_spaces() {
         not_injection!("SELECT * FROM users WHERE status IS NULL", "IS N");
+        not_injection!("SELECT * FROM users WHERE status IS NULL", "IS NU");
 
+        is_injection!("SELECT * FROM users WHERE status IS  NULL", "IS  NU");
         is_injection!("SELECT * FROM users WHERE status IS NULL", "s IS N");
         is_injection!("SELECT * FROM users WHERE status IS NULL", "s IS NULL");
         is_injection!("SELECT * FROM users WHERE status = 1 OR TRUE", "1 OR TRUE");
