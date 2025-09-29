@@ -886,6 +886,22 @@ mod tests {
     }
 
     #[test]
+    fn test_hex_values_with_single_quotes() {
+        not_injection!(
+            "SELECT * FROM items WHERE name ILIKE '%0xabc123def456%' ORDER BY similarity(name, '0xabc123def456') DESC",
+            "0xabc123def456'"
+        );
+        not_injection!(
+            "SELECT * FROM items WHERE name ILIKE '%0xabc123def456%' ORDER BY similarity(name, '0xabc123def456') DESC",
+            "0xabc123def456"
+        );
+        not_injection!(
+            "SELECT * FROM items WHERE name ILIKE '%0xabc123def456%' ORDER BY similarity(name, '0xabc123def456') DESC",
+            "'0xabc123def456"
+        );
+    }
+
+    #[test]
     fn test_safely_escape_wildcard() {
         not_injection!("SELECT * FROM users WHERE status ILIKE '%is n%'", "is n");
     }
