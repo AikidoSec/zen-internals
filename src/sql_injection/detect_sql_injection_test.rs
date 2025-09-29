@@ -319,6 +319,7 @@ mod tests {
         is_injection!("SELECT * FROM hakuna matata theory", "kuna matata theo");
 
         is_injection!("SELECT * FROM hakuna matata", "FROM h");
+        is_injection!("SELECT * FROM hakuna matata", "FROM hakun");
         is_injection!("SELECT * FROM hakuna matata", "FROM hakuna");
         is_injection!("SELECT * FROM hakuna matata", "FROM hakuna matata");
         not_injection!(
@@ -897,6 +898,40 @@ mod tests {
         not_injection!(
             "SELECT * FROM items WHERE name ILIKE '%0xabc123def456%' ORDER BY similarity(name, '0xabc123def456') DESC",
             "'0xabc123def456"
+        );
+    }
+
+    #[test]
+    fn test_safely_escape_wildcard() {
+        not_injection!("SELECT * FROM users WHERE status ILIKE '%is n%'", "is n");
+    }
+
+    #[test]
+    fn test_alpha_with_spaces() {
+        not_injection!("SELECT * FROM users WHERE status IS NULL", "IS N");
+
+        is_injection!("SELECT * FROM users WHERE status IS NULL", "s IS N");
+        is_injection!("SELECT * FROM users WHERE status IS NULL", "s IS NULL");
+        is_injection!("SELECT * FROM users WHERE status = 1 OR TRUE", "1 OR TRUE");
+        is_injection!(
+            "SELECT * FROM users WHERE status = TRUE OR TRUE",
+            "TRUE OR TRUE"
+        );
+        is_injection!(
+            "SELECT * FROM users WHERE status = '' OR TRUE",
+            "'' OR TRUE"
+        );
+        is_injection!(
+            "SELECT * FROM users WHERE status = NULL OR TRUE",
+            "NULL OR TRUE"
+        );
+    }
+
+    #[test]
+    fn test_alpha_numerical_with_spaces() {
+        is_injection!(
+            "SELECT * FROM users WHERE status = 1 OR 1 IS 1",
+            "1 OR 1 IS 1"
         );
     }
 }

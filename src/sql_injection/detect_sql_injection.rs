@@ -4,10 +4,14 @@ use super::tokenize_query::tokenize_query;
 use crate::diff_in_vec_len;
 
 const SPACE_CHAR: char = ' ';
+
+#[derive(Debug)]
 pub struct SqlInjectionDetectionResult {
     pub detected: bool,
     pub reason: DetectionReason,
 }
+
+#[derive(Debug)]
 pub enum DetectionReason {
     // not an injection
     UserInputNotInQuery,
