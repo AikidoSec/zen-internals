@@ -22,11 +22,14 @@ pub enum DetectionReason {
 
 // `userinput` and `query` provided to this function should already be lowercase.
 pub fn detect_sql_injection_str(
-    query: &str,
-    userinput: &str,
+    query_raw: &str,
+    userinput_raw: &str,
     dialect: i32,
 ) -> SqlInjectionDetectionResult {
-    if !query.contains(userinput) {
+    let query: String = query_raw.to_lowercase();
+    let userinput: String = userinput_raw.to_lowercase();
+
+    if !query.contains(&userinput) {
         // If the query does not contain the user input, it's not an injection.
         return SqlInjectionDetectionResult {
             detected: false,
@@ -36,7 +39,7 @@ pub fn detect_sql_injection_str(
 
     // "SELECT *", "INSERT INTO", ... will occur in most queries
     // If the user input is equal to any of these, we can assume it's not an injection.
-    if is_common_sql_string(userinput) {
+    if is_common_sql_string(&userinput) {
         return SqlInjectionDetectionResult {
             detected: false,
             reason: DetectionReason::CommonSQLString,
@@ -44,7 +47,7 @@ pub fn detect_sql_injection_str(
     }
 
     // Tokenize query :
-    let tokens = tokenize_query(query, dialect);
+    let tokens = tokenize_query(&query, dialect);
     if tokens.len() <= 0 {
         // Tokens are empty, probably a parsing issue with original query, return false.
         return SqlInjectionDetectionResult {
