@@ -28,8 +28,8 @@ mod tests {
             for dia in get_supported_dialects().iter() {
                 assert!(
                     detect_sql_injection_str(
-                        &$query.to_lowercase(),
-                        &$input.to_lowercase(),
+                        $query,
+                        $input,
                         dia.clone()
                     )
                     .detected,
@@ -42,7 +42,7 @@ mod tests {
         };
         ($query:expr, $input:expr, $dialect:expr) => {
             assert!(
-                detect_sql_injection_str(&$query.to_lowercase(), &$input.to_lowercase(), $dialect)
+                detect_sql_injection_str($query, $input, $dialect)
                     .detected
             )
         };
@@ -52,8 +52,8 @@ mod tests {
             for dia in get_supported_dialects().iter() {
                 assert!(
                     !(detect_sql_injection_str(
-                        &$query.to_lowercase(),
-                        &$input.to_lowercase(),
+                        $query,
+                        $input,
                         dia.clone()
                     )
                     .detected),
@@ -67,8 +67,8 @@ mod tests {
         ($query:expr, $input:expr, $dialect:expr) => {
             assert!(
                 !(detect_sql_injection_str(
-                    &$query.to_lowercase(),
-                    &$input.to_lowercase(),
+                   $query,
+                   $input,
                     $dialect
                 )
                 .detected)
