@@ -27,12 +27,7 @@ mod tests {
         ($query:expr, $input:expr) => {
             for dia in get_supported_dialects().iter() {
                 assert!(
-                    detect_sql_injection_str(
-                        &$query.to_lowercase(),
-                        &$input.to_lowercase(),
-                        dia.clone()
-                    )
-                    .detected,
+                    detect_sql_injection_str($query, $input, dia.clone()).detected,
                     "should be an injection\nquery: {}\ninput: {}\ndialect: {}\n",
                     $query,
                     $input,
@@ -41,22 +36,14 @@ mod tests {
             }
         };
         ($query:expr, $input:expr, $dialect:expr) => {
-            assert!(
-                detect_sql_injection_str(&$query.to_lowercase(), &$input.to_lowercase(), $dialect)
-                    .detected
-            )
+            assert!(detect_sql_injection_str($query, $input, $dialect).detected)
         };
     }
     macro_rules! not_injection {
         ($query:expr, $input:expr) => {
             for dia in get_supported_dialects().iter() {
                 assert!(
-                    !(detect_sql_injection_str(
-                        &$query.to_lowercase(),
-                        &$input.to_lowercase(),
-                        dia.clone()
-                    )
-                    .detected),
+                    !(detect_sql_injection_str($query, $input, dia.clone()).detected),
                     "should not be an injection\nquery: {}\ninput: {}\ndialect: {}\n",
                     $query,
                     $input,
@@ -65,14 +52,7 @@ mod tests {
             }
         };
         ($query:expr, $input:expr, $dialect:expr) => {
-            assert!(
-                !(detect_sql_injection_str(
-                    &$query.to_lowercase(),
-                    &$input.to_lowercase(),
-                    $dialect
-                )
-                .detected)
-            )
+            assert!(!(detect_sql_injection_str($query, $input, $dialect).detected))
         };
     }
 
