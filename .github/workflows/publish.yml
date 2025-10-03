@@ -35,6 +35,7 @@ jobs:
           - target: x86_64-unknown-linux-gnu.2.17
             runner: ubuntu-22.04
             use_zig: true
+            add_target: x86_64-unknown-linux-gnu
             artifact_name: linux-binaries
             lib_name: libzen_internals.so
             output_name: libzen_internals_x86_64-unknown-linux-gnu.so
@@ -191,7 +192,7 @@ jobs:
           path: ./artifacts
 
       - name: Upload all assets to release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@6cbd405e2c4e67a21c47fa9e383d020e4e28b836 # v2.3.3
         with:
           files: |
             ./artifacts/linux-binaries/*
