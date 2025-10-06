@@ -101,7 +101,9 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         // - `table.column`
         // - `table.`
         // - `.column`
-        return regex!(r"(?i)^(\.[a-zA-Z_][a-zA-Z0-9_]*|[a-zA-Z_][a-zA-Z0-9_]*\.|[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*)$").is_match(user_input);
+        let looks_like_table_column = regex!(r"(?i)^(\.[a-zA-Z_][a-zA-Z0-9_]*|[a-zA-Z_][a-zA-Z0-9_]*\.|[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*)$");
+
+        return looks_like_table_column.is_match(user_input);
     }
 
     // Allow integers like `1`, `-1` or `-2`
