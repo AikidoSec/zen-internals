@@ -1,5 +1,5 @@
-use std::sync::LazyLock;
 use regex::Regex;
+use std::sync::LazyLock;
 
 pub const COMMON_SQL_STRINGS: [&str; 24] = [
     "SELECT *",
@@ -101,7 +101,9 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         // - `table.column`
         // - `table.`
         // - `.column`
-        let looks_like_table_column = regex!(r"(?i)^(\.[a-zA-Z_][a-zA-Z0-9_]*|[a-zA-Z_][a-zA-Z0-9_]*\.|[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*)$");
+        let looks_like_table_column = regex!(
+            r"(?i)^(\.[a-zA-Z_][a-zA-Z0-9_]*|[a-zA-Z_][a-zA-Z0-9_]*\.|[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*)$"
+        );
 
         return looks_like_table_column.is_match(user_input);
     }
