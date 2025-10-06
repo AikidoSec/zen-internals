@@ -21,6 +21,11 @@ wasm-bindgen = "0.2"
 strip = true
 opt-level = "s"
 lto = true
+# To speed up compile times, Rust tries to split crates into small chunks and compile as many in parallel as possible.
+# The downside is that there's less opportunities for the compiler to optimize code across these chunks.
+# So, let’s tell it to do one chunk per crate:
+# See https://groups.google.com/a/chromium.org/g/rust-dev/c/ab_Y2FqgM64
+codegen-units = 1
 
 [features]
 benchmarking = []
