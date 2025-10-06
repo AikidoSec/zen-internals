@@ -21,7 +21,7 @@ wasm-bindgen = "0.2"
 strip = true
 opt-level = "s"
 lto = true
-codegen-units = 1
+codegen-units = 1 # https://groups.google.com/a/chromium.org/g/rust-dev/c/ab_Y2FqgM64
 
 [features]
 benchmarking = []
