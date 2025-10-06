@@ -34,6 +34,3 @@ benchmarking = []
 members = [
     "benchmarks",
 ]
-
-[package.metadata.wasm-pack.profile.release]
-wasm-opt = ["-O", "--enable-bulk-memory"]

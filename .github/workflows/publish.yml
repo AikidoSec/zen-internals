@@ -339,10 +339,8 @@ jobs:
         run: |
           rustup update --no-self-update stable
           rustup default stable
-      - name: Install wasm-pack
-        run: cargo install wasm-pack
-      - name: Build with wasm-pack
-        run: wasm-pack build --target nodejs
+      - name: Build WebAssembly
+        run: ./build-wasm.sh
       - run: |
           cd pkg
           tar -czvf zen_internals.tgz zen_internals.js zen_internals.d.ts zen_internals_bg.wasm
