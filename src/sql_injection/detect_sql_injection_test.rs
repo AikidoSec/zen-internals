@@ -916,4 +916,12 @@ mod tests {
             "1 OR 1 IS 1"
         );
     }
+
+    #[test]
+    fn test_sleep_pentest() {
+        is_injection!(
+            r#"INSERT INTO pets (pet_name, owner) VALUES ('x', 'Aikido Security'), ((SELECT 'x' FROM pg_sleep(5)), 'Aikido Security') -- ', 'Aikido Security')"#,
+            r#"x', 'Aikido Security'), ((SELECT 'x' FROM pg_sleep(5)), 'Aikido Security') -- "#
+        );
+    }
 }
