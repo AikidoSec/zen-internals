@@ -938,7 +938,7 @@ mod tests {
     }
 
     #[test]
-    fn test_sleep_pg() {
+    fn test_sleep_pentest() {
         is_injection!(
             r#"INSERT INTO pets (pet_name, owner) VALUES ('x', 'Aikido Security'), ((SELECT 'x' FROM pg_sleep(5)), 'Aikido Security') -- ', 'Aikido Security')"#,
             r#"x', 'Aikido Security'), ((SELECT 'x' FROM pg_sleep(5)), 'Aikido Security') -- "#
