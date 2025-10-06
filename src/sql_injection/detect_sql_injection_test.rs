@@ -27,12 +27,7 @@ mod tests {
         ($query:expr, $input:expr) => {
             for dia in get_supported_dialects().iter() {
                 assert!(
-                    detect_sql_injection_str(
-                        &$query.to_lowercase(),
-                        &$input.to_lowercase(),
-                        dia.clone()
-                    )
-                    .detected,
+                    detect_sql_injection_str($query, $input, dia.clone()).detected,
                     "should be an injection\nquery: {}\ninput: {}\ndialect: {}\n",
                     $query,
                     $input,
@@ -41,22 +36,14 @@ mod tests {
             }
         };
         ($query:expr, $input:expr, $dialect:expr) => {
-            assert!(
-                detect_sql_injection_str(&$query.to_lowercase(), &$input.to_lowercase(), $dialect)
-                    .detected
-            )
+            assert!(detect_sql_injection_str($query, $input, $dialect).detected)
         };
     }
     macro_rules! not_injection {
         ($query:expr, $input:expr) => {
             for dia in get_supported_dialects().iter() {
                 assert!(
-                    !(detect_sql_injection_str(
-                        &$query.to_lowercase(),
-                        &$input.to_lowercase(),
-                        dia.clone()
-                    )
-                    .detected),
+                    !(detect_sql_injection_str($query, $input, dia.clone()).detected),
                     "should not be an injection\nquery: {}\ninput: {}\ndialect: {}\n",
                     $query,
                     $input,
@@ -65,14 +52,7 @@ mod tests {
             }
         };
         ($query:expr, $input:expr, $dialect:expr) => {
-            assert!(
-                !(detect_sql_injection_str(
-                    &$query.to_lowercase(),
-                    &$input.to_lowercase(),
-                    $dialect
-                )
-                .detected)
-            )
+            assert!(!(detect_sql_injection_str($query, $input, $dialect).detected))
         };
     }
 
@@ -886,6 +866,22 @@ mod tests {
     }
 
     #[test]
+    fn test_hex_values_with_single_quotes() {
+        not_injection!(
+            "SELECT * FROM items WHERE name ILIKE '%0xabc123def456%' ORDER BY similarity(name, '0xabc123def456') DESC",
+            "0xabc123def456'"
+        );
+        not_injection!(
+            "SELECT * FROM items WHERE name ILIKE '%0xabc123def456%' ORDER BY similarity(name, '0xabc123def456') DESC",
+            "0xabc123def456"
+        );
+        not_injection!(
+            "SELECT * FROM items WHERE name ILIKE '%0xabc123def456%' ORDER BY similarity(name, '0xabc123def456') DESC",
+            "'0xabc123def456"
+        );
+    }
+
+    #[test]
     fn test_safely_escape_wildcard() {
         not_injection!("SELECT * FROM users WHERE status ILIKE '%is n%'", "is n");
     }
@@ -893,7 +889,9 @@ mod tests {
     #[test]
     fn test_alpha_with_spaces() {
         not_injection!("SELECT * FROM users WHERE status IS NULL", "IS N");
+        not_injection!("SELECT * FROM users WHERE status IS NULL", "IS NU");
 
+        is_injection!("SELECT * FROM users WHERE status IS  NULL", "IS  NU");
         is_injection!("SELECT * FROM users WHERE status IS NULL", "s IS N");
         is_injection!("SELECT * FROM users WHERE status IS NULL", "s IS NULL");
         is_injection!("SELECT * FROM users WHERE status = 1 OR TRUE", "1 OR TRUE");

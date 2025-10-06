@@ -46,8 +46,8 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         return true;
     }
 
-    if user_input.len() <= 4 && regex!(r"(?i)^[a-z ]+$").is_match(user_input) {
-        // It's very difficult to exploit a query using a short string of only letters and spaces.
+    if user_input.len() <= 5 && regex!(r"(?i)^[a-z]+ [a-z]+$").is_match(user_input) {
+        // It's very difficult to exploit a query using a short string of only letters and space.
         return true;
     }
 
