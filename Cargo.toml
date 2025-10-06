@@ -21,6 +21,7 @@ wasm-bindgen = "0.2"
 strip = true
 opt-level = "s"
 lto = true
+codegen-units = 1
 
 [features]
 benchmarking = []
