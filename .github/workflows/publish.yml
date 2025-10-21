@@ -3,7 +3,6 @@ name: 🚀 Build Release Artifacts
 on:
   release:
     types: [published]
-  pull_request:
 
 permissions:
   contents: write
