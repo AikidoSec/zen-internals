@@ -7,19 +7,21 @@ fn criterion_benchmark(c: &mut Criterion) {
     let user = "1' OR 1=1 # ";
     let dialect = 8; // MySQL
 
-    c.bench_function("is injection", |b| {
+    let mut group = c.benchmark_group("sql");
+
+    group.bench_function("is injection", |b| {
         b.iter(|| detect_sql_injection_str(black_box(sql), black_box(user), black_box(dialect)))
     });
 
     let safeUserInput = "1";
 
-    c.bench_function("is not injection", |b| {
+    group.bench_function("is not injection", |b| {
         b.iter(|| {
             detect_sql_injection_str(black_box(sql), black_box(safeUserInput), black_box(dialect))
         })
     });
 
-    c.bench_function("big sql", |b| {
+    group.bench_function("big code", |b| {
         let sql = "SELECT * FROM users WHERE id = 'hello world' ".to_owned()
             + &" OR id = 'hello world'".repeat(1000);
         b.iter(|| {

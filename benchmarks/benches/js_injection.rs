@@ -7,13 +7,15 @@ fn criterion_benchmark(c: &mut Criterion) {
     let userinput = "Hello World!'; //";
     let sourcetype = 0;
 
-    c.bench_function("is injection", |b| {
+    let mut group = c.benchmark_group("js");
+
+    group.bench_function("is injection", |b| {
         b.iter(|| {
             detect_js_injection_str(black_box(code), black_box(userinput), black_box(sourcetype))
         })
     });
 
-    c.bench_function("is not injection", |b| {
+    group.bench_function("is not injection", |b| {
         b.iter(|| {
             detect_js_injection_str(
                 black_box(code),
@@ -23,7 +25,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
-    c.bench_function("big code", |b| {
+    group.bench_function("big code", |b| {
         let code = "const test = 'Hello World!';".repeat(1000);
         b.iter(|| {
             detect_js_injection_str(
