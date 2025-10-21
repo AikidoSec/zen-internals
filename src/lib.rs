@@ -6,9 +6,11 @@
 mod helpers;
 
 // FFI Bindings
+#[cfg(not(target_arch = "wasm32"))]
 pub mod ffi_bindings;
 
 // Wasm bindings
+#[cfg(target_arch = "wasm32")]
 mod wasm_bindings;
 
 #[cfg(feature = "benchmarking")]
