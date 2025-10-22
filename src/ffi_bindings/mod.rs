@@ -4,6 +4,9 @@ use std::os::raw::c_int;
 use std::panic;
 use std::str;
 
+#[cfg(target_arch = "wasm32")]
+use std::alloc::{alloc, dealloc, Layout};
+
 #[no_mangle]
 pub extern "C" fn detect_sql_injection(
     query: *const u8,
@@ -86,4 +89,32 @@ pub extern "C" fn detect_js_injection(
         return 0;
     })
     .unwrap_or(2);
+}
+
+/// Allocates memory in WASM linear memory
+///
+/// # Satefy
+///
+/// The returned pointer must be deallocated using `wasm_free` with the exact same size.
+/// The allocated memory is uninitialized.
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub unsafe extern "C" fn wasm_alloc(size: usize) -> *mut u8 {
+    let layout = Layout::from_size_align(size, 1).unwrap();
+    unsafe { alloc(layout) }
+}
+
+/// Deallocates memory previously allocated by `wasm_alloc`
+///
+/// # Satefy
+///
+/// - `ptr` must have been allocated by `wasm_alloc`
+/// - `size` must be the exact size passed to `wasm_alloc`
+/// - `ptr` must not have been previously freed
+/// - After calling this function, `ptr` must not be used
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub unsafe extern "C" fn wasm_free(ptr: *mut u8, size: usize) {
+    let layout = Layout::from_size_align(size, 1).unwrap();
+    dealloc(ptr, layout)
 }

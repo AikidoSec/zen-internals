@@ -93,6 +93,14 @@ jobs:
             output_name: libzen_internals_aarch64-apple-darwin.dylib
             use_shasum: true
 
+          - target: wasm32-unknown-unknown
+            runner: ubuntu-latest
+            add_target: wasm32-unknown-unknown
+            artifact_name: wasm-binaries
+            lib_name: zen_internals.wasm
+            output_name: libzen_internals.wasm
+            use_shasum: true
+
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
@@ -151,7 +159,7 @@ jobs:
             target/${{ matrix.add_target || matrix.target }}/release/${{ matrix.output_name }}
             target/${{ matrix.add_target || matrix.target }}/release/${{ matrix.output_name }}.sha256sum
 
-  build-wasm:
+  build-wasm-node:
     needs: [tests, lint]
     runs-on: ubuntu-latest
     steps:
@@ -166,7 +174,7 @@ jobs:
       - name: Install wasm-pack
         run: cargo install wasm-pack
       - name: Build with wasm-pack
-        run: wasm-pack build --target nodejs
+        run: wasm-pack build --target nodejs --features js
       - name: Package and checksum
         run: |
           cd pkg
@@ -177,11 +185,11 @@ jobs:
       - name: Store artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: wasm-binaries
+          name: wasm-node-binaries
           path: pkg/zen_internals.tgz*
 
   upload-release-assets:
-    needs: [build, build-wasm]
+    needs: [build, build-wasm-node]
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
     steps:
@@ -202,6 +210,7 @@ jobs:
             ./artifacts/windows-binaries-arm/*
             ./artifacts/mac-binaries/*
             ./artifacts/mac-binaries-arm64/*
+            ./artifacts/wasm-node-binaries/*
             ./artifacts/wasm-binaries/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
