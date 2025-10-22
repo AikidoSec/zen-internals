@@ -21,7 +21,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
-    group.bench_function("big code", |b| {
+    group.bench_function("big sql", |b| {
         let sql = "SELECT * FROM users WHERE id = 'hello world' ".to_owned()
             + &" OR id = 'hello world'".repeat(1000);
         b.iter(|| {
