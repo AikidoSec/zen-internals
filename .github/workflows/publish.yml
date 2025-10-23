@@ -116,6 +116,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ${{ matrix.apt_packages }}
 
+      - name: Install wasm-opt
+        if: matrix.target == 'wasm32-unknown-unknown'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y binaryen
+
       - name: Install Rust toolchain
         run: |
           rustup update --no-self-update stable
@@ -129,6 +135,11 @@ jobs:
           ${{ matrix.use_zig && 'cargo zigbuild' || 'cargo build' }} \
           --target ${{ matrix.target }} --release
         shell: bash
+
+      - name: Optimize WASM
+        if: matrix.target == 'wasm32-unknown-unknown'
+        run: |
+          wasm-opt -O --enable-bulk-memory target/wasm32-unknown-unknown/release/zen_internals.wasm -o target/wasm32-unknown-unknown/release/zen_internals.wasm
 
       - name: Prepare release (Unix)
         if: "!matrix.use_powershell"
