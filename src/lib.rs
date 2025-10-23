@@ -6,11 +6,11 @@
 mod helpers;
 
 // FFI Bindings
-#[cfg(not(feature = "js"))]
+#[cfg(not(feature = "wasm-js"))]
 pub mod ffi_bindings;
 
 // Wasm bindings
-#[cfg(feature = "js")]
+#[cfg(feature = "wasm-js")]
 mod wasm_bindings;
 
 #[cfg(feature = "benchmarking")]

@@ -30,7 +30,7 @@ codegen-units = 1
 [features]
 default = []
 benchmarking = []
-js = ["wasm-bindgen"]
+wasm-js = ["wasm-bindgen"]
 
 [workspace]
 members = [
