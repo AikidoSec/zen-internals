@@ -17,7 +17,7 @@ jobs:
           rustup default stable
 
       - run: cargo install wasm-pack
-      - run: wasm-pack build --target nodejs
+      - run: wasm-pack build --target nodejs --features wasm-js
 
       - uses: actions/setup-node@v4
         with:
