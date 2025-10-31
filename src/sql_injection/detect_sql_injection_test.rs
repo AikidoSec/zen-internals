@@ -882,6 +882,65 @@ mod tests {
     }
 
     #[test]
+    fn test_start_or_end_with_double_quote() {
+        not_injection!(r#"SELECT name FROM table WHERE id IN ("abc_1")"#, r#"1""#);
+        not_injection!(r#"SELECT name FROM table WHERE id IN ("abc_1")"#, r#""a"#);
+        not_injection!(r#"SELECT name FROM table WHERE id IN ("abc_1")"#, r#""ab"#);
+
+        not_injection!(
+            r#"SELECT * FROM product WHERE p_ID = "product-123""#,
+            r#""product-123"#
+        );
+        not_injection!(
+            r#"SELECT * FROM product WHERE p_ID = "product-123""#,
+            r#"product-123""#
+        );
+        not_injection!(
+            r#"SELECT * FROM users WHERE user_name = "user-id-456""#,
+            r#""user-id-456"#
+        );
+        not_injection!(
+            r#"SELECT * FROM users WHERE user_name = "user-id-456""#,
+            r#"user-id-456""#
+        );
+
+        is_injection!(
+            r#"SELECT * FROM product WHERE p_ID = "product;123""#,
+            r#""product;123"#
+        );
+        is_injection!(
+            r#"SELECT * FROM product WHERE p_ID = "product;123""#,
+            r#"product;123""#
+        );
+        is_injection!(
+            r#"SELECT * FROM product WHERE p_ID = "product 123""#,
+            r#""product 123"#
+        );
+        is_injection!(
+            r#"SELECT * FROM product WHERE p_ID = "product 123""#,
+            r#"product 123""#
+        );
+        is_injection!(
+            r#"SELECT * FROM product WHERE p_ID = "product\123""#,
+            r#""product\123"#
+        );
+        is_injection!(
+            r#"SELECT * FROM product WHERE p_ID = "product\123""#,
+            r#"product\123""#
+        );
+        is_injection!(
+            r#"SELECT * FROM product WHERE p_ID = "payload--drop""#,
+            r#"payload--drop""#
+        );
+        is_injection!(
+            r#"SELECT * FROM product WHERE p_ID = "payload--drop""#,
+            r#""payload--drop"#
+        );
+        is_injection!(r#"SELECT name FROM table WHERE id IN ("abc_1")"#, r#"_1""#);
+        is_injection!(r#"SELECT name FROM table WHERE id IN ("_1")"#, r#""_1"#);
+    }
+
+    #[test]
     fn test_safely_escape_wildcard() {
         not_injection!("SELECT * FROM users WHERE status ILIKE '%is n%'", "is n");
     }

@@ -111,6 +111,7 @@ mod tests {
     #[test]
     fn test_it_returns_false_for_special_chars() {
         assert_eq!(is_common_sql_string("'"), false);
+        assert_eq!(is_common_sql_string("\""), false);
         assert_eq!(is_common_sql_string(";"), false);
         assert_eq!(is_common_sql_string("\""), false);
         assert_eq!(is_common_sql_string("`"), false);
@@ -293,6 +294,56 @@ mod tests {
         );
         assert_eq!(
             is_common_sql_string(&format!("'{}{}", "a".repeat(200), "")),
+            false
+        );
+    }
+
+    #[test]
+    fn test_double_quote_start_end() {
+        assert_eq!(is_common_sql_string(r#""a"#), true);
+        assert_eq!(is_common_sql_string(r#""0"#), true);
+        assert_eq!(is_common_sql_string(r#"a""#), true);
+        assert_eq!(is_common_sql_string(r#"0""#), true);
+
+        assert_eq!(is_common_sql_string(r#"00""#), true);
+        assert_eq!(is_common_sql_string(r#"aa""#), true);
+        assert_eq!(is_common_sql_string(r#""00"#), true);
+        assert_eq!(is_common_sql_string(r#""aa"#), true);
+
+        assert_eq!(is_common_sql_string(r#""product-123"#), true);
+        assert_eq!(is_common_sql_string(r#"product-123""#), true);
+        assert_eq!(is_common_sql_string(r#""user-id-456"#), true);
+        assert_eq!(is_common_sql_string(r#"user-id-456""#), true);
+
+        assert_eq!(is_common_sql_string(r#""payload--drop"#), false);
+        assert_eq!(is_common_sql_string(r#"payload--drop""#), false);
+
+        assert_eq!(is_common_sql_string(r#"";"#), false);
+        assert_eq!(is_common_sql_string(r#";""#), false);
+
+        // underscore has special meaning in MySQL LIKE operator, so we don't allow it here
+        // (Only when ANSI_QUOTES SQL mode is enabled)
+        assert_eq!(is_common_sql_string(r#""item_abc-def"#), false);
+        assert_eq!(is_common_sql_string(r#"item_abc-def""#), false);
+
+        // spaces are not allowed
+        assert_eq!(is_common_sql_string(r#""user -id-456"#), false);
+        assert_eq!(is_common_sql_string(r#"user -id-456""#), false);
+
+        assert_eq!(
+            is_common_sql_string(&format!("{}\"{}", "a".repeat(199), "")),
+            true
+        );
+        assert_eq!(
+            is_common_sql_string(&format!("{}\"{}", "a".repeat(200), "")),
+            false
+        );
+        assert_eq!(
+            is_common_sql_string(&format!("\"{}{}", "a".repeat(199), "")),
+            true
+        );
+        assert_eq!(
+            is_common_sql_string(&format!("\"{}{}", "a".repeat(200), "")),
             false
         );
     }

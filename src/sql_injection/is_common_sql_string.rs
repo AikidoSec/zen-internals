@@ -85,6 +85,20 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         }
     }
 
+    // e.g. "a or "1 or "product-id-123
+    if user_input.starts_with("\"") && user_input.len() <= 200 && !user_input.contains("--") {
+        if regex!(r#"(?i)^"[a-z0-9-]+$"#).is_match(user_input) {
+            return true;
+        }
+    }
+
+    // e.g. a" or 1" or product-id-123"
+    if user_input.ends_with("\"") && user_input.len() <= 200 && !user_input.contains("--") {
+        if regex!(r#"(?i)^[a-z0-9-]+"$"#).is_match(user_input) {
+            return true;
+        }
+    }
+
     if user_input.contains(".") {
         // Check if it is just a decimal (e.g. `16.2`)
         if regex!(r"^-?\d+\.\d+$").is_match(user_input) {
