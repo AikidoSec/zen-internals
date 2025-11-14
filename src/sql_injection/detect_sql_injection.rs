@@ -84,6 +84,9 @@ pub fn detect_sql_injection_str(
         && query.match_indices(trimmed_userinput).all(|(idx, _)| {
             // Ensure that in the query, the user inputs ends with a double backslash and a quote (single or double
             let end_idx = idx + trimmed_userinput.len();
+            if (end_idx + 1) > query.len() {
+                return false;
+            }
             let string_ending = &query[end_idx - 1..end_idx + 2];
             string_ending == "\\\\\"" || string_ending == "\\\\'"
         })

@@ -1011,7 +1011,22 @@ mod tests {
             "test@example.com\\\\",
             dialect("mysql")
         );
+        not_injection!(
+            "SELECT id FROM test WHERE user = 'test@example.com\\'",
+            "test@example.com\\\\",
+            dialect("mysql")
+        );
 
+        is_injection!(
+            "SELECT id FROM test WHERE user = test@example.com\\",
+            "test@example.com\\",
+            dialect("mysql")
+        );
+        is_injection!(
+            "SELECT id FROM test WHERE user = test@example.com\\\\",
+            "test@example.com\\\\",
+            dialect("mysql")
+        );
         is_injection!(
             "SELECT id FROM test WHERE user = 'test@example.com'\\''",
             "test@example.com'\\'",
