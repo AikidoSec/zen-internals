@@ -983,4 +983,44 @@ mod tests {
             r#"x', 'Aikido Security'), ((SELECT 'x' FROM pg_sleep(5)), 'Aikido Security') -- "#
         );
     }
+
+    #[test]
+    fn test_escaped() {
+        not_injection!(
+            "SELECT id FROM test WHERE user = 'test@\\\\example.com'",
+            "test@\\example.com",
+            dialect("mysql")
+        );
+        not_injection!(
+            "SELECT id FROM test WHERE user = 'test@example.com\\\\'",
+            "test@example.com\\",
+            dialect("mysql")
+        );
+        not_injection!(
+            "SELECT id FROM test WHERE user = \"test@example.com\\\\\"",
+            "test@example.com\\",
+            dialect("mysql")
+        );
+        not_injection!(
+            "SELECT id FROM test JOIN test2 WHERE test.user = 'test@example.com\\\\' AND test2.user = 'test@example.com\\\\'",
+            "test@example.com\\",
+            dialect("mysql")
+        );
+        not_injection!(
+            "SELECT id FROM test WHERE user = 'test@example.com\\\\'",
+            "test@example.com\\\\",
+            dialect("mysql")
+        );
+
+        is_injection!(
+            "SELECT id FROM test WHERE user = 'test@example.com'\\''",
+            "test@example.com'\\'",
+            dialect("mysql")
+        );
+        is_injection!(
+            "SELECT id FROM test WHERE user = \"test@example.com\"\\\"\"",
+            "test@example.com\"\\\"",
+            dialect("mysql")
+        );
+    }
 }

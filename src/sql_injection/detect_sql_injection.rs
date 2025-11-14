@@ -73,7 +73,24 @@ pub fn detect_sql_injection_str(
     }
 
     // Replace user input with string of equal length and tokenize again :
-    let safe_replace_str = "a".repeat(trimmed_userinput.len());
+    let mut safe_replace_str = "a".repeat(trimmed_userinput.len());
+
+    // If user input ends with single backslash (not multiple), but inside the sql query it is escaped
+    // with double backslash, we need to add a backslash to the safe replace string.
+    // Otherwise the escaping will be broken and tokenization will fail.
+    // e.g. user input: `test\` -> in query: `test\\'` or `test\\"` goes to `aaaaa\`
+    if trimmed_userinput.ends_with('\\')
+        && !trimmed_userinput.ends_with("\\\\")
+        && query.match_indices(trimmed_userinput).all(|(idx, _)| {
+            // Ensure that in the query, the user inputs ends with a double backslash and a quote (single or double
+            let end_idx = idx + trimmed_userinput.len();
+            let string_ending = &query[end_idx - 1..end_idx + 2];
+            string_ending == "\\\\\"" || string_ending == "\\\\'"
+        })
+    {
+        safe_replace_str.push('\\');
+    }
+
     let query_without_input: &str = &query.replace(trimmed_userinput, safe_replace_str.as_str());
     let tokens_without_input = tokenize_query(query_without_input, dialect);
 
