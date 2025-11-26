@@ -299,6 +299,19 @@ mod tests {
     }
 
     #[test]
+    fn test_digits_ending_with_parenthesis() {
+        assert_eq!(is_common_sql_string("1)"), true);
+        assert_eq!(is_common_sql_string("123)"), true);
+
+        assert_eq!(is_common_sql_string("(123)"), false);
+        assert_eq!(is_common_sql_string("(1"), false);
+        assert_eq!(is_common_sql_string("(123"), false);
+        assert_eq!(is_common_sql_string("1 )"), false);
+        assert_eq!(is_common_sql_string("1) --"), false);
+        assert_eq!(is_common_sql_string("1)--"), false);
+    }
+
+    #[test]
     fn test_double_quote_start_end() {
         assert_eq!(is_common_sql_string(r#""a"#), true);
         assert_eq!(is_common_sql_string(r#""0"#), true);
