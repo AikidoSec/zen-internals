@@ -986,26 +986,14 @@ mod tests {
 
     #[test]
     fn test_digits_ending_with_semi_colon() {
-        not_injection!(
-            "SELECT * FROM `table` LIMIT 1;",
-            "1;"
-        );
-        not_injection!(
-            "SELECT * FROM `table` LIMIT 10;",
-            "10;"
-        );
+        not_injection!("SELECT * FROM `table` LIMIT 1;", "1;");
+        not_injection!("SELECT * FROM `table` LIMIT 10;", "10;");
 
         is_injection!(
             "SELECT * FROM `table` LIMIT 1; DROP TABLE users;",
             "1; DROP TABLE users;"
         );
-        is_injection!(
-            "SELECT * FROM `table` LIMIT 1 ;",
-            "1 ;"
-        );
-        is_injection!(
-            "SELECT * FROM `table` LIMIT 1; --",
-            "1; --"
-        );
+        is_injection!("SELECT * FROM `table` LIMIT 1 ;", "1 ;");
+        is_injection!("SELECT * FROM `table` LIMIT 1; --", "1; --");
     }
 }
