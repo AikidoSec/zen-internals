@@ -64,7 +64,6 @@ mod tests {
         assert_eq!(is_common_sql_string("1asc"), false);
         assert_eq!(is_common_sql_string("1desc"), false);
         assert_eq!(is_common_sql_string("1 "), false);
-        assert_eq!(is_common_sql_string("1;"), false);
         assert_eq!(is_common_sql_string("1--"), false);
         assert_eq!(is_common_sql_string("1/*"), false);
         assert_eq!(is_common_sql_string("1 asc"), false);
@@ -346,5 +345,17 @@ mod tests {
             is_common_sql_string(&format!("\"{}{}", "a".repeat(200), "")),
             false
         );
+    }
+
+    #[test]
+    fn test_digits_end_with_semi_colon() {
+        assert_eq!(is_common_sql_string("1;"), true);
+        assert_eq!(is_common_sql_string("12345;"), true);
+
+        assert_eq!(is_common_sql_string("1;;"), false);
+        assert_eq!(is_common_sql_string("1 ;"), false);
+        assert_eq!(is_common_sql_string(";1"), false);
+        assert_eq!(is_common_sql_string("1;--"), false);
+        assert_eq!(is_common_sql_string("12345;--"), false);
     }
 }
