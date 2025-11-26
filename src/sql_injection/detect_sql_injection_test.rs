@@ -978,10 +978,7 @@ mod tests {
 
     #[test]
     fn test_digit_ending_with_parenthesis() {
-        not_injection!(
-            "SELECT * FROM table WHERE (a = 1 OR b = 2) AND a = 1",
-            "2)"
-        );
+        not_injection!("SELECT * FROM table WHERE (a = 1 OR b = 2) AND a = 1", "2)");
         not_injection!(
             "SELECT * FROM table WHERE (a = 1 OR b = 12) AND a = 1",
             "12)"
