@@ -51,6 +51,11 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         return true;
     }
 
+    if user_input.ends_with(")") && regex!(r"^[0-9]+\)+$").is_match(user_input) {
+        // e.g. `2)` or `12345)`
+        return true;
+    }
+
     // e.g. SELECT * FROM users WHERE users.active= 1
     // If the payload is `e=` the replaced query will be
     // SELECT * FROM users WHERE users.activaa 1
