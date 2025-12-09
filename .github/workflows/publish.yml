@@ -1,6 +1,7 @@
 name: 🚀 Build Release Artifacts
 
 on:
+  pull_request:
   release:
     types: [published]
 
@@ -139,7 +140,9 @@ jobs:
       - name: Optimize WASM
         if: matrix.target == 'wasm32-unknown-unknown'
         run: |
-          wasm-opt -O --enable-bulk-memory --enable-sign-ext target/wasm32-unknown-unknown/release/zen_internals.wasm -o target/wasm32-unknown-unknown/release/zen_internals.wasm
+          wasm-opt -O --enable-bulk-memory --enable-sign-ext target/wasm32-unknown-unknown/release/zen_internals.wasm \
+          --converge --strip-debug --strip-producers \
+          -o target/wasm32-unknown-unknown/release/zen_internals.wasm
 
       - name: Prepare release (Unix)
         if: "!matrix.use_powershell"
