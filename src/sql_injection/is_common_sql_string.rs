@@ -115,9 +115,8 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         // - `table.column`
         // - `table.`
         // - `.column`
-        let looks_like_table_column = regex!(
-            r"^(\.[a-z_][a-z0-9_]*|[a-z_][a-z0-9_]*\.|[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*)$"
-        );
+        let looks_like_table_column =
+            regex!(r"^(\.[a-z_][a-z0-9_]*|[a-z_][a-z0-9_]*\.|[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*)$");
 
         return looks_like_table_column.is_match(user_input);
     }
