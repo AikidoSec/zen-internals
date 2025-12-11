@@ -46,7 +46,7 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         return true;
     }
 
-    if user_input.len() <= 5 && regex!(r"(?i)^[a-z]+ [a-z]+$").is_match(user_input) {
+    if user_input.len() <= 5 && regex!(r"^[a-z]+ [a-z]+$").is_match(user_input) {
         // It's very difficult to exploit a query using a short string of only letters and space.
         return true;
     }
@@ -58,7 +58,7 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
     // it's very difficult to exploit a query using just "e=" as the user input.
     if user_input.len() == 2
         && user_input.ends_with("=")
-        && regex!(r"(?i)^[a-z]=$").is_match(user_input)
+        && regex!(r"^[a-z]=$").is_match(user_input)
     {
         // If the user input is just a single letter followed by an equal sign, it's not an injection.
         return true;
@@ -68,40 +68,40 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         // Check if the user input is a common SQL pattern like "column_name ASC"
         // e.g. https://ghost.org/docs/content-api/#order (Ghost validates the order parameter)
         // SQL identifiers can't start with a number
-        return regex!(r"(?i)^[a-zA-Z_][a-zA-Z0-9_]* +(ASC|DESC)$").is_match(user_input);
+        return regex!(r"^[a-z_][a-z0-9_]* +(asc|desc)$").is_match(user_input);
     }
 
     // e.g. 'a or '1 or 'product-id-123
     if user_input.starts_with("'") && user_input.len() <= 200 && !user_input.contains("--") {
-        if regex!(r"(?i)^'[a-z0-9-]+$").is_match(user_input) {
+        if regex!(r"^'[a-z0-9-]+$").is_match(user_input) {
             return true;
         }
     }
 
     // e.g. a' or 1' or product-id-123'
     if user_input.ends_with("'") && user_input.len() <= 200 && !user_input.contains("--") {
-        if regex!(r"(?i)^[a-z0-9-]+'$").is_match(user_input) {
+        if regex!(r"^[a-z0-9-]+'$").is_match(user_input) {
             return true;
         }
     }
 
     // e.g. "a or "1 or "product-id-123
     if user_input.starts_with("\"") && user_input.len() <= 200 && !user_input.contains("--") {
-        if regex!(r#"(?i)^"[a-z0-9-]+$"#).is_match(user_input) {
+        if regex!(r#"^"[a-z0-9-]+$"#).is_match(user_input) {
             return true;
         }
     }
 
     // e.g. a" or 1" or product-id-123"
     if user_input.ends_with("\"") && user_input.len() <= 200 && !user_input.contains("--") {
-        if regex!(r#"(?i)^[a-z0-9-]+"$"#).is_match(user_input) {
+        if regex!(r#"^[a-z0-9-]+"$"#).is_match(user_input) {
             return true;
         }
     }
 
     if user_input.contains(".") {
         // Check if it is just a decimal (e.g. `16.2`)
-        if regex!(r"^-?\d+\.\d+$").is_match(user_input) {
+        if regex!(r"^-?[0-9]+\.[0-9]+$").is_match(user_input) {
             return true;
         }
 
@@ -115,9 +115,8 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         // - `table.column`
         // - `table.`
         // - `.column`
-        let looks_like_table_column = regex!(
-            r"(?i)^(\.[a-zA-Z_][a-zA-Z0-9_]*|[a-zA-Z_][a-zA-Z0-9_]*\.|[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*)$"
-        );
+        let looks_like_table_column =
+            regex!(r"^(\.[a-z_][a-z0-9_]*|[a-z_][a-z0-9_]*\.|[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*)$");
 
         return looks_like_table_column.is_match(user_input);
     }
