@@ -983,4 +983,22 @@ mod tests {
             r#"x', 'Aikido Security'), ((SELECT 'x' FROM pg_sleep(5)), 'Aikido Security') -- "#
         );
     }
+
+    #[test]
+    fn test_not_in() {
+        not_injection!(
+            r#"
+                SELECT * FROM users u
+                WHERE u.status NOT IN ('SUSPENDED', 'INACTIVE', 'DELETED', 'PENDING_DELETION')
+            "#,
+            "not in"
+        );
+        is_injection!(
+            r#"
+                SELECT * FROM users u
+                WHERE u.status NOT IN ('SUSPENDED', 'INACTIVE', 'DELETED', 'PENDING_DELETION')
+            "#,
+            "u.status NOT IN"
+        );
+    }
 }
