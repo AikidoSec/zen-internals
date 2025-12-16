@@ -985,6 +985,34 @@ mod tests {
     }
 
     #[test]
+    fn test_alpha_digit() {
+        not_injection!(
+            r#"
+                select * from "table" where "id" = $1 limit $2
+            "#,
+            "1 l"
+        );
+        is_injection!(
+            r#"
+                select * from "table" where "id" = $1 limit $2
+            "#,
+            "$1 l"
+        );
+        is_injection!(
+            r#"
+                select * from "table" where "id" = $1 limit $2
+            "#,
+            "1 limit"
+        );
+        is_injection!(
+            r#"
+                select * from "table" where "id" = $1 limit $2
+            "#,
+            "$1 limit $2"
+        );
+    }
+
+    #[test]
     fn test_not_in() {
         not_injection!(
             r#"
