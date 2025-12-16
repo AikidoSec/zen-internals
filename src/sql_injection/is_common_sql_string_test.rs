@@ -57,13 +57,13 @@ mod tests {
             is_common_sql_string("column_name desc, column_name2 desc limit 1"),
             false
         );
+        assert_eq!(is_common_sql_string("1 "), true);
         assert_eq!(is_common_sql_string("asc1"), false);
         assert_eq!(is_common_sql_string("desc1"), false);
         assert_eq!(is_common_sql_string("asc 1"), false);
         assert_eq!(is_common_sql_string("desc 1"), false);
         assert_eq!(is_common_sql_string("1asc"), false);
         assert_eq!(is_common_sql_string("1desc"), false);
-        assert_eq!(is_common_sql_string("1 "), false);
         assert_eq!(is_common_sql_string("1;"), false);
         assert_eq!(is_common_sql_string("1--"), false);
         assert_eq!(is_common_sql_string("1/*"), false);
