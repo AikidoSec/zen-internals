@@ -128,5 +128,12 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         return true;
     }
 
+    // Allow <digit> <space> <letter>
+    // e.g. `select * from "table" where "id" = $1 limit $2`
+    //                                           ^^^ `1 l`
+    if regex!(r"^[0-9] [a-z]$").is_match(user_input) {
+        return true;
+    }
+
     return false;
 }

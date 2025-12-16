@@ -220,6 +220,20 @@ mod tests {
     }
 
     #[test]
+    fn test_digit_space_alpha() {
+        assert_eq!(is_common_sql_string("1 a"), true);
+        assert_eq!(is_common_sql_string("9 z"), true);
+        assert_eq!(is_common_sql_string("0 m"), true);
+
+        assert_eq!(is_common_sql_string("0  m"), false);
+        assert_eq!(is_common_sql_string("'0 m"), false);
+        assert_eq!(is_common_sql_string("0;m"), false);
+        assert_eq!(is_common_sql_string("00 m"), false);
+        assert_eq!(is_common_sql_string("0 mm"), false);
+        assert_eq!(is_common_sql_string("00 mm"), false);
+    }
+
+    #[test]
     fn test_non_decimals() {
         assert_eq!(is_common_sql_string("1."), false);
         assert_eq!(is_common_sql_string(".1"), false);
