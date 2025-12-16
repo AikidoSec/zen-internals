@@ -47,8 +47,8 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         return true;
     }
 
-    if user_input.len() <= 5 && regex!(r"^[a-z]+ [a-z]+$").is_match(user_input) {
-        // It's very difficult to exploit a query using a short string of only letters and space.
+    if user_input.len() <= 5 && regex!(r"^[ a-z0-9]+$").is_match(user_input) {
+        // It's very difficult to exploit a query using a short string of letters, numbers and spaces only.
         return true;
     }
 
@@ -125,13 +125,6 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
     // Allow integers like `1`, `-1` or `-2`
     // We have to be careful with minus signs, as they can be used for SQL injections
     if regex!(r"^-?[0-9]+$").is_match(user_input) {
-        return true;
-    }
-
-    // Allow <digit> <space> <letter>
-    // e.g. `select * from "table" where "id" = $1 limit $2`
-    //                                           ^^^ `1 l`
-    if regex!(r"^[0-9] [a-z]$").is_match(user_input) {
         return true;
     }
 
