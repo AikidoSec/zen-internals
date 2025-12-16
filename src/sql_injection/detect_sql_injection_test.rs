@@ -1001,4 +1001,20 @@ mod tests {
             "u.status NOT IN"
         );
     }
+
+    #[test]
+    fn test_time_zone() {
+        not_injection!(
+            r#"
+                SELECT *::timestamptz AT TIME ZONE 'UTC' AS created_at_utc FROM events
+            "#,
+            "TIME ZONE"
+        );
+        is_injection!(
+            r#"
+                SELECT *::timestamptz AT TIME ZONE 'UTC' AS created_at_utc FROM events
+            "#,
+            "TIME ZONE 'UTC'"
+        );
+    }
 }
