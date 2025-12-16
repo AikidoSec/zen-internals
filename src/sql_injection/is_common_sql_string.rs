@@ -52,7 +52,7 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         return true;
     }
 
-    // Allow <digit> <space> <letter>
+    // Allow short strings with letters, digits and spaces
     // e.g. `select * from "table" where "id" = $1 limit $2`
     //                                           ^^^ `1 l`
     if user_input.len() <= 3 && regex!(r"^[ 0-9a-z]+$").is_match(user_input) {
