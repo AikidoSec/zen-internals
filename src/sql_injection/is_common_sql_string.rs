@@ -84,6 +84,7 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
     // could mean an injection happens with a 2nd field. However this seems unlikely as that 2nd field
     // is also subject to the same scans, so it would be having to use exemptions for both of the fields
     // to cause an injection.
+    // example: SELECT * FROM users WHERE user_id = '${user id}' AND name = '${user_name}'
 
     // e.g. 'a or '1 or 'product-id-123
     if user_input.starts_with("'") && user_input.len() <= 200 && !user_input.contains("--") {
