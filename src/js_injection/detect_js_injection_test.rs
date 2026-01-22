@@ -250,4 +250,39 @@ mod tests {
             0
         );
     }
+
+    #[test]
+    fn test_js_html_like_comments() {
+        not_injection!(
+            "const test = '<!-- Hello World! -->';",
+            "<!-- Hello World! -->",
+            0
+        );
+
+        is_injection!(
+            "const test = 'a'; <!--\n console.log('injection'); //';",
+            "a'; <!--\n console.log('injection'); //",
+            0
+        );
+        is_injection!(
+            "const test = 'a'; <!-- Test --> console.log('injection'); //';",
+            "a'; <!-- Test --> console.log('injection'); //",
+            0
+        );
+        is_injection!(
+            "const test = 'a'; <!-- Test --> console.log('injection'); //';",
+            "a'; <!-- Test --> console.log('injection'); //",
+            1
+        );
+        is_injection!(
+            "const test = 'a'; <!-- Test --> console.log('injection'); //';",
+            "a'; <!-- Test --> console.log('injection'); //",
+            2
+        );
+        is_injection!(
+            "const test = 'a'; <!-- Test --> console.log('injection'); //';",
+            "a'; <!-- Test --> console.log('injection'); //",
+            3
+        );
+    }
 }

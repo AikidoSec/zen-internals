@@ -11,8 +11,8 @@ name = "zen_internals"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-oxc = "0.72.0"
-oxc_ast_visit = "0.72.0"
+oxc = "0.110.0"
+oxc_ast_visit = "0.110.0"
 regex = { version = "1.12.2", default-features = false, features = ["std", "perf"] }
 sqlparser = { git = "https://github.com/AikidoSec/datafusion-sqlparser-rs.git", rev = "e003b3e2b541909cfe163e966972a8e0145bef75" }
 wasm-bindgen = { version = "0.2", optional = true }
