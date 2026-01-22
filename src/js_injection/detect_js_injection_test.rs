@@ -262,27 +262,28 @@ mod tests {
         is_injection!(
             "const test = 'a'; <!--\n console.log('injection'); //';",
             "a'; <!--\n console.log('injection'); //",
-            0
-        );
-        is_injection!(
-            "const test = 'a'; <!-- Test --> console.log('injection'); //';",
-            "a'; <!-- Test --> console.log('injection'); //",
-            0
-        );
-        is_injection!(
-            "const test = 'a'; <!-- Test --> console.log('injection'); //';",
-            "a'; <!-- Test --> console.log('injection'); //",
-            1
+            2
         );
         is_injection!(
             "const test = 'a'; <!-- Test --> console.log('injection'); //';",
             "a'; <!-- Test --> console.log('injection'); //",
             2
         );
-        is_injection!(
+
+        // ESM does not support HTML-like comments.
+        not_injection!(
+            "const test = 'a'; <!--\n console.log('injection'); //';",
+            "a'; <!--\n console.log('injection'); //",
+            3
+        );
+
+        // Unambiguous: Bug in oxc parser, HTML-like comments are not parsed correctly in unambiguous mode.
+        // https://github.com/oxc-project/oxc/issues/18392
+        // Change this test when the issue is fixed.
+        not_injection!(
             "const test = 'a'; <!-- Test --> console.log('injection'); //';",
             "a'; <!-- Test --> console.log('injection'); //",
-            3
+            0
         );
     }
 }
