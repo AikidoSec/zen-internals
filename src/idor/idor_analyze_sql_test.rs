@@ -15,7 +15,6 @@ mod tests {
                 filters: vec![FilterColumn {
                     table: None,
                     column: "tenant_id".into(),
-                    operator: "=".into(),
                     value: "$1".into(),
                     placeholder_number: None,
                 }],
@@ -48,14 +47,14 @@ mod tests {
                     FilterColumn {
                         table: Some("o".into()),
                         column: "user_id".into(),
-                        operator: "=".into(),
+
                         value: "u.id".into(),
                         placeholder_number: None,
                     },
                     FilterColumn {
                         table: Some("u".into()),
                         column: "tenant_id".into(),
-                        operator: "=".into(),
+
                         value: "$1".into(),
                         placeholder_number: None,
                     },
@@ -78,7 +77,7 @@ mod tests {
                 filters: vec![FilterColumn {
                     table: None,
                     column: "tenant_id".into(),
-                    operator: "=".into(),
+
                     value: "?".into(),
                     placeholder_number: Some(0),
                 }],
@@ -105,21 +104,21 @@ mod tests {
                     FilterColumn {
                         table: None,
                         column: "status".into(),
-                        operator: "=".into(),
+
                         value: "?".into(),
                         placeholder_number: Some(0),
                     },
                     FilterColumn {
                         table: None,
                         column: "tenant_id".into(),
-                        operator: "=".into(),
+
                         value: "?".into(),
                         placeholder_number: Some(1),
                     },
                     FilterColumn {
                         table: None,
                         column: "name".into(),
-                        operator: "=".into(),
+
                         value: "?".into(),
                         placeholder_number: Some(2),
                     },
@@ -147,7 +146,7 @@ mod tests {
                 filters: vec![FilterColumn {
                     table: None,
                     column: "tenant_id".into(),
-                    operator: "=".into(),
+
                     value: "$1".into(),
                     placeholder_number: None,
                 }],
@@ -175,7 +174,7 @@ mod tests {
                 filters: vec![FilterColumn {
                     table: None,
                     column: "tenant_id".into(),
-                    operator: "=".into(),
+
                     value: "?".into(),
                     placeholder_number: Some(2),
                 }],
@@ -214,7 +213,7 @@ mod tests {
                 filters: vec![FilterColumn {
                     table: None,
                     column: "tenant_id".into(),
-                    operator: "=".into(),
+
                     value: "?".into(),
                     placeholder_number: Some(1),
                 }],
@@ -236,7 +235,7 @@ mod tests {
                 filters: vec![FilterColumn {
                     table: None,
                     column: "tenant_id".into(),
-                    operator: "=".into(),
+
                     value: "$1".into(),
                     placeholder_number: None,
                 }],
@@ -258,7 +257,7 @@ mod tests {
                 filters: vec![FilterColumn {
                     table: None,
                     column: "tenant_id".into(),
-                    operator: "=".into(),
+
                     value: "?".into(),
                     placeholder_number: Some(0),
                 }],
@@ -482,7 +481,6 @@ mod tests {
                     filters: vec![FilterColumn {
                         table: None,
                         column: "tenant_id".into(),
-                        operator: "=".into(),
                         value: "$1".into(),
                         placeholder_number: None,
                     }],
@@ -497,7 +495,6 @@ mod tests {
                     filters: vec![FilterColumn {
                         table: None,
                         column: "tenant_id".into(),
-                        operator: "=".into(),
                         value: "$2".into(),
                         placeholder_number: None,
                     }],
@@ -525,7 +522,6 @@ mod tests {
                     filters: vec![FilterColumn {
                         table: None,
                         column: "tenant_id".into(),
-                        operator: "=".into(),
                         value: "?".into(),
                         placeholder_number: Some(0),
                     }],
@@ -540,7 +536,6 @@ mod tests {
                     filters: vec![FilterColumn {
                         table: None,
                         column: "tenant_id".into(),
-                        operator: "=".into(),
                         value: "?".into(),
                         placeholder_number: Some(1),
                     }],
@@ -568,7 +563,6 @@ mod tests {
                     filters: vec![FilterColumn {
                         table: None,
                         column: "tenant_id".into(),
-                        operator: "=".into(),
                         value: "$1".into(),
                         placeholder_number: None,
                     }],
@@ -583,7 +577,6 @@ mod tests {
                     filters: vec![FilterColumn {
                         table: None,
                         column: "tenant_id".into(),
-                        operator: "=".into(),
                         value: "$2".into(),
                         placeholder_number: None,
                     }],
@@ -598,7 +591,6 @@ mod tests {
                     filters: vec![FilterColumn {
                         table: None,
                         column: "tenant_id".into(),
-                        operator: "=".into(),
                         value: "$3".into(),
                         placeholder_number: None,
                     }],
@@ -626,7 +618,6 @@ mod tests {
                     filters: vec![FilterColumn {
                         table: None,
                         column: "tenant_id".into(),
-                        operator: "=".into(),
                         value: "$1".into(),
                         placeholder_number: None,
                     }],
@@ -663,7 +654,6 @@ mod tests {
                     filters: vec![FilterColumn {
                         table: None,
                         column: "tenant_id".into(),
-                        operator: "=".into(),
                         value: "$1".into(),
                         placeholder_number: None,
                     }],
@@ -707,14 +697,12 @@ mod tests {
                         FilterColumn {
                             table: Some("o".into()),
                             column: "user_id".into(),
-                            operator: "=".into(),
                             value: "u.id".into(),
                             placeholder_number: None,
                         },
                         FilterColumn {
                             table: Some("u".into()),
                             column: "tenant_id".into(),
-                            operator: "=".into(),
                             value: "$1".into(),
                             placeholder_number: None,
                         },
@@ -737,14 +725,12 @@ mod tests {
                         FilterColumn {
                             table: Some("r".into()),
                             column: "user_id".into(),
-                            operator: "=".into(),
                             value: "u.id".into(),
                             placeholder_number: None,
                         },
                         FilterColumn {
                             table: Some("u".into()),
                             column: "tenant_id".into(),
-                            operator: "=".into(),
                             value: "$2".into(),
                             placeholder_number: None,
                         },
@@ -773,7 +759,6 @@ mod tests {
                     filters: vec![FilterColumn {
                         table: None,
                         column: "tenant_id".into(),
-                        operator: "=".into(),
                         value: "$1".into(),
                         placeholder_number: None,
                     }],
@@ -788,7 +773,6 @@ mod tests {
                     filters: vec![FilterColumn {
                         table: None,
                         column: "tenant_id".into(),
-                        operator: "=".into(),
                         value: "$2".into(),
                         placeholder_number: None,
                     }],
@@ -816,7 +800,6 @@ mod tests {
                     filters: vec![FilterColumn {
                         table: None,
                         column: "tenant_id".into(),
-                        operator: "=".into(),
                         value: "$1".into(),
                         placeholder_number: None,
                     }],
@@ -831,7 +814,6 @@ mod tests {
                     filters: vec![FilterColumn {
                         table: None,
                         column: "tenant_id".into(),
-                        operator: "=".into(),
                         value: "$2".into(),
                         placeholder_number: None,
                     }],
@@ -865,14 +847,12 @@ mod tests {
                     FilterColumn {
                         table: Some("a".into()),
                         column: "manager_id".into(),
-                        operator: "=".into(),
                         value: "b.id".into(),
                         placeholder_number: None,
                     },
                     FilterColumn {
                         table: Some("a".into()),
                         column: "tenant_id".into(),
-                        operator: "=".into(),
                         value: "$1".into(),
                         placeholder_number: None,
                     },
@@ -906,14 +886,12 @@ mod tests {
                     FilterColumn {
                         table: Some("orders".into()),
                         column: "customer_id".into(),
-                        operator: "=".into(),
                         value: "c.id".into(),
                         placeholder_number: None,
                     },
                     FilterColumn {
                         table: Some("c".into()),
                         column: "tenant_id".into(),
-                        operator: "=".into(),
                         value: "$1".into(),
                         placeholder_number: None,
                     },
@@ -947,14 +925,12 @@ mod tests {
                     FilterColumn {
                         table: Some("posts".into()),
                         column: "user_id".into(),
-                        operator: "=".into(),
                         value: "u.id".into(),
                         placeholder_number: None,
                     },
                     FilterColumn {
                         table: Some("u".into()),
                         column: "tenant_id".into(),
-                        operator: "=".into(),
                         value: "$1".into(),
                         placeholder_number: None,
                     },
@@ -988,21 +964,18 @@ mod tests {
                     FilterColumn {
                         table: None,
                         column: "customer_id".into(),
-                        operator: "=".into(),
                         value: "c.id".into(),
                         placeholder_number: None,
                     },
                     FilterColumn {
                         table: None,
                         column: "status".into(),
-                        operator: "=".into(),
                         value: "$1".into(),
                         placeholder_number: None,
                     },
                     FilterColumn {
                         table: Some("c".into()),
                         column: "tenant_id".into(),
-                        operator: "=".into(),
                         value: "$2".into(),
                         placeholder_number: None,
                     },
@@ -1029,7 +1002,6 @@ mod tests {
                 filters: vec![FilterColumn {
                     table: None,
                     column: "tenant_id".into(),
-                    operator: "=".into(),
                     value: "$1".into(),
                     placeholder_number: None,
                 }],
@@ -1056,7 +1028,6 @@ mod tests {
                     filters: vec![FilterColumn {
                         table: None,
                         column: "tenant_id".into(),
-                        operator: "=".into(),
                         value: "$1".into(),
                         placeholder_number: None,
                     }],
@@ -1071,7 +1042,6 @@ mod tests {
                     filters: vec![FilterColumn {
                         table: None,
                         column: "tenant_id".into(),
-                        operator: "=".into(),
                         value: "$2".into(),
                         placeholder_number: None,
                     }],
@@ -1108,7 +1078,6 @@ mod tests {
                     filters: vec![FilterColumn {
                         table: None,
                         column: "tenant_id".into(),
-                        operator: "=".into(),
                         value: "$1".into(),
                         placeholder_number: None,
                     }],
@@ -1123,7 +1092,6 @@ mod tests {
                     filters: vec![FilterColumn {
                         table: None,
                         column: "tenant_id".into(),
-                        operator: "=".into(),
                         value: "$2".into(),
                         placeholder_number: None,
                     }],
@@ -1146,5 +1114,865 @@ mod tests {
     #[test]
     fn test_truncate_returns_error() {
         assert_eq!(idor_analyze_sql("TRUNCATE users", 9).is_err(), true);
+    }
+
+    #[test]
+    fn test_cte_simple() {
+        assert_eq!(
+            idor_analyze_sql(
+                "WITH active AS (SELECT * FROM users WHERE tenant_id = $1) SELECT * FROM active WHERE status = 'active'",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![
+                    FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                    },
+                    FilterColumn {
+                        table: None,
+                        column: "status".into(),
+                        value: "'active'".into(),
+                        placeholder_number: None,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_cte_multiple() {
+        assert_eq!(
+            idor_analyze_sql(
+                "WITH u AS (SELECT * FROM users WHERE tenant_id = $1), o AS (SELECT * FROM orders WHERE tenant_id = $2) SELECT * FROM u JOIN o ON o.user_id = u.id",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "users".into(),
+                        alias: None,
+                    },
+                    TableRef {
+                        name: "orders".into(),
+                        alias: None,
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                    },
+                    FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "$2".into(),
+                        placeholder_number: None,
+                    },
+                    FilterColumn {
+                        table: Some("o".into()),
+                        column: "user_id".into(),
+                        value: "u.id".into(),
+                        placeholder_number: None,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_cte_recursive() {
+        assert_eq!(
+            idor_analyze_sql(
+                "WITH RECURSIVE tree AS (SELECT * FROM categories WHERE id = $1 UNION ALL SELECT c.* FROM categories c JOIN tree t ON c.parent_id = t.id) SELECT * FROM tree",
+                9,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "categories".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                    }],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![
+                        TableRef {
+                            name: "categories".into(),
+                            alias: Some("c".into()),
+                        },
+                        TableRef {
+                            name: "tree".into(),
+                            alias: Some("t".into()),
+                        },
+                    ],
+                    filters: vec![FilterColumn {
+                        table: Some("c".into()),
+                        column: "parent_id".into(),
+                        value: "t.id".into(),
+                        placeholder_number: None,
+                    }],
+                    insert_columns: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_subquery_in_where_in() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM users WHERE id IN (SELECT user_id FROM orders WHERE tenant_id = $1)",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "users".into(),
+                        alias: None,
+                    },
+                    TableRef {
+                        name: "orders".into(),
+                        alias: None,
+                    },
+                ],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_subquery_in_where_exists() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM users WHERE EXISTS (SELECT 1 FROM orgs WHERE orgs.id = users.tenant_id AND orgs.id = $1)",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "users".into(),
+                        alias: None,
+                    },
+                    TableRef {
+                        name: "orgs".into(),
+                        alias: None,
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("orgs".into()),
+                        column: "id".into(),
+                        value: "users.tenant_id".into(),
+                        placeholder_number: None,
+                    },
+                    FilterColumn {
+                        table: Some("orgs".into()),
+                        column: "id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_not_equal_skipped() {
+        // != is not relevant for IDOR — only = matters
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE tenant_id != $1", 9).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_not_equal_ansi_skipped() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE tenant_id <> $1", 9).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_greater_than_skipped() {
+        // Only the = filter is extracted, > is skipped
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM audit_log WHERE created_at > $1 AND tenant_id = $2",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "audit_log".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "$2".into(),
+                    placeholder_number: None,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_less_than_or_equal_skipped() {
+        // Only the = filter is extracted, <= is skipped
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM events WHERE priority <= $1 AND tenant_id = $2",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "events".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "$2".into(),
+                    placeholder_number: None,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_in_list_skipped() {
+        // IN is not relevant for IDOR — only = matters
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE tenant_id IN ($1, $2, $3)", 9,).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_in_list_mysql_skipped() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE tenant_id IN (?, ?, ?)", 8,).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_or_condition() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM users WHERE tenant_id = $1 OR admin = true",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![
+                    FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                    },
+                    FilterColumn {
+                        table: None,
+                        column: "admin".into(),
+                        value: "true".into(),
+                        placeholder_number: None,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_schema_qualified_table() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM public.users WHERE tenant_id = $1", 9,).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "public.users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_schema_qualified_table_with_alias() {
+        assert_eq!(
+            idor_analyze_sql("SELECT u.* FROM public.users u WHERE u.tenant_id = $1", 9,).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "public.users".into(),
+                    alias: Some("u".into()),
+                }],
+                filters: vec![FilterColumn {
+                    table: Some("u".into()),
+                    column: "tenant_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_three_table_join() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM users u JOIN orders o ON o.user_id = u.id JOIN products p ON p.id = o.product_id WHERE u.tenant_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "users".into(),
+                        alias: Some("u".into()),
+                    },
+                    TableRef {
+                        name: "orders".into(),
+                        alias: Some("o".into()),
+                    },
+                    TableRef {
+                        name: "products".into(),
+                        alias: Some("p".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("o".into()),
+                        column: "user_id".into(),
+                        value: "u.id".into(),
+                        placeholder_number: None,
+                    },
+                    FilterColumn {
+                        table: Some("p".into()),
+                        column: "id".into(),
+                        value: "o.product_id".into(),
+                        placeholder_number: None,
+                    },
+                    FilterColumn {
+                        table: Some("u".into()),
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_update_with_from_postgres() {
+        assert_eq!(
+            idor_analyze_sql(
+                "UPDATE orders SET status = 'cancelled' FROM users WHERE users.id = orders.user_id AND users.tenant_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "update".into(),
+                tables: vec![
+                    TableRef {
+                        name: "orders".into(),
+                        alias: None,
+                    },
+                    TableRef {
+                        name: "users".into(),
+                        alias: None,
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("users".into()),
+                        column: "id".into(),
+                        value: "orders.user_id".into(),
+                        placeholder_number: None,
+                    },
+                    FilterColumn {
+                        table: Some("users".into()),
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_insert_select_simple() {
+        assert_eq!(
+            idor_analyze_sql(
+                "INSERT INTO archive (name, tenant_id) SELECT name, tenant_id FROM users WHERE tenant_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "users".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                    }],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "insert".into(),
+                    tables: vec![TableRef {
+                        name: "archive".into(),
+                        alias: None,
+                    }],
+                    filters: vec![],
+                    insert_columns: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_right_join() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM orders o RIGHT JOIN users u ON u.id = o.user_id WHERE u.tenant_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "orders".into(),
+                        alias: Some("o".into()),
+                    },
+                    TableRef {
+                        name: "users".into(),
+                        alias: Some("u".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("u".into()),
+                        column: "id".into(),
+                        value: "o.user_id".into(),
+                        placeholder_number: None,
+                    },
+                    FilterColumn {
+                        table: Some("u".into()),
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_full_outer_join() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM users u FULL OUTER JOIN profiles p ON p.user_id = u.id WHERE u.tenant_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "users".into(),
+                        alias: Some("u".into()),
+                    },
+                    TableRef {
+                        name: "profiles".into(),
+                        alias: Some("p".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("p".into()),
+                        column: "user_id".into(),
+                        value: "u.id".into(),
+                        placeholder_number: None,
+                    },
+                    FilterColumn {
+                        table: Some("u".into()),
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_between_skipped() {
+        // BETWEEN is not relevant for IDOR — only = matters
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM events WHERE id BETWEEN $1 AND $2 AND tenant_id = $3",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "events".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "$3".into(),
+                    placeholder_number: None,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_is_null_skipped() {
+        // IS NULL / IS NOT NULL have no user-controlled value, so they should not appear as filters
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM users WHERE deleted_at IS NULL AND tenant_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_is_not_null_skipped() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM users WHERE email IS NOT NULL AND tenant_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_like_skipped() {
+        // LIKE is a search pattern, not relevant for IDOR detection
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM users WHERE name LIKE $1 AND tenant_id = $2",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "$2".into(),
+                    placeholder_number: None,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_hardcoded_number() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE id = 3 AND tenant_id = $1", 9,).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![
+                    FilterColumn {
+                        table: None,
+                        column: "id".into(),
+                        value: "3".into(),
+                        placeholder_number: None,
+                    },
+                    FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_delete_with_using_postgres() {
+        assert_eq!(
+            idor_analyze_sql(
+                "DELETE FROM orders USING users WHERE users.id = orders.user_id AND users.tenant_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "delete".into(),
+                tables: vec![
+                    TableRef {
+                        name: "orders".into(),
+                        alias: None,
+                    },
+                    TableRef {
+                        name: "users".into(),
+                        alias: None,
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("users".into()),
+                        column: "id".into(),
+                        value: "orders.user_id".into(),
+                        placeholder_number: None,
+                    },
+                    FilterColumn {
+                        table: Some("users".into()),
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_nested_subqueries_in_from() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM (SELECT * FROM (SELECT * FROM users WHERE tenant_id = $1) sub1) sub2",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_insert_schema_qualified() {
+        assert_eq!(
+            idor_analyze_sql(
+                "INSERT INTO public.users (name, tenant_id) VALUES ('x', $1)",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "insert".into(),
+                tables: vec![TableRef {
+                    name: "public.users".into(),
+                    alias: None,
+                }],
+                filters: vec![],
+                insert_columns: Some(vec![vec![
+                    InsertColumn {
+                        column: "name".into(),
+                        value: "'x'".into(),
+                        placeholder_number: None,
+                    },
+                    InsertColumn {
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                    },
+                ]]),
+            }]
+        );
+    }
+
+    #[test]
+    fn test_update_schema_qualified() {
+        assert_eq!(
+            idor_analyze_sql("UPDATE public.users SET name = 'x' WHERE tenant_id = $1", 9,)
+                .unwrap(),
+            vec![SqlQueryResult {
+                kind: "update".into(),
+                tables: vec![TableRef {
+                    name: "public.users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_delete_schema_qualified() {
+        assert_eq!(
+            idor_analyze_sql("DELETE FROM public.users WHERE tenant_id = $1", 9,).unwrap(),
+            vec![SqlQueryResult {
+                kind: "delete".into(),
+                tables: vec![TableRef {
+                    name: "public.users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                }],
+                insert_columns: None,
+            }]
+        );
     }
 }

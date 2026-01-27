@@ -21,7 +21,6 @@ pub struct FilterColumn {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub table: Option<String>,
     pub column: String,
-    pub operator: String,
     pub value: String,
     /// 0-based position of a `?` placeholder in the query (MySQL-style).
     /// Used to resolve the placeholder to the actual parameter value.
@@ -38,7 +37,7 @@ pub struct InsertColumn {
     pub placeholder_number: Option<usize>,
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SqlQueryResult {
     pub kind: String,
     pub tables: Vec<TableRef>,
@@ -64,7 +63,7 @@ impl Visitor for WhereFilterVisitor {
     fn pre_visit_table_factor(&mut self, table_factor: &TableFactor) -> ControlFlow<Self::Break> {
         if let TableFactor::Table { name, alias, .. } = table_factor {
             self.tables.push(TableRef {
-                name: last_ident(name),
+                name: full_name(name),
                 alias: alias.as_ref().map(|a| a.name.value.clone()),
             });
         }
@@ -80,14 +79,13 @@ impl Visitor for WhereFilterVisitor {
         }
 
         if let Expr::BinaryOp { left, op, right } = expr {
-            if let Some(op_str) = binary_op_str(op) {
+            if is_eq_op(op) {
                 // Try left = column, right = value
                 if let Some(col) = extract_column(left) {
                     let placeholder_number = placeholder_number(right, self.placeholder_counter);
                     self.filters.push(FilterColumn {
                         table: col.table,
                         column: col.column,
-                        operator: op_str.to_string(),
                         value: expr_value_str(right),
                         placeholder_number,
                     });
@@ -97,7 +95,6 @@ impl Visitor for WhereFilterVisitor {
                     self.filters.push(FilterColumn {
                         table: col.table,
                         column: col.column,
-                        operator: op_str.to_string(),
                         value: expr_value_str(left),
                         placeholder_number,
                     });
@@ -159,20 +156,16 @@ fn expr_placeholder_number(expr: &Expr, counter: &mut usize) -> Option<usize> {
     }
 }
 
-fn binary_op_str(op: &BinaryOperator) -> Option<&'static str> {
-    match op {
-        BinaryOperator::Eq => Some("="),
-        BinaryOperator::NotEq => Some("!="),
-        BinaryOperator::Gt => Some(">"),
-        BinaryOperator::Lt => Some("<"),
-        BinaryOperator::GtEq => Some(">="),
-        BinaryOperator::LtEq => Some("<="),
-        _ => None,
-    }
+fn is_eq_op(op: &BinaryOperator) -> bool {
+    matches!(op, BinaryOperator::Eq)
 }
 
-fn last_ident(name: &ObjectName) -> String {
-    name.0.last().map(|i| i.value.clone()).unwrap_or_default()
+fn full_name(name: &ObjectName) -> String {
+    name.0
+        .iter()
+        .map(|i| i.value.clone())
+        .collect::<Vec<_>>()
+        .join(".")
 }
 
 /// Extract filters from an expression (WHERE clause) by walking it recursively.
@@ -190,13 +183,12 @@ fn walk_expr_for_filters(expr: &Expr, counter: &mut usize, filters: &mut Vec<Fil
 
     match expr {
         Expr::BinaryOp { left, op, right } => {
-            if let Some(op_str) = binary_op_str(op) {
+            if is_eq_op(op) {
                 if let Some(col) = extract_column(left) {
                     let pn = placeholder_number(right, *counter);
                     filters.push(FilterColumn {
                         table: col.table,
                         column: col.column,
-                        operator: op_str.to_string(),
                         value: expr_value_str(right),
                         placeholder_number: pn,
                     });
@@ -205,7 +197,6 @@ fn walk_expr_for_filters(expr: &Expr, counter: &mut usize, filters: &mut Vec<Fil
                     filters.push(FilterColumn {
                         table: col.table,
                         column: col.column,
-                        operator: op_str.to_string(),
                         value: expr_value_str(left),
                         placeholder_number: pn,
                     });
@@ -253,14 +244,14 @@ fn extract_tables_from_table_with_joins(twj: &TableWithJoins) -> Vec<TableRef> {
     let mut tables = Vec::new();
     if let TableFactor::Table { name, alias, .. } = &twj.relation {
         tables.push(TableRef {
-            name: last_ident(name),
+            name: full_name(name),
             alias: alias.as_ref().map(|a| a.name.value.clone()),
         });
     }
     for join in &twj.joins {
         if let TableFactor::Table { name, alias, .. } = &join.relation {
             tables.push(TableRef {
-                name: last_ident(name),
+                name: full_name(name),
                 alias: alias.as_ref().map(|a| a.name.value.clone()),
             });
         }
@@ -319,12 +310,75 @@ fn flatten_set_expr(
 }
 
 /// Flatten a Query (which wraps a SetExpr body) into separate results.
+/// If the query has CTEs (WITH clause), their bodies are resolved inline:
+/// any table reference in the main query that matches a CTE name is replaced
+/// with the actual tables and filters from that CTE.
 fn flatten_query(
     query: &Query,
     results: &mut Vec<SqlQueryResult>,
     placeholder_counter: &mut usize,
 ) {
-    flatten_set_expr(&query.body, results, placeholder_counter);
+    // Build CTE map: name -> Vec<SqlQueryResult>
+    let mut cte_map: Vec<(String, Vec<SqlQueryResult>)> = Vec::new();
+    if let Some(with) = &query.with {
+        for cte in &with.cte_tables {
+            let cte_name = cte.alias.name.value.clone();
+            let mut cte_results = Vec::new();
+            flatten_query(&cte.query, &mut cte_results, placeholder_counter);
+            cte_map.push((cte_name, cte_results));
+        }
+    }
+
+    // Flatten the main query body
+    let mut main_results = Vec::new();
+    flatten_set_expr(&query.body, &mut main_results, placeholder_counter);
+
+    if cte_map.is_empty() {
+        results.extend(main_results);
+        return;
+    }
+
+    // Resolve CTE references in main query results
+    for mut result in main_results {
+        let mut resolved_tables: Vec<TableRef> = Vec::new();
+        let mut prepend_filters: Vec<FilterColumn> = Vec::new();
+        let mut had_multi_result_cte = false;
+
+        for table in &result.tables {
+            // Check if this table name matches a CTE (use alias if present, else name)
+            let lookup_name = &table.name;
+            if let Some((_cte_name, cte_results)) =
+                cte_map.iter().find(|(name, _)| name == lookup_name)
+            {
+                if cte_results.len() == 1 {
+                    // Single-result CTE: merge tables and filters inline
+                    resolved_tables.extend(cte_results[0].tables.clone());
+                    prepend_filters.extend(cte_results[0].filters.clone());
+                } else {
+                    // Multi-result CTE (e.g. UNION inside CTE): emit each result separately
+                    for cte_result in cte_results {
+                        results.push(cte_result.clone());
+                    }
+                    had_multi_result_cte = true;
+                }
+            } else {
+                // Not a CTE reference, keep the table as-is
+                resolved_tables.push(table.clone());
+            }
+        }
+
+        if had_multi_result_cte && resolved_tables.is_empty() && result.filters.is_empty() {
+            // The main query only referenced a multi-result CTE with no extra filters,
+            // so we already emitted the CTE results above — skip the main result.
+            continue;
+        }
+
+        result.tables = resolved_tables;
+        let mut merged_filters = prepend_filters;
+        merged_filters.extend(result.filters);
+        result.filters = merged_filters;
+        results.push(result);
+    }
 }
 
 pub fn idor_analyze_sql(query: &str, dialect: i32) -> Result<Vec<SqlQueryResult>, String> {
@@ -341,9 +395,17 @@ pub fn idor_analyze_sql(query: &str, dialect: i32) -> Result<Vec<SqlQueryResult>
                 flatten_query(query, &mut results, &mut placeholder_counter);
             }
             Statement::Update {
-                table, selection, ..
+                table,
+                from,
+                selection,
+                ..
             } => {
-                let tables = extract_tables_from_table_with_joins(table);
+                let mut tables = extract_tables_from_table_with_joins(table);
+
+                // Include tables from the FROM clause (e.g. PostgreSQL UPDATE ... FROM ...)
+                if let Some(from_twj) = from {
+                    tables.extend(extract_tables_from_table_with_joins(from_twj));
+                }
 
                 // Count placeholders in SET assignments so we offset correctly for WHERE
                 let mut placeholder_counter = 0;
@@ -368,7 +430,7 @@ pub fn idor_analyze_sql(query: &str, dialect: i32) -> Result<Vec<SqlQueryResult>
                 });
             }
             Statement::Delete(delete) => {
-                let tables = match &delete.from {
+                let mut tables = match &delete.from {
                     FromTable::WithFromKeyword(twjs) | FromTable::WithoutKeyword(twjs) => {
                         let mut tables = Vec::new();
                         for twj in twjs {
@@ -377,6 +439,13 @@ pub fn idor_analyze_sql(query: &str, dialect: i32) -> Result<Vec<SqlQueryResult>
                         tables
                     }
                 };
+
+                // Include tables from the USING clause (e.g. PostgreSQL DELETE ... USING ...)
+                if let Some(using_twjs) = &delete.using {
+                    for twj in using_twjs {
+                        tables.extend(extract_tables_from_table_with_joins(twj));
+                    }
+                }
 
                 let mut placeholder_counter = 0;
                 let filters = if let Some(selection) = &delete.selection {
@@ -394,7 +463,7 @@ pub fn idor_analyze_sql(query: &str, dialect: i32) -> Result<Vec<SqlQueryResult>
             }
             Statement::Insert(insert) => {
                 let table = TableRef {
-                    name: last_ident(&insert.table_name),
+                    name: full_name(&insert.table_name),
                     alias: insert.table_alias.as_ref().map(|a| a.value.clone()),
                 };
                 let tables = vec![table];
