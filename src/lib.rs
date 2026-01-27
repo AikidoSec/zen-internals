@@ -24,3 +24,5 @@ pub mod js_injection;
 
 #[cfg(not(feature = "benchmarking"))]
 mod js_injection;
+
+mod idor;
