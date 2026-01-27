@@ -1,8 +1,8 @@
 use core::ops::ControlFlow;
 use serde::Serialize;
 use sqlparser::ast::{
-    BinaryOperator, Expr, FromTable, ObjectName, SetExpr, Statement, TableFactor, TableWithJoins,
-    Value, Visit, Visitor,
+    BinaryOperator, Expr, FromTable, ObjectName, Query, SetExpr, Statement, TableFactor,
+    TableWithJoins, Value, Visit, Visitor,
 };
 use sqlparser::parser::Parser;
 
@@ -268,6 +268,61 @@ fn extract_tables_from_table_with_joins(twj: &TableWithJoins) -> Vec<TableRef> {
     tables
 }
 
+/// Recursively flatten a SetExpr into separate SqlQueryResult entries.
+/// Each leaf SELECT becomes its own entry; SetOperation (UNION/EXCEPT/INTERSECT)
+/// branches are split so that each side is analyzed independently.
+fn flatten_set_expr(
+    set_expr: &SetExpr,
+    results: &mut Vec<SqlQueryResult>,
+    placeholder_counter: &mut usize,
+) {
+    match set_expr {
+        SetExpr::Select(_) => {
+            let mut visitor = WhereFilterVisitor {
+                tables: Vec::new(),
+                filters: Vec::new(),
+                placeholder_counter: *placeholder_counter,
+            };
+            let _ = set_expr.visit(&mut visitor);
+            *placeholder_counter = visitor.placeholder_counter;
+            results.push(SqlQueryResult {
+                kind: "select".into(),
+                tables: visitor.tables,
+                filters: visitor.filters,
+                insert_columns: None,
+            });
+        }
+        SetExpr::SetOperation { left, right, .. } => {
+            flatten_set_expr(left, results, placeholder_counter);
+            flatten_set_expr(right, results, placeholder_counter);
+        }
+        SetExpr::Query(query) => {
+            flatten_set_expr(&query.body, results, placeholder_counter);
+        }
+        _ => {
+            // Values, Insert, Update, Table — use visitor as fallback
+            let mut visitor = WhereFilterVisitor {
+                tables: Vec::new(),
+                filters: Vec::new(),
+                placeholder_counter: *placeholder_counter,
+            };
+            let _ = set_expr.visit(&mut visitor);
+            *placeholder_counter = visitor.placeholder_counter;
+            results.push(SqlQueryResult {
+                kind: "select".into(),
+                tables: visitor.tables,
+                filters: visitor.filters,
+                insert_columns: None,
+            });
+        }
+    }
+}
+
+/// Flatten a Query (which wraps a SetExpr body) into separate results.
+fn flatten_query(query: &Query, results: &mut Vec<SqlQueryResult>, placeholder_counter: &mut usize) {
+    flatten_set_expr(&query.body, results, placeholder_counter);
+}
+
 pub fn idor_analyze_sql(query: &str, dialect: i32) -> Result<Vec<SqlQueryResult>, String> {
     let dialect = select_dialect_based_on_enum(dialect);
 
@@ -277,20 +332,9 @@ pub fn idor_analyze_sql(query: &str, dialect: i32) -> Result<Vec<SqlQueryResult>
 
     for stmt in &statements {
         match stmt {
-            Statement::Query(_) => {
-                // SELECT: use the visitor approach — all BinaryOps are in WHERE/JOIN ON
-                let mut visitor = WhereFilterVisitor {
-                    tables: Vec::new(),
-                    filters: Vec::new(),
-                    placeholder_counter: 0,
-                };
-                let _ = stmt.visit(&mut visitor);
-                results.push(SqlQueryResult {
-                    kind: "select".into(),
-                    tables: visitor.tables,
-                    filters: visitor.filters,
-                    insert_columns: None,
-                });
+            Statement::Query(query) => {
+                let mut placeholder_counter = 0;
+                flatten_query(query, &mut results, &mut placeholder_counter);
             }
             Statement::Update {
                 table, selection, ..
@@ -382,27 +426,20 @@ pub fn idor_analyze_sql(query: &str, dialect: i32) -> Result<Vec<SqlQueryResult>
                     None
                 };
 
-                // For INSERT...SELECT, extract filters from the subquery
-                let filters = if insert_columns.is_none() {
+                // For INSERT...SELECT, flatten the source query into separate
+                // select results (handling UNION/EXCEPT/INTERSECT), then append
+                // the insert entry.
+                if insert_columns.is_none() {
                     if let Some(source) = &insert.source {
-                        let mut visitor = WhereFilterVisitor {
-                            tables: Vec::new(),
-                            filters: Vec::new(),
-                            placeholder_counter: 0,
-                        };
-                        let _ = source.visit(&mut visitor);
-                        visitor.filters
-                    } else {
-                        Vec::new()
+                        let mut placeholder_counter = 0;
+                        flatten_query(source, &mut results, &mut placeholder_counter);
                     }
-                } else {
-                    Vec::new()
-                };
+                }
 
                 results.push(SqlQueryResult {
                     kind: "insert".into(),
                     tables,
-                    filters,
+                    filters: Vec::new(),
                     insert_columns,
                 });
             }
