@@ -319,7 +319,11 @@ fn flatten_set_expr(
 }
 
 /// Flatten a Query (which wraps a SetExpr body) into separate results.
-fn flatten_query(query: &Query, results: &mut Vec<SqlQueryResult>, placeholder_counter: &mut usize) {
+fn flatten_query(
+    query: &Query,
+    results: &mut Vec<SqlQueryResult>,
+    placeholder_counter: &mut usize,
+) {
     flatten_set_expr(&query.body, results, placeholder_counter);
 }
 
