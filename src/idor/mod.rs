@@ -5,14 +5,14 @@ use sqlparser::parser::Parser;
 
 use crate::sql_injection::helpers::select_dialect_based_on_enum::select_dialect_based_on_enum;
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct TableRef {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub alias: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct FilterColumn {
     /// Table name or alias (if qualified, e.g. `u.tenant_id`)
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -26,7 +26,7 @@ pub struct FilterColumn {
     pub placeholder_number: Option<usize>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct SelectQueryResult {
     pub tables: Vec<TableRef>,
     pub filters: Vec<FilterColumn>,
@@ -168,68 +168,4 @@ pub fn idor_analyze_sql(query: &str, dialect: i32) -> Result<Vec<SelectQueryResu
     Ok(selects)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_simple_select() {
-        let selects = idor_analyze_sql("SELECT * FROM users WHERE tenant_id = $1", 9).unwrap();
-        assert_eq!(selects.len(), 1);
-        assert_eq!(selects[0].tables[0].name, "users");
-        assert_eq!(selects[0].filters[0].column, "tenant_id");
-        assert_eq!(selects[0].filters[0].value, "$1");
-        assert_eq!(selects[0].filters[0].operator, "=");
-        assert_eq!(selects[0].filters[0].placeholder_number, None);
-    }
-
-    #[test]
-    fn test_join() {
-        let selects = idor_analyze_sql(
-            "SELECT * FROM users u JOIN orders o ON o.user_id = u.id WHERE u.tenant_id = $1",
-            9,
-        )
-        .unwrap();
-
-        assert_eq!(selects[0].tables.len(), 2);
-        assert_eq!(selects[0].tables[0].name, "users");
-        assert_eq!(selects[0].tables[0].alias.as_deref(), Some("u"));
-        assert_eq!(selects[0].tables[1].name, "orders");
-
-        assert!(selects[0]
-            .filters
-            .iter()
-            .any(|f| f.column == "tenant_id" && f.value == "$1"));
-    }
-
-    #[test]
-    fn test_mysql_placeholder() {
-        let selects = idor_analyze_sql("SELECT * FROM users WHERE tenant_id = ?", 8).unwrap();
-        assert_eq!(selects[0].filters[0].value, "?");
-        assert_eq!(selects[0].filters[0].placeholder_number, Some(0));
-    }
-
-    #[test]
-    fn test_mysql_multiple_placeholders() {
-        let selects = idor_analyze_sql(
-            "SELECT * FROM users WHERE status = ? AND tenant_id = ? AND name = ?",
-            8,
-        )
-        .unwrap();
-        // status = ? is placeholder 0
-        assert_eq!(selects[0].filters[0].column, "status");
-        assert_eq!(selects[0].filters[0].placeholder_number, Some(0));
-        // tenant_id = ? is placeholder 1
-        assert_eq!(selects[0].filters[1].column, "tenant_id");
-        assert_eq!(selects[0].filters[1].placeholder_number, Some(1));
-        // name = ? is placeholder 2
-        assert_eq!(selects[0].filters[2].column, "name");
-        assert_eq!(selects[0].filters[2].placeholder_number, Some(2));
-    }
-
-    #[test]
-    fn test_parse_error() {
-        let result = idor_analyze_sql("NOT VALID SQL !!!", 9);
-        assert!(result.is_err());
-    }
-}
+pub mod idor_analyze_sql_test;
