@@ -1837,11 +1837,7 @@ mod tests {
     #[test]
     fn test_postgres_double_quoted_identifiers() {
         assert_eq!(
-            idor_analyze_sql(
-                "SELECT * FROM \"users\" WHERE \"tenant_id\" = $1",
-                9,
-            )
-            .unwrap(),
+            idor_analyze_sql("SELECT * FROM \"users\" WHERE \"tenant_id\" = $1", 9,).unwrap(),
             vec![SqlQueryResult {
                 kind: "select".into(),
                 tables: vec![TableRef {
@@ -2028,7 +2024,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn test_insert_returning_postgres() {
         assert_eq!(
@@ -2104,7 +2099,6 @@ mod tests {
             }]
         );
     }
-
 
     #[test]
     fn test_update_with_multiple_set_placeholders_mysql() {
@@ -2206,7 +2200,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn test_delete_with_join_mysql() {
         assert_eq!(
@@ -2241,11 +2234,7 @@ mod tests {
     #[test]
     fn test_select_string_value_in_filter() {
         assert_eq!(
-            idor_analyze_sql(
-                "SELECT * FROM users WHERE tenant_id = 'org_123'",
-                9,
-            )
-            .unwrap(),
+            idor_analyze_sql("SELECT * FROM users WHERE tenant_id = 'org_123'", 9,).unwrap(),
             vec![SqlQueryResult {
                 kind: "select".into(),
                 tables: vec![TableRef {

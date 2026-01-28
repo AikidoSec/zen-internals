@@ -90,10 +90,7 @@ impl Visitor for WhereFilterVisitor {
         ControlFlow::Continue(())
     }
 
-    fn post_visit_table_factor(
-        &mut self,
-        table_factor: &TableFactor,
-    ) -> ControlFlow<Self::Break> {
+    fn post_visit_table_factor(&mut self, table_factor: &TableFactor) -> ControlFlow<Self::Break> {
         if let TableFactor::Derived { lateral: true, .. } = table_factor {
             self.skip_depth = self.skip_depth.saturating_sub(1);
         }
@@ -135,7 +132,8 @@ impl Visitor for WhereFilterVisitor {
                 // Only extract filters where one side is a column and the other is a value
                 if let Some(col) = extract_column(left) {
                     if !is_column_ref(right) {
-                        let placeholder_number = placeholder_number(right, self.placeholder_counter);
+                        let placeholder_number =
+                            placeholder_number(right, self.placeholder_counter);
                         self.filters.push(FilterColumn {
                             table: col.table,
                             column: col.column,
@@ -240,10 +238,7 @@ fn full_name(name: &ObjectName) -> String {
 
 /// Extract filters from an expression (WHERE clause) by walking it recursively.
 /// Also collects subqueries that should be processed separately.
-fn extract_filters_from_expr(
-    expr: &Expr,
-    counter: &mut usize,
-) -> (Vec<FilterColumn>, Vec<Query>) {
+fn extract_filters_from_expr(expr: &Expr, counter: &mut usize) -> (Vec<FilterColumn>, Vec<Query>) {
     let mut filters = Vec::new();
     let mut subqueries = Vec::new();
     walk_expr_for_filters(expr, counter, &mut filters, &mut subqueries);
@@ -439,10 +434,7 @@ fn flatten_query(
 
 /// Returns true if the expression is a column reference (Identifier or CompoundIdentifier).
 fn is_column_ref(expr: &Expr) -> bool {
-    matches!(
-        expr,
-        Expr::Identifier(_) | Expr::CompoundIdentifier(_)
-    )
+    matches!(expr, Expr::Identifier(_) | Expr::CompoundIdentifier(_))
 }
 
 /// Analyzes a SQL query for IDOR (Insecure Direct Object Reference) protection.
