@@ -286,6 +286,10 @@ struct SelectVisitor {
     filters: Vec<FilterColumn>,
     placeholder_counter: usize,
     subqueries: Vec<Query>,
+    /// Tracks nesting depth inside subqueries. When > 0, we skip collecting tables/filters
+    /// because the Visitor walks into subquery children automatically, but we want to
+    /// process subqueries separately (they're stored in `subqueries` for later processing).
+    /// Incremented when entering a subquery, decremented when leaving.
     skip_depth: usize,
 }
 
