@@ -42,6 +42,236 @@ pub struct SqlQueryResult {
     pub insert_columns: Option<Vec<Vec<InsertColumn>>>,
 }
 
+/// Analyzes a SQL query for IDOR (Insecure Direct Object Reference) protection.
+///
+/// Returns a list of `SqlQueryResult` entries, one per logical query. Each entry contains:
+/// - `kind`: The statement type ("select", "insert", "update", "delete")
+/// - `tables`: All tables referenced (with optional aliases)
+/// - `filters`: Equality filters extracted from WHERE clauses
+/// - `insert_columns`: For INSERT statements, the column-value pairs per row
+///
+/// # Filter Extraction
+///
+/// Only equality comparisons (`=`) where one side is a column and the other is a
+/// concrete value (literal or placeholder) are extracted. Column-to-column comparisons
+/// (e.g., JOIN conditions like `a.id = b.user_id`) are ignored.
+///
+/// # Set Operations
+///
+/// UNION / INTERSECT / EXCEPT are flattened: each side becomes a separate result.
+///
+/// # Subqueries
+///
+/// Subqueries in WHERE IN, WHERE EXISTS, and LATERAL joins produce separate results.
+///
+/// # MySQL Placeholder Numbering
+///
+/// For MySQL's positional `?` placeholders, the 0-based position is tracked. For UPDATE
+/// statements, placeholders in SET assignments are counted first, so WHERE placeholders
+/// have correct offsets.
+pub fn idor_analyze_sql(query: &str, dialect: i32) -> Result<Vec<SqlQueryResult>, String> {
+    let statements = parse_sql(query, dialect)?;
+    let mut results = Vec::new();
+
+    for stmt in &statements {
+        analyze_statement(stmt, &mut results)?;
+    }
+
+    Ok(results)
+}
+
+fn parse_sql(query: &str, dialect: i32) -> Result<Vec<Statement>, String> {
+    if query.trim().is_empty() {
+        return Err("Empty query".to_string());
+    }
+
+    let dialect = select_dialect_based_on_enum(dialect);
+    let statements = Parser::parse_sql(&*dialect, query).map_err(|e| e.to_string())?;
+
+    if statements.is_empty() {
+        return Err("No SQL statements found".to_string());
+    }
+
+    Ok(statements)
+}
+
+fn analyze_statement(stmt: &Statement, results: &mut Vec<SqlQueryResult>) -> Result<(), String> {
+    match stmt {
+        Statement::Query(query) => {
+            let mut counter = 0;
+            flatten_query(query, results, &mut counter)?;
+        }
+        Statement::Update {
+            table,
+            assignments,
+            from,
+            selection,
+            ..
+        } => {
+            analyze_update(
+                table,
+                assignments,
+                from.as_ref(),
+                selection.as_ref(),
+                results,
+            );
+        }
+        Statement::Delete(delete) => {
+            analyze_delete(delete, results);
+        }
+        Statement::Insert(insert) => {
+            analyze_insert(insert, results);
+        }
+        _ => {
+            return Err(
+                "Unsupported SQL statement type: only SELECT, INSERT, UPDATE, and DELETE are supported".to_string()
+            );
+        }
+    }
+    Ok(())
+}
+
+fn analyze_update(
+    table: &TableWithJoins,
+    assignments: &[sqlparser::ast::Assignment],
+    from: Option<&TableWithJoins>,
+    selection: Option<&Expr>,
+    results: &mut Vec<SqlQueryResult>,
+) {
+    let mut tables = extract_tables_from_table_with_joins(table);
+    if let Some(from_clause) = from {
+        tables.extend(extract_tables_from_table_with_joins(from_clause));
+    }
+
+    let assignment_values: Vec<Expr> = assignments.iter().map(|a| a.value.clone()).collect();
+    let mut counter = count_placeholders_in_exprs(&assignment_values);
+
+    let (filters, subqueries) = match selection {
+        Some(expr) => extract_filters_from_where(expr, &mut counter),
+        None => (Vec::new(), Vec::new()),
+    };
+
+    results.push(SqlQueryResult {
+        kind: "update".into(),
+        tables,
+        filters,
+        insert_columns: None,
+    });
+
+    for subquery in subqueries {
+        let _ = flatten_query(&subquery, results, &mut counter);
+    }
+}
+
+fn analyze_delete(delete: &sqlparser::ast::Delete, results: &mut Vec<SqlQueryResult>) {
+    let mut tables: Vec<TableRef> = match &delete.from {
+        FromTable::WithFromKeyword(twjs) | FromTable::WithoutKeyword(twjs) => twjs
+            .iter()
+            .flat_map(extract_tables_from_table_with_joins)
+            .collect(),
+    };
+
+    if let Some(using_clauses) = &delete.using {
+        for twj in using_clauses {
+            tables.extend(extract_tables_from_table_with_joins(twj));
+        }
+    }
+
+    let mut counter = 0;
+    let (filters, subqueries) = match &delete.selection {
+        Some(expr) => extract_filters_from_where(expr, &mut counter),
+        None => (Vec::new(), Vec::new()),
+    };
+
+    results.push(SqlQueryResult {
+        kind: "delete".into(),
+        tables,
+        filters,
+        insert_columns: None,
+    });
+
+    for subquery in subqueries {
+        let _ = flatten_query(&subquery, results, &mut counter);
+    }
+}
+
+fn analyze_insert(insert: &sqlparser::ast::Insert, results: &mut Vec<SqlQueryResult>) {
+    let table = TableRef {
+        name: object_name_to_string(&insert.table_name),
+        alias: insert.table_alias.as_ref().map(|a| a.value.clone()),
+    };
+    let columns: Vec<String> = insert.columns.iter().map(|c| c.value.clone()).collect();
+    let insert_columns = extract_insert_columns(&insert.source, &columns);
+
+    // For INSERT ... SELECT, analyze the SELECT source
+    if insert_columns.is_none() {
+        if let Some(source) = &insert.source {
+            let mut counter = 0;
+            let _ = flatten_query(source, results, &mut counter);
+        }
+    }
+
+    results.push(SqlQueryResult {
+        kind: "insert".into(),
+        tables: vec![table],
+        filters: Vec::new(),
+        insert_columns,
+    });
+}
+
+fn flatten_query(
+    query: &Query,
+    results: &mut Vec<SqlQueryResult>,
+    counter: &mut usize,
+) -> Result<(), String> {
+    if query.with.is_some() {
+        return Err("CTEs (WITH clauses) are not supported yet".to_string());
+    }
+    flatten_set_expr(&query.body, results, counter)
+}
+
+fn flatten_set_expr(
+    set_expr: &SetExpr,
+    results: &mut Vec<SqlQueryResult>,
+    counter: &mut usize,
+) -> Result<(), String> {
+    match set_expr {
+        SetExpr::SetOperation { left, right, .. } => {
+            flatten_set_expr(left, results, counter)?;
+            flatten_set_expr(right, results, counter)?;
+        }
+        SetExpr::Query(query) => {
+            flatten_set_expr(&query.body, results, counter)?;
+        }
+        _ => {
+            visit_select(set_expr, results, counter)?;
+        }
+    }
+    Ok(())
+}
+
+fn visit_select(
+    set_expr: &SetExpr,
+    results: &mut Vec<SqlQueryResult>,
+    counter: &mut usize,
+) -> Result<(), String> {
+    let mut visitor = SelectVisitor::new(*counter);
+    let _ = set_expr.visit(&mut visitor);
+    *counter = visitor.placeholder_counter;
+
+    results.push(SqlQueryResult {
+        kind: "select".into(),
+        tables: visitor.tables,
+        filters: visitor.filters,
+        insert_columns: None,
+    });
+
+    for subquery in visitor.subqueries {
+        flatten_query(&subquery, results, counter)?;
+    }
+    Ok(())
+}
+
 struct SelectVisitor {
     tables: Vec<TableRef>,
     filters: Vec<FilterColumn>,
@@ -135,9 +365,6 @@ fn extract_subquery(expr: &Expr) -> Option<&Query> {
     }
 }
 
-/// Extracts a filter from an equality comparison where one side is a column
-/// and the other is a concrete value (literal or placeholder).
-/// Returns None for column-to-column comparisons (e.g., JOIN conditions).
 fn try_extract_filter(expr: &Expr, placeholder_counter: usize) -> Option<FilterColumn> {
     let Expr::BinaryOp { left, op, right } = expr else {
         return None;
@@ -147,7 +374,6 @@ fn try_extract_filter(expr: &Expr, placeholder_counter: usize) -> Option<FilterC
         return None;
     }
 
-    // Try both orderings: column = value, or value = column
     extract_column_value_pair(left, right, placeholder_counter)
         .or_else(|| extract_column_value_pair(right, left, placeholder_counter))
 }
@@ -159,7 +385,6 @@ fn extract_column_value_pair(
 ) -> Option<FilterColumn> {
     let (table, column) = extract_column_ref(maybe_column)?;
 
-    // Skip if the other side is also a column (this is a JOIN condition)
     if is_column_ref(maybe_value) {
         return None;
     }
@@ -212,8 +437,6 @@ fn object_name_to_string(name: &ObjectName) -> String {
         .join(".")
 }
 
-/// Walks an expression tree to extract filters and subqueries.
-/// Used for UPDATE/DELETE WHERE clauses where we don't need to collect tables.
 fn extract_filters_from_where(expr: &Expr, counter: &mut usize) -> (Vec<FilterColumn>, Vec<Query>) {
     let mut filters = Vec::new();
     let mut subqueries = Vec::new();
@@ -298,236 +521,6 @@ fn extract_tables_from_table_with_joins(twj: &TableWithJoins) -> Vec<TableRef> {
         }
     }
     tables
-}
-
-fn flatten_set_expr(
-    set_expr: &SetExpr,
-    results: &mut Vec<SqlQueryResult>,
-    counter: &mut usize,
-) -> Result<(), String> {
-    match set_expr {
-        SetExpr::SetOperation { left, right, .. } => {
-            flatten_set_expr(left, results, counter)?;
-            flatten_set_expr(right, results, counter)?;
-        }
-        SetExpr::Query(query) => {
-            flatten_set_expr(&query.body, results, counter)?;
-        }
-        _ => {
-            visit_select(set_expr, results, counter)?;
-        }
-    }
-    Ok(())
-}
-
-fn visit_select(
-    set_expr: &SetExpr,
-    results: &mut Vec<SqlQueryResult>,
-    counter: &mut usize,
-) -> Result<(), String> {
-    let mut visitor = SelectVisitor::new(*counter);
-    let _ = set_expr.visit(&mut visitor);
-    *counter = visitor.placeholder_counter;
-
-    results.push(SqlQueryResult {
-        kind: "select".into(),
-        tables: visitor.tables,
-        filters: visitor.filters,
-        insert_columns: None,
-    });
-
-    for subquery in visitor.subqueries {
-        flatten_query(&subquery, results, counter)?;
-    }
-    Ok(())
-}
-
-fn flatten_query(
-    query: &Query,
-    results: &mut Vec<SqlQueryResult>,
-    counter: &mut usize,
-) -> Result<(), String> {
-    if query.with.is_some() {
-        return Err("CTEs (WITH clauses) are not supported yet".to_string());
-    }
-    flatten_set_expr(&query.body, results, counter)
-}
-
-/// Analyzes a SQL query for IDOR (Insecure Direct Object Reference) protection.
-///
-/// Returns a list of `SqlQueryResult` entries, one per logical query. Each entry contains:
-/// - `kind`: The statement type ("select", "insert", "update", "delete")
-/// - `tables`: All tables referenced (with optional aliases)
-/// - `filters`: Equality filters extracted from WHERE clauses
-/// - `insert_columns`: For INSERT statements, the column-value pairs per row
-///
-/// # Filter Extraction
-///
-/// Only equality comparisons (`=`) where one side is a column and the other is a
-/// concrete value (literal or placeholder) are extracted. Column-to-column comparisons
-/// (e.g., JOIN conditions like `a.id = b.user_id`) are ignored.
-///
-/// # Set Operations
-///
-/// UNION / INTERSECT / EXCEPT are flattened: each side becomes a separate result.
-///
-/// # Subqueries
-///
-/// Subqueries in WHERE IN, WHERE EXISTS, and LATERAL joins produce separate results.
-///
-/// # MySQL Placeholder Numbering
-///
-/// For MySQL's positional `?` placeholders, the 0-based position is tracked. For UPDATE
-/// statements, placeholders in SET assignments are counted first, so WHERE placeholders
-/// have correct offsets.
-pub fn idor_analyze_sql(query: &str, dialect: i32) -> Result<Vec<SqlQueryResult>, String> {
-    let statements = parse_sql(query, dialect)?;
-    let mut results = Vec::new();
-
-    for stmt in &statements {
-        analyze_statement(stmt, &mut results)?;
-    }
-
-    Ok(results)
-}
-
-fn parse_sql(query: &str, dialect: i32) -> Result<Vec<Statement>, String> {
-    if query.trim().is_empty() {
-        return Err("Empty query".to_string());
-    }
-
-    let dialect = select_dialect_based_on_enum(dialect);
-    let statements = Parser::parse_sql(&*dialect, query).map_err(|e| e.to_string())?;
-
-    if statements.is_empty() {
-        return Err("No SQL statements found".to_string());
-    }
-
-    Ok(statements)
-}
-
-fn analyze_statement(stmt: &Statement, results: &mut Vec<SqlQueryResult>) -> Result<(), String> {
-    match stmt {
-        Statement::Query(query) => {
-            let mut counter = 0;
-            flatten_query(query, results, &mut counter)?;
-        }
-        Statement::Update {
-            table,
-            assignments,
-            from,
-            selection,
-            ..
-        } => {
-            analyze_update(
-                table,
-                assignments,
-                from.as_ref(),
-                selection.as_ref(),
-                results,
-            );
-        }
-        Statement::Delete(delete) => {
-            analyze_delete(delete, results);
-        }
-        Statement::Insert(insert) => {
-            analyze_insert(insert, results);
-        }
-        _ => {
-            return Err(format!(
-                "Unsupported SQL statement type: only SELECT, INSERT, UPDATE, and DELETE are supported"
-            ));
-        }
-    }
-    Ok(())
-}
-
-fn analyze_update(
-    table: &TableWithJoins,
-    assignments: &[sqlparser::ast::Assignment],
-    from: Option<&TableWithJoins>,
-    selection: Option<&Expr>,
-    results: &mut Vec<SqlQueryResult>,
-) {
-    let mut tables = extract_tables_from_table_with_joins(table);
-    if let Some(from_clause) = from {
-        tables.extend(extract_tables_from_table_with_joins(from_clause));
-    }
-
-    let assignment_values: Vec<Expr> = assignments.iter().map(|a| a.value.clone()).collect();
-    let mut counter = count_placeholders_in_exprs(&assignment_values);
-
-    let (filters, subqueries) = match selection {
-        Some(expr) => extract_filters_from_where(expr, &mut counter),
-        None => (Vec::new(), Vec::new()),
-    };
-
-    results.push(SqlQueryResult {
-        kind: "update".into(),
-        tables,
-        filters,
-        insert_columns: None,
-    });
-
-    for subquery in subqueries {
-        let _ = flatten_query(&subquery, results, &mut counter);
-    }
-}
-
-fn analyze_delete(delete: &sqlparser::ast::Delete, results: &mut Vec<SqlQueryResult>) {
-    let mut tables: Vec<TableRef> = match &delete.from {
-        FromTable::WithFromKeyword(twjs) | FromTable::WithoutKeyword(twjs) => twjs
-            .iter()
-            .flat_map(extract_tables_from_table_with_joins)
-            .collect(),
-    };
-
-    if let Some(using_clauses) = &delete.using {
-        for twj in using_clauses {
-            tables.extend(extract_tables_from_table_with_joins(twj));
-        }
-    }
-
-    let mut counter = 0;
-    let (filters, subqueries) = match &delete.selection {
-        Some(expr) => extract_filters_from_where(expr, &mut counter),
-        None => (Vec::new(), Vec::new()),
-    };
-
-    results.push(SqlQueryResult {
-        kind: "delete".into(),
-        tables,
-        filters,
-        insert_columns: None,
-    });
-
-    for subquery in subqueries {
-        let _ = flatten_query(&subquery, results, &mut counter);
-    }
-}
-
-fn analyze_insert(insert: &sqlparser::ast::Insert, results: &mut Vec<SqlQueryResult>) {
-    let table = TableRef {
-        name: object_name_to_string(&insert.table_name),
-        alias: insert.table_alias.as_ref().map(|a| a.value.clone()),
-    };
-    let columns: Vec<String> = insert.columns.iter().map(|c| c.value.clone()).collect();
-    let insert_columns = extract_insert_columns(&insert.source, &columns);
-
-    // For INSERT ... SELECT, analyze the SELECT source
-    if insert_columns.is_none() {
-        if let Some(source) = &insert.source {
-            let mut counter = 0;
-            let _ = flatten_query(source, results, &mut counter);
-        }
-    }
-
-    results.push(SqlQueryResult {
-        kind: "insert".into(),
-        tables: vec![table],
-        filters: Vec::new(),
-        insert_columns,
-    });
 }
 
 fn extract_insert_columns(
