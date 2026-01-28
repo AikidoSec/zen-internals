@@ -230,6 +230,15 @@ fn flatten_query(
     flatten_set_expr(&query.body, results, counter)
 }
 
+/// Recursively flattens set operations into individual SELECT results.
+///
+/// For example, this UNION query:
+///   SELECT * FROM users WHERE tenant_id = $1
+///   UNION
+///   SELECT * FROM admins WHERE tenant_id = $2
+///
+/// Produces two separate SqlQueryResult entries (one for users, one for admins),
+/// so each branch can be independently checked for tenant filtering.
 fn flatten_set_expr(
     set_expr: &SetExpr,
     results: &mut Vec<SqlQueryResult>,
