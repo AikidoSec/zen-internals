@@ -2290,4 +2290,343 @@ mod tests {
             }]
         );
     }
+
+    #[test]
+    fn test_parenthesized_select_query() {
+        assert_eq!(
+            idor_analyze_sql("(SELECT * FROM users WHERE tenant_id = $1)", 9).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_union_with_parenthesized_selects() {
+        assert_eq!(
+            idor_analyze_sql(
+                "(SELECT * FROM users WHERE tenant_id = $1) UNION (SELECT * FROM admins WHERE tenant_id = $2)",
+                9,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "users".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                    }],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "admins".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "$2".into(),
+                        placeholder_number: None,
+                    }],
+                    insert_columns: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_scalar_subquery_in_select() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT *, (SELECT COUNT(*) FROM orders WHERE orders.user_id = users.id AND orders.tenant_id = $1) FROM users WHERE tenant_id = $2",
+                9,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "users".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "$2".into(),
+                        placeholder_number: None,
+                    }],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "orders".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: Some("orders".into()),
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                    }],
+                    insert_columns: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_mysql_double_quoted_string_value() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM users WHERE tenant_id = \"org_123\"",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "org_123".into(),
+                    placeholder_number: None,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_update_parenthesized_where() {
+        assert_eq!(
+            idor_analyze_sql(
+                "UPDATE users SET status = 'inactive' WHERE (tenant_id = $1 AND role = 'admin')",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "update".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![
+                    FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                    },
+                    FilterColumn {
+                        table: None,
+                        column: "role".into(),
+                        value: "admin".into(),
+                        placeholder_number: None,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_delete_parenthesized_where() {
+        assert_eq!(
+            idor_analyze_sql(
+                "DELETE FROM users WHERE (tenant_id = $1 AND status = 'deleted')",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "delete".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![
+                    FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                    },
+                    FilterColumn {
+                        table: None,
+                        column: "status".into(),
+                        value: "deleted".into(),
+                        placeholder_number: None,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_update_deeply_nested_parentheses() {
+        assert_eq!(
+            idor_analyze_sql(
+                "UPDATE users SET status = 'inactive' WHERE ((tenant_id = $1) AND (role = 'admin'))",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "update".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![
+                    FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                    },
+                    FilterColumn {
+                        table: None,
+                        column: "role".into(),
+                        value: "admin".into(),
+                        placeholder_number: None,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_insert_more_values_than_columns() {
+        assert_eq!(
+            idor_analyze_sql(
+                "INSERT INTO users (name) VALUES ('alice', 'extra_value')",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "insert".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![],
+                insert_columns: Some(vec![vec![InsertColumn {
+                    column: "name".into(),
+                    value: "alice".into(),
+                    placeholder_number: None,
+                }]]),
+            }]
+        );
+    }
+
+    #[test]
+    fn test_insert_multi_row_more_values_than_columns() {
+        assert_eq!(
+            idor_analyze_sql(
+                "INSERT INTO users (name, tenant_id) VALUES ('alice', 'org_1', 'extra'), ('bob', 'org_2', 'extra2')",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "insert".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![],
+                insert_columns: Some(vec![
+                    vec![
+                        InsertColumn {
+                            column: "name".into(),
+                            value: "alice".into(),
+                            placeholder_number: None,
+                        },
+                        InsertColumn {
+                            column: "tenant_id".into(),
+                            value: "org_1".into(),
+                            placeholder_number: None,
+                        },
+                    ],
+                    vec![
+                        InsertColumn {
+                            column: "name".into(),
+                            value: "bob".into(),
+                            placeholder_number: None,
+                        },
+                        InsertColumn {
+                            column: "tenant_id".into(),
+                            value: "org_2".into(),
+                            placeholder_number: None,
+                        },
+                    ],
+                ]),
+            }]
+        );
+    }
+
+    #[test]
+    fn test_whitespace_only_query() {
+        assert!(idor_analyze_sql("   ", 9).is_err());
+    }
+
+    #[test]
+    fn test_semicolon_only_query() {
+        assert!(idor_analyze_sql(";", 9).is_err());
+    }
+
+    #[test]
+    fn test_delete_with_mysql_placeholder_in_nested_where() {
+        assert_eq!(
+            idor_analyze_sql(
+                "DELETE FROM users WHERE (tenant_id = ? AND status = ?)",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "delete".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![
+                    FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "?".into(),
+                        placeholder_number: Some(0),
+                    },
+                    FilterColumn {
+                        table: None,
+                        column: "status".into(),
+                        value: "?".into(),
+                        placeholder_number: Some(1),
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
 }
