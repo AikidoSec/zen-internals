@@ -56,9 +56,9 @@ pub struct SqlQueryResult {
 /// concrete value (literal or placeholder) are extracted. Column-to-column comparisons
 /// (e.g., JOIN conditions like `a.id = b.user_id`) are ignored.
 ///
-/// # Set Operations
+/// # UNION / INTERSECT / EXCEPT
 ///
-/// UNION / INTERSECT / EXCEPT are flattened: each side becomes a separate result.
+/// These are flattened: each side becomes a separate result.
 ///
 /// # Subqueries
 ///
