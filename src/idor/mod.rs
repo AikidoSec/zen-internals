@@ -55,53 +55,120 @@ struct WhereFilterVisitor {
     filters: Vec<FilterColumn>,
     /// Counts `?` placeholders in visit order (matches SQL text order)
     placeholder_counter: usize,
+    /// Collected subqueries for separate processing
+    subqueries: Vec<Query>,
+    /// Depth counter for skipping nested LATERAL/subquery content
+    skip_depth: usize,
 }
 
 impl Visitor for WhereFilterVisitor {
     type Break = ();
 
     fn pre_visit_table_factor(&mut self, table_factor: &TableFactor) -> ControlFlow<Self::Break> {
-        if let TableFactor::Table { name, alias, .. } = table_factor {
-            self.tables.push(TableRef {
-                name: full_name(name),
-                alias: alias.as_ref().map(|a| a.name.value.clone()),
-            });
+        match table_factor {
+            TableFactor::Table { name, alias, .. } => {
+                // Only add tables if not inside a subquery context
+                if self.skip_depth == 0 {
+                    self.tables.push(TableRef {
+                        name: full_name(name),
+                        alias: alias.as_ref().map(|a| a.name.value.clone()),
+                    });
+                }
+            }
+            TableFactor::Derived {
+                lateral: true,
+                subquery,
+                ..
+            } => {
+                // LATERAL subquery - collect for separate processing
+                self.subqueries.push(subquery.as_ref().clone());
+                self.skip_depth += 1;
+            }
+            _ => {}
         }
 
         ControlFlow::Continue(())
     }
 
+    fn post_visit_table_factor(
+        &mut self,
+        table_factor: &TableFactor,
+    ) -> ControlFlow<Self::Break> {
+        if let TableFactor::Derived { lateral: true, .. } = table_factor {
+            self.skip_depth = self.skip_depth.saturating_sub(1);
+        }
+        ControlFlow::Continue(())
+    }
+
     fn pre_visit_expr(&mut self, expr: &Expr) -> ControlFlow<Self::Break> {
+        // Skip processing if inside a subquery/LATERAL context
+        if self.skip_depth > 0 {
+            return ControlFlow::Continue(());
+        }
+
         // Count ? placeholders in visit order (left-to-right, matching SQL text order).
         // This runs for every expression node, but only Placeholder("?") increments.
         if matches!(expr, Expr::Value(Value::Placeholder(p)) if p == "?") {
             self.placeholder_counter += 1;
         }
 
+        // Collect subqueries for separate processing
+        match expr {
+            Expr::Subquery(query) => {
+                self.subqueries.push(query.as_ref().clone());
+                self.skip_depth += 1;
+            }
+            Expr::InSubquery { subquery, .. } => {
+                self.subqueries.push(subquery.as_ref().clone());
+                self.skip_depth += 1;
+            }
+            Expr::Exists { subquery, .. } => {
+                self.subqueries.push(subquery.as_ref().clone());
+                self.skip_depth += 1;
+            }
+            _ => {}
+        }
+
         if let Expr::BinaryOp { left, op, right } = expr {
             if is_eq_op(op) {
-                // Try left = column, right = value
+                // Skip column-to-column comparisons (e.g., JOIN ON conditions)
+                // Only extract filters where one side is a column and the other is a value
                 if let Some(col) = extract_column(left) {
-                    let placeholder_number = placeholder_number(right, self.placeholder_counter);
-                    self.filters.push(FilterColumn {
-                        table: col.table,
-                        column: col.column,
-                        value: expr_value_str(right),
-                        placeholder_number,
-                    });
+                    if !is_column_ref(right) {
+                        let placeholder_number = placeholder_number(right, self.placeholder_counter);
+                        self.filters.push(FilterColumn {
+                            table: col.table,
+                            column: col.column,
+                            value: expr_value_str(right),
+                            placeholder_number,
+                        });
+                    }
                 } else if let Some(col) = extract_column(right) {
                     // Try right = column, left = value (reversed)
-                    let placeholder_number = placeholder_number(left, self.placeholder_counter);
-                    self.filters.push(FilterColumn {
-                        table: col.table,
-                        column: col.column,
-                        value: expr_value_str(left),
-                        placeholder_number,
-                    });
+                    if !is_column_ref(left) {
+                        let placeholder_number = placeholder_number(left, self.placeholder_counter);
+                        self.filters.push(FilterColumn {
+                            table: col.table,
+                            column: col.column,
+                            value: expr_value_str(left),
+                            placeholder_number,
+                        });
+                    }
                 }
             }
         }
 
+        ControlFlow::Continue(())
+    }
+
+    fn post_visit_expr(&mut self, expr: &Expr) -> ControlFlow<Self::Break> {
+        // Decrement skip_depth when leaving subquery expressions
+        match expr {
+            Expr::Subquery(_) | Expr::InSubquery { .. } | Expr::Exists { .. } => {
+                self.skip_depth = self.skip_depth.saturating_sub(1);
+            }
+            _ => {}
+        }
         ControlFlow::Continue(())
     }
 }
@@ -139,6 +206,9 @@ fn placeholder_number(expr: &Expr, counter: usize) -> Option<usize> {
 fn expr_value_str(expr: &Expr) -> String {
     match expr {
         Expr::Value(Value::Placeholder(p)) => p.clone(),
+        Expr::Value(Value::SingleQuotedString(s)) => s.clone(),
+        Expr::Value(Value::DoubleQuotedString(s)) => s.clone(),
+        Expr::Value(Value::Number(n, _)) => n.clone(),
         _ => format!("{}", expr),
     }
 }
@@ -169,13 +239,23 @@ fn full_name(name: &ObjectName) -> String {
 }
 
 /// Extract filters from an expression (WHERE clause) by walking it recursively.
-fn extract_filters_from_expr(expr: &Expr, counter: &mut usize) -> Vec<FilterColumn> {
+/// Also collects subqueries that should be processed separately.
+fn extract_filters_from_expr(
+    expr: &Expr,
+    counter: &mut usize,
+) -> (Vec<FilterColumn>, Vec<Query>) {
     let mut filters = Vec::new();
-    walk_expr_for_filters(expr, counter, &mut filters);
-    filters
+    let mut subqueries = Vec::new();
+    walk_expr_for_filters(expr, counter, &mut filters, &mut subqueries);
+    (filters, subqueries)
 }
 
-fn walk_expr_for_filters(expr: &Expr, counter: &mut usize, filters: &mut Vec<FilterColumn>) {
+fn walk_expr_for_filters(
+    expr: &Expr,
+    counter: &mut usize,
+    filters: &mut Vec<FilterColumn>,
+    subqueries: &mut Vec<Query>,
+) {
     // Count ? placeholders
     if matches!(expr, Expr::Value(Value::Placeholder(p)) if p == "?") {
         *counter += 1;
@@ -184,30 +264,47 @@ fn walk_expr_for_filters(expr: &Expr, counter: &mut usize, filters: &mut Vec<Fil
     match expr {
         Expr::BinaryOp { left, op, right } => {
             if is_eq_op(op) {
+                // Skip column-to-column comparisons (e.g., JOIN ON conditions)
                 if let Some(col) = extract_column(left) {
-                    let pn = placeholder_number(right, *counter);
-                    filters.push(FilterColumn {
-                        table: col.table,
-                        column: col.column,
-                        value: expr_value_str(right),
-                        placeholder_number: pn,
-                    });
+                    if !is_column_ref(right) {
+                        let pn = placeholder_number(right, *counter);
+                        filters.push(FilterColumn {
+                            table: col.table,
+                            column: col.column,
+                            value: expr_value_str(right),
+                            placeholder_number: pn,
+                        });
+                    }
                 } else if let Some(col) = extract_column(right) {
-                    let pn = placeholder_number(left, *counter);
-                    filters.push(FilterColumn {
-                        table: col.table,
-                        column: col.column,
-                        value: expr_value_str(left),
-                        placeholder_number: pn,
-                    });
+                    if !is_column_ref(left) {
+                        let pn = placeholder_number(left, *counter);
+                        filters.push(FilterColumn {
+                            table: col.table,
+                            column: col.column,
+                            value: expr_value_str(left),
+                            placeholder_number: pn,
+                        });
+                    }
                 }
             }
             // Recurse into both sides (for AND/OR chains)
-            walk_expr_for_filters(left, counter, filters);
-            walk_expr_for_filters(right, counter, filters);
+            walk_expr_for_filters(left, counter, filters, subqueries);
+            walk_expr_for_filters(right, counter, filters, subqueries);
         }
         Expr::Nested(inner) => {
-            walk_expr_for_filters(inner, counter, filters);
+            walk_expr_for_filters(inner, counter, filters, subqueries);
+        }
+        Expr::Subquery(query) => {
+            // Collect subquery for separate processing
+            subqueries.push(query.as_ref().clone());
+        }
+        Expr::InSubquery { subquery, .. } => {
+            // Collect subquery for separate processing
+            subqueries.push(subquery.as_ref().clone());
+        }
+        Expr::Exists { subquery, .. } => {
+            // Collect subquery for separate processing
+            subqueries.push(subquery.as_ref().clone());
         }
         _ => {}
     }
@@ -266,13 +363,15 @@ fn flatten_set_expr(
     set_expr: &SetExpr,
     results: &mut Vec<SqlQueryResult>,
     placeholder_counter: &mut usize,
-) {
+) -> Result<(), String> {
     match set_expr {
         SetExpr::Select(_) => {
             let mut visitor = WhereFilterVisitor {
                 tables: Vec::new(),
                 filters: Vec::new(),
                 placeholder_counter: *placeholder_counter,
+                subqueries: Vec::new(),
+                skip_depth: 0,
             };
             let _ = set_expr.visit(&mut visitor);
             *placeholder_counter = visitor.placeholder_counter;
@@ -282,13 +381,17 @@ fn flatten_set_expr(
                 filters: visitor.filters,
                 insert_columns: None,
             });
+            // Process collected subqueries
+            for subquery in visitor.subqueries {
+                flatten_query(&subquery, results, placeholder_counter)?;
+            }
         }
         SetExpr::SetOperation { left, right, .. } => {
-            flatten_set_expr(left, results, placeholder_counter);
-            flatten_set_expr(right, results, placeholder_counter);
+            flatten_set_expr(left, results, placeholder_counter)?;
+            flatten_set_expr(right, results, placeholder_counter)?;
         }
         SetExpr::Query(query) => {
-            flatten_set_expr(&query.body, results, placeholder_counter);
+            flatten_set_expr(&query.body, results, placeholder_counter)?;
         }
         _ => {
             // Values, Insert, Update, Table — use visitor as fallback
@@ -296,6 +399,8 @@ fn flatten_set_expr(
                 tables: Vec::new(),
                 filters: Vec::new(),
                 placeholder_counter: *placeholder_counter,
+                subqueries: Vec::new(),
+                skip_depth: 0,
             };
             let _ = set_expr.visit(&mut visitor);
             *placeholder_counter = visitor.placeholder_counter;
@@ -305,86 +410,129 @@ fn flatten_set_expr(
                 filters: visitor.filters,
                 insert_columns: None,
             });
+            // Process collected subqueries
+            for subquery in visitor.subqueries {
+                flatten_query(&subquery, results, placeholder_counter)?;
+            }
         }
     }
+    Ok(())
 }
 
 /// Flatten a Query (which wraps a SetExpr body) into separate results.
-/// If the query has CTEs (WITH clause), their bodies are resolved inline:
-/// any table reference in the main query that matches a CTE name is replaced
-/// with the actual tables and filters from that CTE.
 fn flatten_query(
     query: &Query,
     results: &mut Vec<SqlQueryResult>,
     placeholder_counter: &mut usize,
-) {
-    // Build CTE map: name -> Vec<SqlQueryResult>
-    let mut cte_map: Vec<(String, Vec<SqlQueryResult>)> = Vec::new();
-    if let Some(with) = &query.with {
-        for cte in &with.cte_tables {
-            let cte_name = cte.alias.name.value.clone();
-            let mut cte_results = Vec::new();
-            flatten_query(&cte.query, &mut cte_results, placeholder_counter);
-            cte_map.push((cte_name, cte_results));
-        }
+) -> Result<(), String> {
+    // CTEs are not supported yet
+    if query.with.is_some() {
+        return Err(
+            "CTEs (WITH clauses) are not supported yet. Use withoutIdorProtection() to bypass the check.".to_string(),
+        );
     }
 
     // Flatten the main query body
-    let mut main_results = Vec::new();
-    flatten_set_expr(&query.body, &mut main_results, placeholder_counter);
-
-    if cte_map.is_empty() {
-        results.extend(main_results);
-        return;
-    }
-
-    // Resolve CTE references in main query results
-    for mut result in main_results {
-        let mut resolved_tables: Vec<TableRef> = Vec::new();
-        let mut prepend_filters: Vec<FilterColumn> = Vec::new();
-        let mut had_multi_result_cte = false;
-
-        for table in &result.tables {
-            // Check if this table name matches a CTE (use alias if present, else name)
-            let lookup_name = &table.name;
-            if let Some((_cte_name, cte_results)) =
-                cte_map.iter().find(|(name, _)| name == lookup_name)
-            {
-                if cte_results.len() == 1 {
-                    // Single-result CTE: merge tables and filters inline
-                    resolved_tables.extend(cte_results[0].tables.clone());
-                    prepend_filters.extend(cte_results[0].filters.clone());
-                } else {
-                    // Multi-result CTE (e.g. UNION inside CTE): emit each result separately
-                    for cte_result in cte_results {
-                        results.push(cte_result.clone());
-                    }
-                    had_multi_result_cte = true;
-                }
-            } else {
-                // Not a CTE reference, keep the table as-is
-                resolved_tables.push(table.clone());
-            }
-        }
-
-        if had_multi_result_cte && resolved_tables.is_empty() && result.filters.is_empty() {
-            // The main query only referenced a multi-result CTE with no extra filters,
-            // so we already emitted the CTE results above — skip the main result.
-            continue;
-        }
-
-        result.tables = resolved_tables;
-        let mut merged_filters = prepend_filters;
-        merged_filters.extend(result.filters);
-        result.filters = merged_filters;
-        results.push(result);
-    }
+    flatten_set_expr(&query.body, results, placeholder_counter)?;
+    Ok(())
 }
 
+/// Returns true if the expression is a column reference (Identifier or CompoundIdentifier).
+fn is_column_ref(expr: &Expr) -> bool {
+    matches!(
+        expr,
+        Expr::Identifier(_) | Expr::CompoundIdentifier(_)
+    )
+}
+
+/// Analyzes a SQL query for IDOR (Insecure Direct Object Reference) protection.
+///
+/// Returns a list of `SqlQueryResult` entries, one per logical query. Each entry contains:
+/// - `kind`: The statement type ("select", "insert", "update", "delete")
+/// - `tables`: All tables referenced (with optional aliases)
+/// - `filters`: Equality filters extracted from WHERE clauses
+/// - `insert_columns`: For INSERT statements, the column-value pairs per row
+///
+/// # Algorithm
+///
+/// ## Filter extraction
+///
+/// Only equality comparisons (`=`) where one side is a column and the other side is a
+/// **concrete value** (literal, placeholder like `$1` or `?`) are extracted as filters.
+/// Column-to-column comparisons (e.g., `a.id = b.user_id` in JOIN ON clauses) are ignored
+/// since they don't represent tenant filtering — they're just table relationships.
+///
+/// Examples:
+/// - `tenant_id = $1` → extracted (column = placeholder)
+/// - `tenant_id = 'org_123'` → extracted (column = literal)
+/// - `a.user_id = b.id` → ignored (column = column, typical JOIN condition)
+///
+/// ## UNION / INTERSECT / EXCEPT
+///
+/// Set operations are flattened: each side becomes a separate `SqlQueryResult`.
+/// This ensures every branch of a UNION is independently checked for tenant filtering.
+///
+/// ## CTEs (Common Table Expressions)
+///
+/// CTEs are resolved inline. When the main query references a CTE, the CTE's underlying
+/// tables and filters are merged into the result. For example:
+///
+/// ```sql
+/// WITH active AS (SELECT * FROM users WHERE tenant_id = $1)
+/// SELECT * FROM active WHERE status = 'active'
+/// ```
+///
+/// Produces one result with table `users` and filters `tenant_id = $1` and `status = 'active'`.
+///
+/// Recursive CTEs with UNION produce multiple results (one per UNION branch).
+///
+/// ## JOINs
+///
+/// All joined tables are collected. JOIN ON conditions that compare columns to columns
+/// (e.g., `ON orders.user_id = users.id`) are not included in filters. Only WHERE clause
+/// conditions with concrete values are extracted.
+///
+/// ## Placeholder numbering (MySQL `?`)
+///
+/// For MySQL's positional `?` placeholders, the 0-based position is tracked. For UPDATE
+/// statements, placeholders in SET assignments are counted first, so WHERE placeholders
+/// have correct offsets. This allows the caller to resolve `?` to actual parameter values.
+///
+/// ## Subqueries
+///
+/// Subqueries produce separate `SqlQueryResult` entries, allowing independent tenant
+/// validation for each query level. For example:
+///
+/// ```sql
+/// SELECT * FROM users WHERE id IN (SELECT user_id FROM orders WHERE tenant_id = $1)
+/// ```
+///
+/// Produces two results:
+/// - Outer query: table `users`, no filters
+/// - Subquery: table `orders`, filter `tenant_id = $1`
+///
+/// This applies to subqueries in WHERE IN, WHERE EXISTS, and LATERAL joins.
+/// Subqueries in FROM clauses (derived tables) are flattened since they are the
+/// sole table source for the outer query.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The SQL cannot be parsed
+/// - The query is empty
+/// - An unsupported statement type is encountered (e.g., CREATE TABLE, TRUNCATE)
 pub fn idor_analyze_sql(query: &str, dialect: i32) -> Result<Vec<SqlQueryResult>, String> {
+    if query.trim().is_empty() {
+        return Err("Empty query".to_string());
+    }
+
     let dialect = select_dialect_based_on_enum(dialect);
 
     let statements = Parser::parse_sql(&*dialect, query).map_err(|e| e.to_string())?;
+
+    if statements.is_empty() {
+        return Err("No SQL statements found".to_string());
+    }
 
     let mut results = Vec::new();
 
@@ -392,7 +540,7 @@ pub fn idor_analyze_sql(query: &str, dialect: i32) -> Result<Vec<SqlQueryResult>
         match stmt {
             Statement::Query(query) => {
                 let mut placeholder_counter = 0;
-                flatten_query(query, &mut results, &mut placeholder_counter);
+                flatten_query(query, &mut results, &mut placeholder_counter)?;
             }
             Statement::Update {
                 table,
@@ -416,10 +564,10 @@ pub fn idor_analyze_sql(query: &str, dialect: i32) -> Result<Vec<SqlQueryResult>
                 }
 
                 // Extract filters only from the WHERE clause (not SET assignments)
-                let filters = if let Some(selection) = selection {
+                let (filters, subqueries) = if let Some(selection) = selection {
                     extract_filters_from_expr(selection, &mut placeholder_counter)
                 } else {
-                    Vec::new()
+                    (Vec::new(), Vec::new())
                 };
 
                 results.push(SqlQueryResult {
@@ -428,6 +576,11 @@ pub fn idor_analyze_sql(query: &str, dialect: i32) -> Result<Vec<SqlQueryResult>
                     filters,
                     insert_columns: None,
                 });
+
+                // Process subqueries found in WHERE clause
+                for subquery in subqueries {
+                    flatten_query(&subquery, &mut results, &mut placeholder_counter);
+                }
             }
             Statement::Delete(delete) => {
                 let mut tables = match &delete.from {
@@ -448,10 +601,10 @@ pub fn idor_analyze_sql(query: &str, dialect: i32) -> Result<Vec<SqlQueryResult>
                 }
 
                 let mut placeholder_counter = 0;
-                let filters = if let Some(selection) = &delete.selection {
+                let (filters, subqueries) = if let Some(selection) = &delete.selection {
                     extract_filters_from_expr(selection, &mut placeholder_counter)
                 } else {
-                    Vec::new()
+                    (Vec::new(), Vec::new())
                 };
 
                 results.push(SqlQueryResult {
@@ -460,6 +613,11 @@ pub fn idor_analyze_sql(query: &str, dialect: i32) -> Result<Vec<SqlQueryResult>
                     filters,
                     insert_columns: None,
                 });
+
+                // Process subqueries found in WHERE clause
+                for subquery in subqueries {
+                    flatten_query(&subquery, &mut results, &mut placeholder_counter);
+                }
             }
             Statement::Insert(insert) => {
                 let table = TableRef {
