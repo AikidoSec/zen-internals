@@ -25,5 +25,4 @@ pub mod js_injection;
 #[cfg(not(feature = "benchmarking"))]
 mod js_injection;
 
-#[cfg(any(feature = "wasm-js", test))]
 mod idor;

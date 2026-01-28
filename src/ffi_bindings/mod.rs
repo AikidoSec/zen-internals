@@ -1,6 +1,8 @@
+use crate::idor::idor_analyze_sql;
 use crate::js_injection::detect_js_injection::detect_js_injection_str;
 use crate::sql_injection::detect_sql_injection::{detect_sql_injection_str, DetectionReason};
-use std::os::raw::c_int;
+use std::ffi::CString;
+use std::os::raw::{c_char, c_int};
 use std::panic;
 use std::str;
 
@@ -117,4 +119,53 @@ pub unsafe extern "C" fn wasm_alloc(size: usize) -> *mut u8 {
 pub unsafe extern "C" fn wasm_free(ptr: *mut u8, size: usize) {
     let layout = Layout::from_size_align(size, 1).unwrap();
     dealloc(ptr, layout)
+}
+
+#[no_mangle]
+pub extern "C" fn idor_analyze_sql_ffi(
+    query: *const u8,
+    query_len: usize,
+    dialect: c_int,
+) -> *mut c_char {
+    let result = panic::catch_unwind(|| {
+        if query.is_null() || query_len == 0 {
+            return CString::new(r#"{"error":"Invalid query pointer or length"}"#)
+                .unwrap()
+                .into_raw();
+        }
+
+        let query_bytes = unsafe { std::slice::from_raw_parts(query, query_len) };
+        let query_str = match str::from_utf8(query_bytes) {
+            Ok(s) => s,
+            Err(_) => {
+                return CString::new(r#"{"error":"Invalid UTF-8 in query"}"#)
+                    .unwrap()
+                    .into_raw();
+            }
+        };
+
+        let json = match idor_analyze_sql(query_str, dialect) {
+            Ok(results) => {
+                serde_json::to_string(&results).unwrap_or_else(|e| format!(r#"{{"error":"{}"}}"#, e))
+            }
+            Err(e) => format!(r#"{{"error":"{}"}}"#, e),
+        };
+
+        CString::new(json)
+            .unwrap_or_else(|_| CString::new(r#"{"error":"Failed to create C string"}"#).unwrap())
+            .into_raw()
+    });
+
+    result.unwrap_or_else(|_| {
+        CString::new(r#"{"error":"Internal error"}"#)
+            .unwrap()
+            .into_raw()
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn free_string(ptr: *mut c_char) {
+    if !ptr.is_null() {
+        drop(CString::from_raw(ptr));
+    }
 }
