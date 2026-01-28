@@ -99,7 +99,7 @@ fn analyze_statement(stmt: &Statement, results: &mut Vec<SqlQueryResult>) -> Res
     match stmt {
         Statement::Query(query) => {
             let mut counter = 0;
-            flatten_query(query, results, &mut counter)?;
+            collect_selects(query, results, &mut counter)?;
         }
         Statement::Update {
             table,
@@ -159,7 +159,7 @@ fn analyze_update(
     });
 
     for subquery in subqueries {
-        let _ = flatten_query(&subquery, results, &mut counter);
+        let _ = collect_selects(&subquery, results, &mut counter);
     }
 }
 
@@ -191,7 +191,7 @@ fn analyze_delete(delete: &sqlparser::ast::Delete, results: &mut Vec<SqlQueryRes
     });
 
     for subquery in subqueries {
-        let _ = flatten_query(&subquery, results, &mut counter);
+        let _ = collect_selects(&subquery, results, &mut counter);
     }
 }
 
@@ -207,7 +207,7 @@ fn analyze_insert(insert: &sqlparser::ast::Insert, results: &mut Vec<SqlQueryRes
     if insert_columns.is_none() {
         if let Some(source) = &insert.source {
             let mut counter = 0;
-            let _ = flatten_query(source, results, &mut counter);
+            let _ = collect_selects(source, results, &mut counter);
         }
     }
 
@@ -219,7 +219,16 @@ fn analyze_insert(insert: &sqlparser::ast::Insert, results: &mut Vec<SqlQueryRes
     });
 }
 
-fn flatten_query(
+/// Collects all SELECT queries, flattening UNIONs into separate results.
+///
+/// For example, this UNION:
+///   SELECT * FROM users WHERE tenant_id = $1
+///   UNION
+///   SELECT * FROM admins WHERE tenant_id = $2
+///
+/// Produces two SqlQueryResult entries (users, admins) so each branch
+/// can be independently checked for tenant filtering.
+fn collect_selects(
     query: &Query,
     results: &mut Vec<SqlQueryResult>,
     counter: &mut usize,
@@ -227,30 +236,21 @@ fn flatten_query(
     if query.with.is_some() {
         return Err("CTEs (WITH clauses) are not supported yet".to_string());
     }
-    flatten_set_expr(&query.body, results, counter)
+    collect_selects_recursive(&query.body, results, counter)
 }
 
-/// Recursively flattens set operations into individual SELECT results.
-///
-/// For example, this UNION query:
-///   SELECT * FROM users WHERE tenant_id = $1
-///   UNION
-///   SELECT * FROM admins WHERE tenant_id = $2
-///
-/// Produces two separate SqlQueryResult entries (one for users, one for admins),
-/// so each branch can be independently checked for tenant filtering.
-fn flatten_set_expr(
+fn collect_selects_recursive(
     set_expr: &SetExpr,
     results: &mut Vec<SqlQueryResult>,
     counter: &mut usize,
 ) -> Result<(), String> {
     match set_expr {
         SetExpr::SetOperation { left, right, .. } => {
-            flatten_set_expr(left, results, counter)?;
-            flatten_set_expr(right, results, counter)?;
+            collect_selects_recursive(left, results, counter)?;
+            collect_selects_recursive(right, results, counter)?;
         }
         SetExpr::Query(query) => {
-            flatten_set_expr(&query.body, results, counter)?;
+            collect_selects_recursive(&query.body, results, counter)?;
         }
         _ => {
             visit_select(set_expr, results, counter)?;
@@ -276,7 +276,7 @@ fn visit_select(
     });
 
     for subquery in visitor.subqueries {
-        flatten_query(&subquery, results, counter)?;
+        collect_selects(&subquery, results, counter)?;
     }
     Ok(())
 }
