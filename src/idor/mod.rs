@@ -438,6 +438,9 @@ fn expr_to_value_string(expr: &Expr) -> String {
         Expr::Value(Value::SingleQuotedString(s)) => s.clone(),
         Expr::Value(Value::DoubleQuotedString(s)) => s.clone(),
         Expr::Value(Value::Number(n, _)) => n.clone(),
+        Expr::Value(Value::EscapedStringLiteral(s)) => s.clone(),
+        Expr::Value(Value::DollarQuotedString(dqs)) => dqs.value.clone(),
+        Expr::Value(Value::NationalStringLiteral(s)) => s.clone(),
         _ => format!("{}", expr),
     }
 }

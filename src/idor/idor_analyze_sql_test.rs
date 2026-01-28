@@ -2594,6 +2594,69 @@ mod tests {
     }
 
     #[test]
+    fn test_select_with_escaped_string_literal_postgres() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE tenant_id = E'org_123'", 9,).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "org_123".into(),
+                    placeholder_number: None,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_select_with_dollar_quoted_string_postgres() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE tenant_id = $$org_123$$", 9,).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "org_123".into(),
+                    placeholder_number: None,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_select_with_national_string_literal_mysql() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE tenant_id = N'org_123'", 8,).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "org_123".into(),
+                    placeholder_number: None,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
     fn test_delete_with_mysql_placeholder_in_nested_where() {
         assert_eq!(
             idor_analyze_sql("DELETE FROM users WHERE (tenant_id = ? AND status = ?)", 8,).unwrap(),
