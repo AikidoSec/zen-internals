@@ -348,9 +348,7 @@ fn flatten_query(
     counter: &mut usize,
 ) -> Result<(), String> {
     if query.with.is_some() {
-        return Err(
-            "CTEs (WITH clauses) are not supported yet. Use withoutIdorProtection() to bypass the check.".to_string(),
-        );
+        return Err("CTEs (WITH clauses) are not supported yet".to_string());
     }
     flatten_set_expr(&query.body, results, counter)
 }
@@ -436,10 +434,9 @@ fn analyze_statement(stmt: &Statement, results: &mut Vec<SqlQueryResult>) -> Res
             analyze_insert(insert, results);
         }
         _ => {
-            return Err(
-                "Unsupported SQL statement type. Use withoutIdorProtection() to bypass the check."
-                    .to_string(),
-            );
+            return Err(format!(
+                "Unsupported SQL statement type: only SELECT, INSERT, UPDATE, and DELETE are supported"
+            ));
         }
     }
     Ok(())
