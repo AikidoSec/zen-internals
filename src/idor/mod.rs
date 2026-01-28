@@ -519,7 +519,6 @@ pub fn idor_analyze_sql(query: &str, dialect: i32) -> Result<Vec<SqlQueryResult>
     }
 
     let dialect = select_dialect_based_on_enum(dialect);
-
     let statements = Parser::parse_sql(&*dialect, query).map_err(|e| e.to_string())?;
 
     if statements.is_empty() {
@@ -534,32 +533,26 @@ pub fn idor_analyze_sql(query: &str, dialect: i32) -> Result<Vec<SqlQueryResult>
                 let mut placeholder_counter = 0;
                 flatten_query(query, &mut results, &mut placeholder_counter)?;
             }
+
             Statement::Update {
                 table,
+                assignments,
                 from,
                 selection,
                 ..
             } => {
                 let mut tables = extract_tables_from_table_with_joins(table);
-
-                // Include tables from the FROM clause (e.g. PostgreSQL UPDATE ... FROM ...)
-                if let Some(from_twj) = from {
-                    tables.extend(extract_tables_from_table_with_joins(from_twj));
+                if let Some(from_clause) = from {
+                    tables.extend(extract_tables_from_table_with_joins(from_clause));
                 }
 
-                // Count placeholders in SET assignments so we offset correctly for WHERE
-                let mut placeholder_counter = 0;
-                if let Statement::Update { assignments, .. } = stmt {
-                    let assignment_exprs: Vec<Expr> =
-                        assignments.iter().map(|a| a.value.clone()).collect();
-                    placeholder_counter = count_placeholders_in_exprs(&assignment_exprs);
-                }
+                let assignment_values: Vec<Expr> =
+                    assignments.iter().map(|a| a.value.clone()).collect();
+                let mut placeholder_counter = count_placeholders_in_exprs(&assignment_values);
 
-                // Extract filters only from the WHERE clause (not SET assignments)
-                let (filters, subqueries) = if let Some(selection) = selection {
-                    extract_filters_from_expr(selection, &mut placeholder_counter)
-                } else {
-                    (Vec::new(), Vec::new())
+                let (filters, subqueries) = match selection {
+                    Some(expr) => extract_filters_from_expr(expr, &mut placeholder_counter),
+                    None => (Vec::new(), Vec::new()),
                 };
 
                 results.push(SqlQueryResult {
@@ -569,34 +562,29 @@ pub fn idor_analyze_sql(query: &str, dialect: i32) -> Result<Vec<SqlQueryResult>
                     insert_columns: None,
                 });
 
-                // Process subqueries found in WHERE clause
                 for subquery in subqueries {
-                    flatten_query(&subquery, &mut results, &mut placeholder_counter);
+                    let _ = flatten_query(&subquery, &mut results, &mut placeholder_counter);
                 }
             }
+
             Statement::Delete(delete) => {
-                let mut tables = match &delete.from {
-                    FromTable::WithFromKeyword(twjs) | FromTable::WithoutKeyword(twjs) => {
-                        let mut tables = Vec::new();
-                        for twj in twjs {
-                            tables.extend(extract_tables_from_table_with_joins(twj));
-                        }
-                        tables
-                    }
+                let mut tables: Vec<TableRef> = match &delete.from {
+                    FromTable::WithFromKeyword(twjs) | FromTable::WithoutKeyword(twjs) => twjs
+                        .iter()
+                        .flat_map(extract_tables_from_table_with_joins)
+                        .collect(),
                 };
 
-                // Include tables from the USING clause (e.g. PostgreSQL DELETE ... USING ...)
-                if let Some(using_twjs) = &delete.using {
-                    for twj in using_twjs {
+                if let Some(using_clauses) = &delete.using {
+                    for twj in using_clauses {
                         tables.extend(extract_tables_from_table_with_joins(twj));
                     }
                 }
 
                 let mut placeholder_counter = 0;
-                let (filters, subqueries) = if let Some(selection) = &delete.selection {
-                    extract_filters_from_expr(selection, &mut placeholder_counter)
-                } else {
-                    (Vec::new(), Vec::new())
+                let (filters, subqueries) = match &delete.selection {
+                    Some(expr) => extract_filters_from_expr(expr, &mut placeholder_counter),
+                    None => (Vec::new(), Vec::new()),
                 };
 
                 results.push(SqlQueryResult {
@@ -606,75 +594,78 @@ pub fn idor_analyze_sql(query: &str, dialect: i32) -> Result<Vec<SqlQueryResult>
                     insert_columns: None,
                 });
 
-                // Process subqueries found in WHERE clause
                 for subquery in subqueries {
-                    flatten_query(&subquery, &mut results, &mut placeholder_counter);
+                    let _ = flatten_query(&subquery, &mut results, &mut placeholder_counter);
                 }
             }
+
             Statement::Insert(insert) => {
                 let table = TableRef {
                     name: full_name(&insert.table_name),
                     alias: insert.table_alias.as_ref().map(|a| a.value.clone()),
                 };
-                let tables = vec![table];
-
                 let columns: Vec<String> = insert.columns.iter().map(|c| c.value.clone()).collect();
 
-                // Extract insert column-value pairs from VALUES rows
-                let insert_columns = if let Some(source) = &insert.source {
-                    if let SetExpr::Values(values) = source.body.as_ref() {
-                        let mut placeholder_counter = 0;
-                        let mut all_rows = Vec::new();
-                        for row in &values.rows {
-                            let mut row_columns = Vec::new();
-                            for (i, expr) in row.iter().enumerate() {
-                                if i < columns.len() {
-                                    let pn =
-                                        expr_placeholder_number(expr, &mut placeholder_counter);
-                                    row_columns.push(InsertColumn {
-                                        column: columns[i].clone(),
-                                        value: expr_value_str(expr),
-                                        placeholder_number: pn,
-                                    });
-                                }
-                            }
-                            all_rows.push(row_columns);
-                        }
-                        Some(all_rows)
-                    } else {
-                        // INSERT ... SELECT — no insert_columns
-                        None
-                    }
-                } else {
-                    None
-                };
+                let insert_columns = extract_insert_columns(&insert.source, &columns);
 
-                // For INSERT...SELECT, flatten the source query into separate
-                // select results (handling UNION/EXCEPT/INTERSECT), then append
-                // the insert entry.
                 if insert_columns.is_none() {
                     if let Some(source) = &insert.source {
                         let mut placeholder_counter = 0;
-                        flatten_query(source, &mut results, &mut placeholder_counter);
+                        let _ = flatten_query(source, &mut results, &mut placeholder_counter);
                     }
                 }
 
                 results.push(SqlQueryResult {
                     kind: "insert".into(),
-                    tables,
+                    tables: vec![table],
                     filters: Vec::new(),
                     insert_columns,
                 });
             }
+
             _ => {
-                return Err(format!(
-                    "Unsupported SQL statement type. Use withoutIdorProtection() to bypass the check."
-                ));
+                return Err(
+                    "Unsupported SQL statement type. Use withoutIdorProtection() to bypass the check.".to_string(),
+                );
             }
         }
     }
 
     Ok(results)
+}
+
+fn extract_insert_columns(
+    source: &Option<Box<Query>>,
+    columns: &[String],
+) -> Option<Vec<Vec<InsertColumn>>> {
+    let source = source.as_ref()?;
+    let values = match source.body.as_ref() {
+        SetExpr::Values(v) => v,
+        _ => return None,
+    };
+
+    let mut placeholder_counter = 0;
+    let rows = values
+        .rows
+        .iter()
+        .map(|row| {
+            row.iter()
+                .enumerate()
+                .filter_map(|(i, expr)| {
+                    if i >= columns.len() {
+                        return None;
+                    }
+                    Some(InsertColumn {
+                        column: columns[i].clone(),
+                        value: expr_value_str(expr),
+                        placeholder_number: expr_placeholder_number(expr, &mut placeholder_counter),
+                    })
+                })
+                .collect()
+        })
+        .collect();
+
+    Some(rows)
 }
 
 pub mod idor_analyze_sql_test;
