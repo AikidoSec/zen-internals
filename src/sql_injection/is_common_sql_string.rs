@@ -80,6 +80,12 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         return regex!(r"^[a-z_][a-z0-9_]* +(asc|desc)$").is_match(user_input);
     }
 
+    // For the following exemptions there is a consideration to be made that allowing this user input
+    // could mean an injection happens with a 2nd field. However this seems unlikely as that 2nd field
+    // is also subject to the same scans, so it would be having to use exemptions for both of the fields
+    // to cause an injection.
+    // example: SELECT * FROM users WHERE user_id = '${user id}' AND name = '${user_name}'
+
     // e.g. 'a or '1 or 'product-id-123
     if user_input.starts_with("'") && user_input.len() <= 200 && !user_input.contains("--") {
         if regex!(r"^'[a-z0-9-]+$").is_match(user_input) {
