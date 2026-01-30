@@ -108,9 +108,9 @@ fn analyze_update(
         tables.extend(extract_tables_from_table_with_joins(from_clause));
     }
 
-    let assignment_values: Vec<Expr> = assignments.iter().map(|a| a.value.clone()).collect();
-    let assignment_subqueries = extract_subqueries_from_exprs(&assignment_values);
-    let mut counter = count_placeholders_in_exprs(&assignment_values);
+    let assignment_exprs: Vec<&Expr> = assignments.iter().map(|a| &a.value).collect();
+    let assignment_subqueries = extract_subqueries_from_exprs(&assignment_exprs);
+    let mut counter = count_placeholders_in_exprs(&assignment_exprs);
 
     let (filters, subqueries) = match selection {
         Some(expr) => extract_filters_from_where(expr, &mut counter),
@@ -180,7 +180,7 @@ fn analyze_insert(
         name: object_name_to_string(&insert.table_name),
         alias: insert.table_alias.as_ref().map(|a| a.value.clone()),
     };
-    let columns: Vec<String> = insert.columns.iter().map(|c| c.value.clone()).collect();
+    let columns: Vec<&str> = insert.columns.iter().map(|c| c.value.as_str()).collect();
     let insert_columns = extract_insert_columns(&insert.source, &columns);
 
     // For INSERT ... SELECT, analyze the SELECT source
@@ -473,7 +473,7 @@ fn walk_expr(
     }
 }
 
-fn extract_subqueries_from_exprs(exprs: &[Expr]) -> Vec<Query> {
+fn extract_subqueries_from_exprs(exprs: &[&Expr]) -> Vec<Query> {
     let mut subqueries = Vec::new();
     for expr in exprs {
         if let Some(subquery) = extract_subquery(expr) {
@@ -483,7 +483,7 @@ fn extract_subqueries_from_exprs(exprs: &[Expr]) -> Vec<Query> {
     subqueries
 }
 
-fn count_placeholders_in_exprs(exprs: &[Expr]) -> usize {
+fn count_placeholders_in_exprs(exprs: &[&Expr]) -> usize {
     let mut count = 0;
     for expr in exprs {
         count_placeholders(expr, &mut count);
@@ -533,7 +533,7 @@ fn extract_tables_from_table_with_joins(twj: &TableWithJoins) -> Vec<TableRef> {
 
 fn extract_insert_columns(
     source: &Option<Box<Query>>,
-    columns: &[String],
+    columns: &[&str],
 ) -> Option<Vec<Vec<InsertColumn>>> {
     let source = source.as_ref()?;
     let values = match source.body.as_ref() {
@@ -562,7 +562,7 @@ fn extract_insert_columns(
                     };
 
                     Some(InsertColumn {
-                        column: columns[i].clone(),
+                        column: columns[i].to_string(),
                         value: expr_to_value_string(expr),
                         placeholder_number,
                     })
