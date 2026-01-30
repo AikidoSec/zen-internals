@@ -144,6 +144,7 @@ fn analyze_update(
     }
 
     let assignment_values: Vec<Expr> = assignments.iter().map(|a| a.value.clone()).collect();
+    let assignment_subqueries = extract_subqueries_from_exprs(&assignment_values);
     let mut counter = count_placeholders_in_exprs(&assignment_values);
 
     let (filters, subqueries) = match selection {
@@ -157,6 +158,10 @@ fn analyze_update(
         filters,
         insert_columns: None,
     });
+
+    for subquery in assignment_subqueries {
+        let _ = collect_selects(&subquery, results, &mut counter);
+    }
 
     for subquery in subqueries {
         let _ = collect_selects(&subquery, results, &mut counter);
@@ -489,6 +494,16 @@ fn walk_expr(
         }
         _ => {}
     }
+}
+
+fn extract_subqueries_from_exprs(exprs: &[Expr]) -> Vec<Query> {
+    let mut subqueries = Vec::new();
+    for expr in exprs {
+        if let Some(subquery) = extract_subquery(expr) {
+            subqueries.push(subquery.clone());
+        }
+    }
+    subqueries
 }
 
 fn count_placeholders_in_exprs(exprs: &[Expr]) -> usize {

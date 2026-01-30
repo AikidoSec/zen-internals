@@ -2657,6 +2657,97 @@ mod tests {
     }
 
     #[test]
+    fn test_select_with_having_clause() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT department, COUNT(*) FROM employees WHERE tenant_id = $1 GROUP BY department HAVING COUNT(*) > 5",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "employees".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_select_with_group_by() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT status, COUNT(*) FROM orders WHERE tenant_id = $1 GROUP BY status",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "orders".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_update_with_subquery_in_set() {
+        assert_eq!(
+            idor_analyze_sql(
+                "UPDATE users SET score = (SELECT AVG(score) FROM scores WHERE tenant_id = $1) WHERE id = $2",
+                9,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "update".into(),
+                    tables: vec![TableRef {
+                        name: "users".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "id".into(),
+                        value: "$2".into(),
+                        placeholder_number: None,
+                    }],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "scores".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                    }],
+                    insert_columns: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn test_delete_with_mysql_placeholder_in_nested_where() {
         assert_eq!(
             idor_analyze_sql("DELETE FROM users WHERE (tenant_id = ? AND status = ?)", 8,).unwrap(),
