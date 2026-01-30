@@ -2775,4 +2775,90 @@ mod tests {
             }]
         );
     }
+
+    #[test]
+    fn test_on_with_specific_value() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM orders o JOIN users u ON o.user_id = u.id AND u.tenant_id = 123",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "orders".into(),
+                        alias: Some("o".into()),
+                    },
+                    TableRef {
+                        name: "users".into(),
+                        alias: Some("u".into()),
+                    },
+                ],
+                filters: vec![FilterColumn {
+                    table: Some("u".into()),
+                    column: "tenant_id".into(),
+                    value: "123".into(),
+                    placeholder_number: None,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_multiple_subqueries_in_select_list() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT (SELECT name FROM orgs WHERE id = $1), (SELECT COUNT(*) FROM logs WHERE tenant_id = $2) FROM users WHERE id = $3",
+                9,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "users".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "id".into(),
+                        value: "$3".into(),
+                        placeholder_number: None,
+                    }],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "orgs".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                    }],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "logs".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "$2".into(),
+                        placeholder_number: None,
+                    }],
+                    insert_columns: None,
+                },
+            ]
+        );
+    }
 }

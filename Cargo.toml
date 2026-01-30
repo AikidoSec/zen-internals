@@ -11,8 +11,8 @@ name = "zen_internals"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-oxc = "0.72.0"
-oxc_ast_visit = "0.72.0"
+oxc = "0.111.0"
+oxc_ast_visit = "0.111.0"
 regex = { version = "1.12.2", default-features = false, features = ["std", "perf"] }
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.137"
@@ -40,4 +40,4 @@ members = [
 ]
 
 [package.metadata.wasm-pack.profile.release]
-wasm-opt = ["-O", "--enable-bulk-memory"]
+wasm-opt = ["-O", "--enable-bulk-memory", "--enable-nontrapping-float-to-int"]
