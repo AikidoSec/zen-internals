@@ -418,7 +418,7 @@ fn expr_to_value_string(expr: &Expr) -> String {
 fn object_name_to_string(name: &ObjectName) -> String {
     name.0
         .iter()
-        .map(|i| i.value.clone())
+        .map(|i| i.value.as_str())
         .collect::<Vec<_>>()
         .join(".")
 }
