@@ -79,13 +79,13 @@ fn analyze_statement(stmt: &Statement, results: &mut Vec<SqlQueryResult>) -> Res
                 from.as_ref(),
                 selection.as_ref(),
                 results,
-            );
+            )?;
         }
         Statement::Delete(delete) => {
-            analyze_delete(delete, results);
+            analyze_delete(delete, results)?;
         }
         Statement::Insert(insert) => {
-            analyze_insert(insert, results);
+            analyze_insert(insert, results)?;
         }
         _ => {
             return Err(
@@ -102,7 +102,7 @@ fn analyze_update(
     from: Option<&TableWithJoins>,
     selection: Option<&Expr>,
     results: &mut Vec<SqlQueryResult>,
-) {
+) -> Result<(), String> {
     let mut tables = extract_tables_from_table_with_joins(table);
     if let Some(from_clause) = from {
         tables.extend(extract_tables_from_table_with_joins(from_clause));
@@ -125,15 +125,20 @@ fn analyze_update(
     });
 
     for subquery in assignment_subqueries {
-        let _ = collect_selects(&subquery, results, &mut counter);
+        collect_selects(&subquery, results, &mut counter)?;
     }
 
     for subquery in subqueries {
-        let _ = collect_selects(&subquery, results, &mut counter);
+        collect_selects(&subquery, results, &mut counter)?;
     }
+
+    Ok(())
 }
 
-fn analyze_delete(delete: &sqlparser::ast::Delete, results: &mut Vec<SqlQueryResult>) {
+fn analyze_delete(
+    delete: &sqlparser::ast::Delete,
+    results: &mut Vec<SqlQueryResult>,
+) -> Result<(), String> {
     let mut tables: Vec<TableRef> = match &delete.from {
         FromTable::WithFromKeyword(twjs) | FromTable::WithoutKeyword(twjs) => twjs
             .iter()
@@ -161,11 +166,16 @@ fn analyze_delete(delete: &sqlparser::ast::Delete, results: &mut Vec<SqlQueryRes
     });
 
     for subquery in subqueries {
-        let _ = collect_selects(&subquery, results, &mut counter);
+        collect_selects(&subquery, results, &mut counter)?;
     }
+
+    Ok(())
 }
 
-fn analyze_insert(insert: &sqlparser::ast::Insert, results: &mut Vec<SqlQueryResult>) {
+fn analyze_insert(
+    insert: &sqlparser::ast::Insert,
+    results: &mut Vec<SqlQueryResult>,
+) -> Result<(), String> {
     let table = TableRef {
         name: object_name_to_string(&insert.table_name),
         alias: insert.table_alias.as_ref().map(|a| a.value.clone()),
@@ -177,7 +187,7 @@ fn analyze_insert(insert: &sqlparser::ast::Insert, results: &mut Vec<SqlQueryRes
     if insert_columns.is_none() {
         if let Some(source) = &insert.source {
             let mut counter = 0;
-            let _ = collect_selects(source, results, &mut counter);
+            collect_selects(source, results, &mut counter)?;
         }
     }
 
@@ -187,6 +197,8 @@ fn analyze_insert(insert: &sqlparser::ast::Insert, results: &mut Vec<SqlQueryRes
         filters: Vec::new(),
         insert_columns,
     });
+
+    Ok(())
 }
 
 /// Collects all SELECT queries, flattening UNIONs into separate results.
