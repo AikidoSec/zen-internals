@@ -12,6 +12,14 @@ const lib = Deno.dlopen(fullTargetDir, {
         parameters: ["pointer", "usize", "pointer", "usize", "i32"],
         result: "i32",
     },
+    idor_analyze_sql_ffi: {
+        parameters: ["pointer", "usize", "i32"],
+        result: "pointer",
+    },
+    free_string: {
+        parameters: ["pointer"],
+        result: "void",
+    },
 });
 
 function getBufferAndLength(str: string): [Deno.PointerValue, number] {
@@ -253,6 +261,40 @@ assertEquals(
         0
     ),
     1
+);
+
+// Test IDOR SQL analysis
+function callIdorAnalyzeSql(query: string, dialect: number): unknown {
+    const [queryPtr, queryLen] = getBufferAndLength(query);
+    const resultPtr = lib.symbols.idor_analyze_sql_ffi(queryPtr, queryLen, dialect);
+    const result = new Deno.UnsafePointerView(resultPtr!).getCString();
+    lib.symbols.free_string(resultPtr);
+    return JSON.parse(result);
+}
+
+assertEquals(
+    callIdorAnalyzeSql("SELECT * FROM users WHERE tenant_id = $1", 9),
+    [{ kind: "select", tables: [{ name: "users" }], filters: [{ column: "tenant_id", value: "$1" }] }]
+);
+
+assertEquals(
+    callIdorAnalyzeSql("INSERT INTO users (name, email) VALUES ('test', 'test@example.com')", 9),
+    [{ kind: "insert", tables: [{ name: "users" }], filters: [], insert_columns: [[{ column: "name", value: "test" }, { column: "email", value: "test@example.com" }]] }]
+);
+
+assertEquals(
+    callIdorAnalyzeSql("INVALID SQL QUERY", 9),
+    { error: "sql parser error: Expected: an SQL statement, found: INVALID at Line: 1, Column: 1" }
+);
+
+assertEquals(
+    (() => {
+        const resultPtr = lib.symbols.idor_analyze_sql_ffi(null, 0, 9);
+        const result = new Deno.UnsafePointerView(resultPtr!).getCString();
+        lib.symbols.free_string(resultPtr);
+        return JSON.parse(result);
+    })(),
+    { error: "Invalid query pointer or length" }
 );
 
 lib.close();

@@ -14,7 +14,11 @@ crate-type = ["cdylib", "rlib"]
 oxc = "0.111.0"
 oxc_ast_visit = "0.111.0"
 regex = { version = "1.12.2", default-features = false, features = ["std", "perf"] }
-sqlparser = { git = "https://github.com/AikidoSec/datafusion-sqlparser-rs.git", rev = "e003b3e2b541909cfe163e966972a8e0145bef75" }
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.137"
+sqlparser = { git = "https://github.com/AikidoSec/datafusion-sqlparser-rs.git", rev = "e003b3e2b541909cfe163e966972a8e0145bef75", features = ["visitor"] }
+js-sys = { version = "0.3.85", optional = true }
+serde-wasm-bindgen = { version = "0.6.5", optional = true }
 wasm-bindgen = { version = "0.2", optional = true }
 
 [profile.release]
@@ -30,7 +34,7 @@ codegen-units = 1
 [features]
 default = []
 benchmarking = []
-wasm-js = ["wasm-bindgen"]
+wasm-js = ["wasm-bindgen", "serde-wasm-bindgen", "js-sys"]
 
 [workspace]
 members = [

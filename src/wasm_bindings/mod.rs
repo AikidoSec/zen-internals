@@ -1,3 +1,4 @@
+use crate::idor::idor_analyze_sql::idor_analyze_sql;
 use crate::js_injection::detect_js_injection::detect_js_injection_str;
 use crate::sql_injection::detect_sql_injection::{detect_sql_injection_str, DetectionReason};
 use wasm_bindgen::prelude::*;
@@ -21,4 +22,16 @@ pub fn wasm_detect_sql_injection(query: &str, userinput: &str, dialect: i32) -> 
 #[wasm_bindgen]
 pub fn wasm_detect_js_injection(code: &str, userinput: &str, sourcetype: i32) -> bool {
     detect_js_injection_str(code, userinput, sourcetype)
+}
+
+#[wasm_bindgen]
+pub fn wasm_idor_analyze_sql(query: &str, dialect: i32) -> JsValue {
+    match idor_analyze_sql(query, dialect) {
+        Ok(selects) => serde_wasm_bindgen::to_value(&selects).unwrap_or(JsValue::NULL),
+        Err(e) => {
+            let obj = js_sys::Object::new();
+            let _ = js_sys::Reflect::set(&obj, &"error".into(), &e.into());
+            obj.into()
+        }
+    }
 }
