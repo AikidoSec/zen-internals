@@ -1,4 +1,4 @@
-use crate::idor::idor_analyze_sql;
+use crate::idor::idor_analyze_sql::idor_analyze_sql;
 use crate::js_injection::detect_js_injection::detect_js_injection_str;
 use crate::sql_injection::detect_sql_injection::{detect_sql_injection_str, DetectionReason};
 use std::ffi::CString;
