@@ -29,9 +29,9 @@ pub fn wasm_idor_analyze_sql(query: &str, dialect: i32) -> JsValue {
     match idor_analyze_sql(query, dialect) {
         Ok(selects) => serde_wasm_bindgen::to_value(&selects).unwrap_or(JsValue::NULL),
         Err(e) => {
-            let serializer = serde_wasm_bindgen::Serializer::json_compatible();
-            serde::Serialize::serialize(&serde_json::json!({"error": e}), &serializer)
-                .unwrap_or(JsValue::NULL)
+            let obj = js_sys::Object::new();
+            let _ = js_sys::Reflect::set(&obj, &"error".into(), &e.into());
+            obj.into()
         }
     }
 }
