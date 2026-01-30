@@ -56,9 +56,8 @@ const outputEl = document.getElementById('output');
 
 function run() {
   try {
-    const raw = wasm_idor_analyze_sql(queryEl.value, parseInt(dialectEl.value, 10));
-    const parsed = JSON.parse(raw);
-    outputEl.value = JSON.stringify(parsed, null, 2);
+    const result = wasm_idor_analyze_sql(queryEl.value, parseInt(dialectEl.value, 10));
+    outputEl.value = JSON.stringify(result, null, 2);
     outputEl.classList.remove('error');
   } catch (e) {
     outputEl.value = String(e);

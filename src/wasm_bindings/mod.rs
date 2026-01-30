@@ -25,11 +25,13 @@ pub fn wasm_detect_js_injection(code: &str, userinput: &str, sourcetype: i32) ->
 }
 
 #[wasm_bindgen]
-pub fn wasm_idor_analyze_sql(query: &str, dialect: i32) -> String {
+pub fn wasm_idor_analyze_sql(query: &str, dialect: i32) -> JsValue {
     match idor_analyze_sql(query, dialect) {
-        Ok(selects) => {
-            serde_json::to_string(&selects).unwrap_or_else(|e| format!(r#"{{"error":"{}"}}"#, e))
+        Ok(selects) => serde_wasm_bindgen::to_value(&selects).unwrap_or(JsValue::NULL),
+        Err(e) => {
+            let serializer = serde_wasm_bindgen::Serializer::json_compatible();
+            serde::Serialize::serialize(&serde_json::json!({"error": e}), &serializer)
+                .unwrap_or(JsValue::NULL)
         }
-        Err(e) => format!(r#"{{"error":"{}"}}"#, e),
     }
 }
