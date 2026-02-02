@@ -42,4 +42,4 @@ members = [
 ]
 
 [package.metadata.wasm-pack.profile.release]
-wasm-opt = ["-O", "--enable-bulk-memory", "--enable-nontrapping-float-to-int"]
+wasm-opt = ["-O", "--enable-bulk-memory", "--enable-sign-ext", "--enable-nontrapping-float-to-int"]
