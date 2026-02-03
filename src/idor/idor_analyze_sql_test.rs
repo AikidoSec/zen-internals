@@ -2862,4 +2862,21 @@ mod tests {
             ]
         );
     }
+
+    #[test]
+    fn test_transaction_statements_ignored() {
+        assert_eq!(idor_analyze_sql("START TRANSACTION;", 9).unwrap(), vec![]);
+        assert_eq!(idor_analyze_sql("BEGIN TRANSACTION;", 9).unwrap(), vec![]);
+        assert_eq!(idor_analyze_sql("COMMIT;", 9).unwrap(), vec![]);
+        assert_eq!(idor_analyze_sql("ROLLBACK;", 9).unwrap(), vec![]);
+        assert_eq!(idor_analyze_sql("SAVEPOINT sp1;", 9).unwrap(), vec![]);
+        assert_eq!(
+            idor_analyze_sql("SET TRANSACTION ISOLATION LEVEL READ COMMITTED;", 9).unwrap(),
+            vec![]
+        );
+        assert_eq!(
+            idor_analyze_sql("RELEASE SAVEPOINT sp1;", 9).unwrap(),
+            vec![]
+        );
+    }
 }
