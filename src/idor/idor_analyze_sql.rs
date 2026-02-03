@@ -87,6 +87,14 @@ fn analyze_statement(stmt: &Statement, results: &mut Vec<SqlQueryResult>) -> Res
         Statement::Insert(insert) => {
             analyze_insert(insert, results)?;
         }
+        Statement::Commit { .. }
+        | Statement::Rollback { .. }
+        | Statement::StartTransaction { .. }
+        | Statement::Savepoint { .. }
+        | Statement::SetTransaction { .. }
+        | Statement::ReleaseSavepoint { .. } => {
+            // Ignore safe transaction-related statements
+        }
         _ => {
             return Err(
                 "Unsupported SQL statement type: only SELECT, INSERT, UPDATE, and DELETE are supported".to_string()
