@@ -297,4 +297,10 @@ assertEquals(
     { error: "Invalid query pointer or length" }
 );
 
+// Test transaction-related queries
+assertEquals(
+    callIdorAnalyzeSql("COMMIT", 9),
+    []
+);
+
 lib.close();

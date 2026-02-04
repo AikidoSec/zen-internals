@@ -28,4 +28,9 @@ test("wasm_idor_analyze_sql", () => {
   internals.wasm_idor_analyze_sql("INVALID SQL QUERY", 9),
   { error: "sql parser error: Expected: an SQL statement, found: INVALID at Line: 1, Column: 1" }
  );
+ // Test transaction-related queries
+ deepStrictEqual(
+  internals.wasm_idor_analyze_sql("COMMIT", 9),
+  []
+ );
 });
