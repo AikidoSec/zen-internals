@@ -198,10 +198,8 @@ fn analyze_insert(
     counter: &mut usize,
     cte_names: &HashSet<String>,
 ) -> Result<(), String> {
-    let table_name = object_name_to_string(&insert.table_name);
-
     let table = TableRef {
-        name: table_name,
+        name: object_name_to_string(&insert.table_name),
         alias: insert.table_alias.as_ref().map(|a| a.value.clone()),
     };
     let columns: Vec<&str> = insert.columns.iter().map(|c| c.value.as_str()).collect();
