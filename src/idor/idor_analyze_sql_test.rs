@@ -1363,16 +1363,10 @@ mod tests {
                 },
                 SqlQueryResult {
                     kind: "update".into(),
-                    tables: vec![
-                        TableRef {
-                            name: "items".into(),
-                            alias: Some("i".into()),
-                        },
-                        TableRef {
-                            name: "selected".into(),
-                            alias: Some("s".into()),
-                        },
-                    ],
+                    tables: vec![TableRef {
+                        name: "items".into(),
+                        alias: Some("i".into()),
+                    }],
                     filters: vec![FilterColumn {
                         table: Some("i".into()),
                         column: "tenant_id".into(),
@@ -1405,10 +1399,7 @@ mod tests {
                 },
                 SqlQueryResult {
                     kind: "select".into(),
-                    tables: vec![TableRef {
-                        name: "selected".into(),
-                        alias: None,
-                    }],
+                    tables: vec![],
                     filters: vec![],
                     insert_columns: None,
                 },

@@ -80,13 +80,15 @@ fn analyze_statement(stmt: &Statement, results: &mut Vec<SqlQueryResult>) -> Res
                 from.as_ref(),
                 selection.as_ref(),
                 results,
+                &mut 0,
+                &HashSet::new(),
             )?;
         }
         Statement::Delete(delete) => {
-            analyze_delete(delete, results)?;
+            analyze_delete(delete, results, &mut 0, &HashSet::new())?;
         }
         Statement::Insert(insert) => {
-            analyze_insert(insert, results)?;
+            analyze_insert(insert, results, &mut 0, &HashSet::new())?;
         }
         Statement::Commit { .. }
         | Statement::Rollback { .. }
@@ -111,18 +113,23 @@ fn analyze_update(
     from: Option<&TableWithJoins>,
     selection: Option<&Expr>,
     results: &mut Vec<SqlQueryResult>,
+    counter: &mut usize,
+    cte_names: &HashSet<String>,
 ) -> Result<(), String> {
     let mut tables = extract_tables_from_table_with_joins(table);
     if let Some(from_clause) = from {
         tables.extend(extract_tables_from_table_with_joins(from_clause));
     }
 
+    // Filter out common table expression names
+    tables.retain(|t| !cte_names.contains(&t.name.to_lowercase()));
+
     let assignment_exprs: Vec<&Expr> = assignments.iter().map(|a| &a.value).collect();
     let assignment_subqueries = extract_subqueries_from_exprs(&assignment_exprs);
-    let mut counter = count_placeholders_in_exprs(&assignment_exprs);
+    *counter += count_placeholders_in_exprs(&assignment_exprs);
 
     let (filters, subqueries) = match selection {
-        Some(expr) => extract_filters_from_where(expr, &mut counter),
+        Some(expr) => extract_filters_from_where(expr, counter),
         None => (Vec::new(), Vec::new()),
     };
 
@@ -134,11 +141,11 @@ fn analyze_update(
     });
 
     for subquery in assignment_subqueries {
-        collect_selects(&subquery, results, &mut counter)?;
+        collect_selects_with_exclusions(&subquery, results, counter, cte_names)?;
     }
 
     for subquery in subqueries {
-        collect_selects(&subquery, results, &mut counter)?;
+        collect_selects_with_exclusions(&subquery, results, counter, cte_names)?;
     }
 
     Ok(())
@@ -147,6 +154,8 @@ fn analyze_update(
 fn analyze_delete(
     delete: &sqlparser::ast::Delete,
     results: &mut Vec<SqlQueryResult>,
+    counter: &mut usize,
+    cte_names: &HashSet<String>,
 ) -> Result<(), String> {
     let mut tables: Vec<TableRef> = match &delete.from {
         FromTable::WithFromKeyword(twjs) | FromTable::WithoutKeyword(twjs) => twjs
@@ -161,9 +170,11 @@ fn analyze_delete(
         }
     }
 
-    let mut counter = 0;
+    // Filter out common table expression names
+    tables.retain(|t| !cte_names.contains(&t.name.to_lowercase()));
+
     let (filters, subqueries) = match &delete.selection {
-        Some(expr) => extract_filters_from_where(expr, &mut counter),
+        Some(expr) => extract_filters_from_where(expr, counter),
         None => (Vec::new(), Vec::new()),
     };
 
@@ -175,7 +186,7 @@ fn analyze_delete(
     });
 
     for subquery in subqueries {
-        collect_selects(&subquery, results, &mut counter)?;
+        collect_selects_with_exclusions(&subquery, results, counter, cte_names)?;
     }
 
     Ok(())
@@ -184,9 +195,18 @@ fn analyze_delete(
 fn analyze_insert(
     insert: &sqlparser::ast::Insert,
     results: &mut Vec<SqlQueryResult>,
+    counter: &mut usize,
+    cte_names: &HashSet<String>,
 ) -> Result<(), String> {
+    let table_name = object_name_to_string(&insert.table_name);
+
+    // Skip if inserting into a common table expression name
+    if cte_names.contains(&table_name.to_lowercase()) {
+        return Ok(());
+    }
+
     let table = TableRef {
-        name: object_name_to_string(&insert.table_name),
+        name: table_name,
         alias: insert.table_alias.as_ref().map(|a| a.value.clone()),
     };
     let columns: Vec<&str> = insert.columns.iter().map(|c| c.value.as_str()).collect();
@@ -195,8 +215,7 @@ fn analyze_insert(
     // For INSERT ... SELECT, analyze the SELECT source
     if insert_columns.is_none() {
         if let Some(source) = &insert.source {
-            let mut counter = 0;
-            collect_selects(source, results, &mut counter)?;
+            collect_selects_with_exclusions(source, results, counter, cte_names)?;
         }
     }
 
@@ -271,6 +290,31 @@ fn collect_selects_recursive(
         SetExpr::Query(query) => {
             // Nested query may have its own common table expressions
             collect_selects_with_exclusions(query, results, counter, cte_names)?;
+        }
+        SetExpr::Update(stmt) => {
+            if let Statement::Update {
+                table,
+                assignments,
+                from,
+                selection,
+                ..
+            } = stmt
+            {
+                analyze_update(
+                    table,
+                    assignments,
+                    from.as_ref(),
+                    selection.as_ref(),
+                    results,
+                    counter,
+                    cte_names,
+                )?;
+            }
+        }
+        SetExpr::Insert(stmt) => {
+            if let Statement::Insert(insert) = stmt {
+                analyze_insert(insert, results, counter, cte_names)?;
+            }
         }
         _ => {
             visit_select(set_expr, results, counter, cte_names)?;
