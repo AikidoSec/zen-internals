@@ -32,6 +32,15 @@ fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
+    group.bench_function("update", |b| {
+        b.iter(|| {
+            idor_analyze_sql(
+                black_box("UPDATE users SET name = $1 WHERE tenant_id = $2"),
+                black_box(9),
+            )
+        })
+    });
+
     group.bench_function("cte_with_multiple_queries", |b| {
         b.iter(|| {
             idor_analyze_sql(
