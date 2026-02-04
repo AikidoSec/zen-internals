@@ -14,3 +14,7 @@ harness = false
 [[bench]]
 name = "js_injection"
 harness = false
+
+[[bench]]
+name = "idor_analysis"
+harness = false
