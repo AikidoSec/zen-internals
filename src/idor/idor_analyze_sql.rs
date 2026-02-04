@@ -65,7 +65,7 @@ fn analyze_statement(stmt: &Statement, results: &mut Vec<SqlQueryResult>) -> Res
     match stmt {
         Statement::Query(query) => {
             let mut counter = 0;
-            collect_selects(query, results, &mut counter)?;
+            analyze_query(query, results, &mut counter)?;
         }
         Statement::Update {
             table,
@@ -141,11 +141,11 @@ fn analyze_update(
     });
 
     for subquery in assignment_subqueries {
-        collect_selects_with_exclusions(&subquery, results, counter, cte_names)?;
+        analyze_query_with_ctes(&subquery, results, counter, cte_names)?;
     }
 
     for subquery in subqueries {
-        collect_selects_with_exclusions(&subquery, results, counter, cte_names)?;
+        analyze_query_with_ctes(&subquery, results, counter, cte_names)?;
     }
 
     Ok(())
@@ -186,7 +186,7 @@ fn analyze_delete(
     });
 
     for subquery in subqueries {
-        collect_selects_with_exclusions(&subquery, results, counter, cte_names)?;
+        analyze_query_with_ctes(&subquery, results, counter, cte_names)?;
     }
 
     Ok(())
@@ -215,7 +215,7 @@ fn analyze_insert(
     // For INSERT ... SELECT, analyze the SELECT source
     if insert_columns.is_none() {
         if let Some(source) = &insert.source {
-            collect_selects_with_exclusions(source, results, counter, cte_names)?;
+            analyze_query_with_ctes(source, results, counter, cte_names)?;
         }
     }
 
@@ -229,7 +229,10 @@ fn analyze_insert(
     Ok(())
 }
 
-/// Collects all SELECT queries, flattening UNIONs into separate results.
+/// Analyzes a Query AST node, extracting all query parts into results.
+///
+/// Handles SELECT, UPDATE, and INSERT statements (including those inside WITH clauses).
+/// UNIONs are flattened: each side becomes a separate result.
 ///
 /// For example, this UNION:
 ///   SELECT * FROM users WHERE tenant_id = $1
@@ -239,25 +242,24 @@ fn analyze_insert(
 /// Produces two SqlQueryResult entries (users, admins) so each branch
 /// can be independently checked for tenant filtering.
 ///
-/// CTEs (WITH clauses) are handled by:
-/// 1. Analyzing each CTE's body to extract tables and filters from base tables
-/// 2. Tracking CTE names so they're excluded when collecting tables from the main query
-///    (CTE names are virtual tables, not real tables that need tenant filtering)
-fn collect_selects(
+/// Common table expressions (WITH clauses) are handled by:
+/// 1. Analyzing each common table expression's body to extract tables and filters
+/// 2. Tracking common table expression names so they're excluded when collecting tables
+///    (common table expression names are virtual tables, not real tables)
+fn analyze_query(
     query: &Query,
     results: &mut Vec<SqlQueryResult>,
     counter: &mut usize,
 ) -> Result<(), String> {
-    collect_selects_with_exclusions(query, results, counter, &HashSet::new())
+    analyze_query_with_ctes(query, results, counter, &HashSet::new())
 }
 
-fn collect_selects_with_exclusions(
+fn analyze_query_with_ctes(
     query: &Query,
     results: &mut Vec<SqlQueryResult>,
     counter: &mut usize,
     parent_cte_names: &HashSet<String>,
 ) -> Result<(), String> {
-    // Build a set of common table expression names to exclude from table collection
     let mut cte_names = parent_cte_names.clone();
 
     if let Some(with) = &query.with {
@@ -268,15 +270,14 @@ fn collect_selects_with_exclusions(
 
         // Second pass: analyze each common table expression's body
         for cte in &with.cte_tables {
-            collect_selects_with_exclusions(&cte.query, results, counter, &cte_names)?;
+            analyze_query_with_ctes(&cte.query, results, counter, &cte_names)?;
         }
     }
 
-    // Analyze main query body, excluding common table expression names from tables
-    collect_selects_recursive(&query.body, results, counter, &cte_names)
+    analyze_set_expr(&query.body, results, counter, &cte_names)
 }
 
-fn collect_selects_recursive(
+fn analyze_set_expr(
     set_expr: &SetExpr,
     results: &mut Vec<SqlQueryResult>,
     counter: &mut usize,
@@ -284,12 +285,12 @@ fn collect_selects_recursive(
 ) -> Result<(), String> {
     match set_expr {
         SetExpr::SetOperation { left, right, .. } => {
-            collect_selects_recursive(left, results, counter, cte_names)?;
-            collect_selects_recursive(right, results, counter, cte_names)?;
+            analyze_set_expr(left, results, counter, cte_names)?;
+            analyze_set_expr(right, results, counter, cte_names)?;
         }
         SetExpr::Query(query) => {
             // Nested query may have its own common table expressions
-            collect_selects_with_exclusions(query, results, counter, cte_names)?;
+            analyze_query_with_ctes(query, results, counter, cte_names)?;
         }
         SetExpr::Update(stmt) => {
             if let Statement::Update {
@@ -341,7 +342,7 @@ fn visit_select(
     });
 
     for subquery in visitor.subqueries {
-        collect_selects_with_exclusions(&subquery, results, counter, cte_names)?;
+        analyze_query_with_ctes(&subquery, results, counter, cte_names)?;
     }
     Ok(())
 }
@@ -357,18 +358,18 @@ struct SelectVisitor {
     /// Incremented when entering a subquery, decremented when leaving.
     skip_depth: usize,
     /// Common table expression names to skip when collecting tables (virtual tables, not real ones)
-    cte_table_names: HashSet<String>,
+    cte_names: HashSet<String>,
 }
 
 impl SelectVisitor {
-    fn new(initial_placeholder_count: usize, cte_table_names: HashSet<String>) -> Self {
+    fn new(initial_placeholder_count: usize, cte_names: HashSet<String>) -> Self {
         Self {
             tables: Vec::new(),
             filters: Vec::new(),
             placeholder_counter: initial_placeholder_count,
             subqueries: Vec::new(),
             skip_depth: 0,
-            cte_table_names,
+            cte_names,
         }
     }
 }
@@ -381,7 +382,7 @@ impl Visitor for SelectVisitor {
             TableFactor::Table { name, alias, .. } if self.skip_depth == 0 => {
                 let table_name = object_name_to_string(name);
                 // Skip common table expression references (virtual tables, not real ones)
-                if !self.cte_table_names.contains(&table_name.to_lowercase()) {
+                if !self.cte_names.contains(&table_name.to_lowercase()) {
                     self.tables.push(TableRef {
                         name: table_name,
                         alias: alias.as_ref().map(|a| a.name.value.clone()),
