@@ -1322,6 +1322,107 @@ mod tests {
     }
 
     #[test]
+    fn test_cte_with_update_and_subquery() {
+        assert_eq!(
+            idor_analyze_sql(
+                r#"WITH selected AS (
+                    SELECT id FROM items WHERE project_id = $1 AND tenant_id = $2 ORDER BY priority ASC LIMIT 1
+                ),
+                upd_item AS (
+                    UPDATE items i SET status = 'active' FROM selected s WHERE i.id = s.id AND i.tenant_id = $2 RETURNING i.*
+                ),
+                upd_worker AS (
+                    UPDATE workers w SET item_id = (SELECT id FROM selected) WHERE w.id = $3 AND w.tenant_id = $2 RETURNING w.*
+                )
+                SELECT upd_worker.* FROM upd_worker"#,
+                9,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "items".into(),
+                        alias: None,
+                    }],
+                    filters: vec![
+                        FilterColumn {
+                            table: None,
+                            column: "project_id".into(),
+                            value: "$1".into(),
+                            placeholder_number: None,
+                        },
+                        FilterColumn {
+                            table: None,
+                            column: "tenant_id".into(),
+                            value: "$2".into(),
+                            placeholder_number: None,
+                        },
+                    ],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "update".into(),
+                    tables: vec![
+                        TableRef {
+                            name: "items".into(),
+                            alias: Some("i".into()),
+                        },
+                        TableRef {
+                            name: "selected".into(),
+                            alias: Some("s".into()),
+                        },
+                    ],
+                    filters: vec![FilterColumn {
+                        table: Some("i".into()),
+                        column: "tenant_id".into(),
+                        value: "$2".into(),
+                        placeholder_number: None,
+                    }],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "update".into(),
+                    tables: vec![TableRef {
+                        name: "workers".into(),
+                        alias: Some("w".into()),
+                    }],
+                    filters: vec![
+                        FilterColumn {
+                            table: Some("w".into()),
+                            column: "id".into(),
+                            value: "$3".into(),
+                            placeholder_number: None,
+                        },
+                        FilterColumn {
+                            table: Some("w".into()),
+                            column: "tenant_id".into(),
+                            value: "$2".into(),
+                            placeholder_number: None,
+                        },
+                    ],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "selected".into(),
+                        alias: None,
+                    }],
+                    filters: vec![],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![],
+                    filters: vec![],
+                    insert_columns: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn test_subquery_in_where_in() {
         assert_eq!(
             idor_analyze_sql(
