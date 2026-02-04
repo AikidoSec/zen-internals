@@ -1322,6 +1322,49 @@ mod tests {
     }
 
     #[test]
+    fn test_cte_insert_into_real_table_with_same_name_as_cte() {
+        // Always track INSERT even if table name matches CTE - safer to over-report than miss real inserts
+        assert_eq!(
+            idor_analyze_sql(
+                "WITH users AS (SELECT * FROM admins) INSERT INTO users (name, tenant_id) VALUES ('test', $1)",
+                9,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "admins".into(),
+                        alias: None,
+                    }],
+                    filters: vec![],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "insert".into(),
+                    tables: vec![TableRef {
+                        name: "users".into(),
+                        alias: None,
+                    }],
+                    filters: vec![],
+                    insert_columns: Some(vec![vec![
+                        InsertColumn {
+                            column: "name".into(),
+                            value: "test".into(),
+                            placeholder_number: None,
+                        },
+                        InsertColumn {
+                            column: "tenant_id".into(),
+                            value: "$1".into(),
+                            placeholder_number: None,
+                        },
+                    ]]),
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn test_cte_with_update_and_subquery() {
         assert_eq!(
             idor_analyze_sql(

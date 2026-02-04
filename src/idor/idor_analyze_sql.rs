@@ -200,11 +200,6 @@ fn analyze_insert(
 ) -> Result<(), String> {
     let table_name = object_name_to_string(&insert.table_name);
 
-    // Skip if inserting into a common table expression name
-    if cte_names.contains(&table_name.to_lowercase()) {
-        return Ok(());
-    }
-
     let table = TableRef {
         name: table_name,
         alias: insert.table_alias.as_ref().map(|a| a.value.clone()),
