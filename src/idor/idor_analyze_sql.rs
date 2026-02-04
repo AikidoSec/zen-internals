@@ -229,23 +229,13 @@ fn analyze_insert(
     Ok(())
 }
 
-/// Analyzes a Query AST node, extracting all query parts into results.
+/// Analyzes a Query AST node, producing a SqlQueryResult for each query part.
 ///
-/// Handles SELECT, UPDATE, and INSERT statements (including those inside WITH clauses).
-/// UNIONs are flattened: each side becomes a separate result.
+/// Example: `SELECT * FROM users UNION SELECT * FROM admins`
+/// produces two results (one for users, one for admins).
 ///
-/// For example, this UNION:
-///   SELECT * FROM users WHERE tenant_id = $1
-///   UNION
-///   SELECT * FROM admins WHERE tenant_id = $2
-///
-/// Produces two SqlQueryResult entries (users, admins) so each branch
-/// can be independently checked for tenant filtering.
-///
-/// Common table expressions (WITH clauses) are handled by:
-/// 1. Analyzing each common table expression's body to extract tables and filters
-/// 2. Tracking common table expression names so they're excluded when collecting tables
-///    (common table expression names are virtual tables, not real tables)
+/// Example: `WITH active AS (SELECT * FROM users) SELECT * FROM active`
+/// produces one result for users (the common table expression name "active" is excluded).
 fn analyze_query(
     query: &Query,
     results: &mut Vec<SqlQueryResult>,
