@@ -6,6 +6,7 @@ use sqlparser::ast::{
     TableWithJoins, Value, Visit, Visitor,
 };
 use sqlparser::parser::Parser;
+use std::collections::HashSet;
 
 /// Analyzes a SQL query for IDOR (Insecure Direct Object Reference) protection.
 ///
@@ -218,32 +219,61 @@ fn analyze_insert(
 ///
 /// Produces two SqlQueryResult entries (users, admins) so each branch
 /// can be independently checked for tenant filtering.
+///
+/// CTEs (WITH clauses) are handled by:
+/// 1. Analyzing each CTE's body to extract tables and filters from base tables
+/// 2. Tracking CTE names so they're excluded when collecting tables from the main query
+///    (CTE names are virtual tables, not real tables that need tenant filtering)
 fn collect_selects(
     query: &Query,
     results: &mut Vec<SqlQueryResult>,
     counter: &mut usize,
 ) -> Result<(), String> {
-    if query.with.is_some() {
-        return Err("CTEs (WITH clauses) are not supported yet".to_string());
+    collect_selects_with_exclusions(query, results, counter, &HashSet::new())
+}
+
+fn collect_selects_with_exclusions(
+    query: &Query,
+    results: &mut Vec<SqlQueryResult>,
+    counter: &mut usize,
+    parent_cte_names: &HashSet<String>,
+) -> Result<(), String> {
+    // Build a set of common table expression names to exclude from table collection
+    let mut cte_names = parent_cte_names.clone();
+
+    if let Some(with) = &query.with {
+        // First pass: collect all names (needed when one references another)
+        for cte in &with.cte_tables {
+            cte_names.insert(cte.alias.name.value.to_lowercase());
+        }
+
+        // Second pass: analyze each common table expression's body
+        for cte in &with.cte_tables {
+            collect_selects_with_exclusions(&cte.query, results, counter, &cte_names)?;
+        }
     }
-    collect_selects_recursive(&query.body, results, counter)
+
+    // Analyze main query body, excluding common table expression names from tables
+    collect_selects_recursive(&query.body, results, counter, &cte_names)
 }
 
 fn collect_selects_recursive(
     set_expr: &SetExpr,
     results: &mut Vec<SqlQueryResult>,
     counter: &mut usize,
+    cte_names: &HashSet<String>,
 ) -> Result<(), String> {
     match set_expr {
         SetExpr::SetOperation { left, right, .. } => {
-            collect_selects_recursive(left, results, counter)?;
-            collect_selects_recursive(right, results, counter)?;
+            collect_selects_recursive(left, results, counter, cte_names)?;
+            collect_selects_recursive(right, results, counter, cte_names)?;
         }
         SetExpr::Query(query) => {
-            collect_selects_recursive(&query.body, results, counter)?;
+            // Nested query may have its own common table expressions
+            collect_selects_with_exclusions(query, results, counter, cte_names)?;
         }
         _ => {
-            visit_select(set_expr, results, counter)?;
+            visit_select(set_expr, results, counter, cte_names)?;
         }
     }
     Ok(())
@@ -253,8 +283,9 @@ fn visit_select(
     set_expr: &SetExpr,
     results: &mut Vec<SqlQueryResult>,
     counter: &mut usize,
+    cte_names: &HashSet<String>,
 ) -> Result<(), String> {
-    let mut visitor = SelectVisitor::new(*counter);
+    let mut visitor = SelectVisitor::new(*counter, cte_names.clone());
     let _ = set_expr.visit(&mut visitor);
     *counter = visitor.placeholder_counter;
 
@@ -266,7 +297,7 @@ fn visit_select(
     });
 
     for subquery in visitor.subqueries {
-        collect_selects(&subquery, results, counter)?;
+        collect_selects_with_exclusions(&subquery, results, counter, cte_names)?;
     }
     Ok(())
 }
@@ -281,16 +312,19 @@ struct SelectVisitor {
     /// process subqueries separately (they're stored in `subqueries` for later processing).
     /// Incremented when entering a subquery, decremented when leaving.
     skip_depth: usize,
+    /// Common table expression names to skip when collecting tables (virtual tables, not real ones)
+    cte_table_names: HashSet<String>,
 }
 
 impl SelectVisitor {
-    fn new(initial_placeholder_count: usize) -> Self {
+    fn new(initial_placeholder_count: usize, cte_table_names: HashSet<String>) -> Self {
         Self {
             tables: Vec::new(),
             filters: Vec::new(),
             placeholder_counter: initial_placeholder_count,
             subqueries: Vec::new(),
             skip_depth: 0,
+            cte_table_names,
         }
     }
 }
@@ -301,10 +335,14 @@ impl Visitor for SelectVisitor {
     fn pre_visit_table_factor(&mut self, table_factor: &TableFactor) -> ControlFlow<Self::Break> {
         match table_factor {
             TableFactor::Table { name, alias, .. } if self.skip_depth == 0 => {
-                self.tables.push(TableRef {
-                    name: object_name_to_string(name),
-                    alias: alias.as_ref().map(|a| a.name.value.clone()),
-                });
+                let table_name = object_name_to_string(name);
+                // Skip common table expression references (virtual tables, not real ones)
+                if !self.cte_table_names.contains(&table_name.to_lowercase()) {
+                    self.tables.push(TableRef {
+                        name: table_name,
+                        alias: alias.as_ref().map(|a| a.name.value.clone()),
+                    });
+                }
             }
             TableFactor::Derived {
                 lateral: true,
