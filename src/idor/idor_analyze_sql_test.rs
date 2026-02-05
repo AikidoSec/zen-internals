@@ -1072,20 +1072,388 @@ mod tests {
     }
 
     #[test]
-    fn test_cte_not_supported_yet() {
-        // TODO: CTE support not implemented yet. Example queries for future implementation:
-        // - "WITH active AS (SELECT * FROM users WHERE tenant_id = $1) SELECT * FROM active WHERE status = 'active'"
-        // - "WITH u AS (SELECT * FROM users WHERE tenant_id = $1), o AS (SELECT * FROM orders WHERE tenant_id = $2) SELECT * FROM u JOIN o ON o.user_id = u.id"
-        // - "WITH RECURSIVE tree AS (SELECT * FROM categories WHERE id = $1 UNION ALL SELECT c.* FROM categories c JOIN tree t ON c.parent_id = t.id) SELECT * FROM tree"
-        // - "WITH a AS (SELECT * FROM users WHERE tenant_id = $1), b AS (SELECT * FROM a WHERE status = 'active') SELECT * FROM b"
-        // - "WITH cte AS (SELECT * FROM users WHERE tenant_id = $1) SELECT * FROM orders WHERE tenant_id = $2"
-        // - "WITH active_users AS (SELECT * FROM users WHERE tenant_id = $1) SELECT * FROM active_users au JOIN orders o ON o.user_id = au.id WHERE o.tenant_id = $2"
-        // - "WITH cte AS (SELECT * FROM users WHERE tenant_id = $1) INSERT INTO archive SELECT * FROM cte"
-        assert!(idor_analyze_sql(
-            "WITH active AS (SELECT * FROM users WHERE tenant_id = $1) SELECT * FROM active",
-            9,
-        )
-        .is_err());
+    fn test_cte_simple() {
+        assert_eq!(
+            idor_analyze_sql(
+                "WITH active AS (SELECT * FROM users WHERE tenant_id = $1) SELECT * FROM active WHERE status = 'active'",
+                9,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "users".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                    }],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "status".into(),
+                        value: "active".into(),
+                        placeholder_number: None,
+                    }],
+                    insert_columns: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_cte_multiple() {
+        assert_eq!(
+            idor_analyze_sql(
+                "WITH u AS (SELECT * FROM users WHERE tenant_id = $1), o AS (SELECT * FROM orders WHERE tenant_id = $2) SELECT * FROM u JOIN o ON o.user_id = u.id",
+                9,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "users".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                    }],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "orders".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "$2".into(),
+                        placeholder_number: None,
+                    }],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![],
+                    filters: vec![],
+                    insert_columns: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_cte_with_real_table_in_main_query() {
+        assert_eq!(
+            idor_analyze_sql(
+                "WITH active_users AS (SELECT * FROM users WHERE tenant_id = $1) SELECT * FROM active_users au JOIN orders o ON o.user_id = au.id WHERE o.tenant_id = $2",
+                9,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "users".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                    }],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "orders".into(),
+                        alias: Some("o".into()),
+                    }],
+                    filters: vec![FilterColumn {
+                        table: Some("o".into()),
+                        column: "tenant_id".into(),
+                        value: "$2".into(),
+                        placeholder_number: None,
+                    }],
+                    insert_columns: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_cte_referencing_another_cte() {
+        assert_eq!(
+            idor_analyze_sql(
+                "WITH a AS (SELECT * FROM users WHERE tenant_id = $1), b AS (SELECT * FROM a WHERE status = 'active') SELECT * FROM b",
+                9,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "users".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                    }],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "status".into(),
+                        value: "active".into(),
+                        placeholder_number: None,
+                    }],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![],
+                    filters: vec![],
+                    insert_columns: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_cte_recursive_with_self_reference() {
+        assert_eq!(
+            idor_analyze_sql(
+                "WITH RECURSIVE tree AS (SELECT * FROM categories WHERE tenant_id = $1 UNION ALL SELECT c.* FROM categories c JOIN tree t ON c.parent_id = t.id WHERE c.tenant_id = $1) SELECT * FROM tree",
+                9,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "categories".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                    }],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "categories".into(),
+                        alias: Some("c".into()),
+                    }],
+                    filters: vec![FilterColumn {
+                        table: Some("c".into()),
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                    }],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![],
+                    filters: vec![],
+                    insert_columns: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_cte_name_case_insensitive() {
+        assert_eq!(
+            idor_analyze_sql(
+                "WITH Active AS (SELECT * FROM users WHERE tenant_id = $1) SELECT * FROM ACTIVE",
+                9,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "users".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                    }],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![],
+                    filters: vec![],
+                    insert_columns: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_cte_insert_into_real_table_with_same_name_as_cte() {
+        // Always track INSERT even if table name matches CTE - safer to over-report than miss real inserts
+        assert_eq!(
+            idor_analyze_sql(
+                "WITH users AS (SELECT * FROM admins) INSERT INTO users (name, tenant_id) VALUES ('test', $1)",
+                9,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "admins".into(),
+                        alias: None,
+                    }],
+                    filters: vec![],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "insert".into(),
+                    tables: vec![TableRef {
+                        name: "users".into(),
+                        alias: None,
+                    }],
+                    filters: vec![],
+                    insert_columns: Some(vec![vec![
+                        InsertColumn {
+                            column: "name".into(),
+                            value: "test".into(),
+                            placeholder_number: None,
+                        },
+                        InsertColumn {
+                            column: "tenant_id".into(),
+                            value: "$1".into(),
+                            placeholder_number: None,
+                        },
+                    ]]),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_cte_with_update_and_subquery() {
+        assert_eq!(
+            idor_analyze_sql(
+                r#"WITH selected AS (
+                    SELECT id FROM items WHERE project_id = $1 AND tenant_id = $2 ORDER BY priority ASC LIMIT 1
+                ),
+                upd_item AS (
+                    UPDATE items i SET status = 'active' FROM selected s WHERE i.id = s.id AND i.tenant_id = $2 RETURNING i.*
+                ),
+                upd_worker AS (
+                    UPDATE workers w SET item_id = (SELECT id FROM selected) WHERE w.id = $3 AND w.tenant_id = $2 RETURNING w.*
+                )
+                SELECT upd_worker.* FROM upd_worker"#,
+                9,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "items".into(),
+                        alias: None,
+                    }],
+                    filters: vec![
+                        FilterColumn {
+                            table: None,
+                            column: "project_id".into(),
+                            value: "$1".into(),
+                            placeholder_number: None,
+                        },
+                        FilterColumn {
+                            table: None,
+                            column: "tenant_id".into(),
+                            value: "$2".into(),
+                            placeholder_number: None,
+                        },
+                    ],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "update".into(),
+                    tables: vec![TableRef {
+                        name: "items".into(),
+                        alias: Some("i".into()),
+                    }],
+                    filters: vec![FilterColumn {
+                        table: Some("i".into()),
+                        column: "tenant_id".into(),
+                        value: "$2".into(),
+                        placeholder_number: None,
+                    }],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "update".into(),
+                    tables: vec![TableRef {
+                        name: "workers".into(),
+                        alias: Some("w".into()),
+                    }],
+                    filters: vec![
+                        FilterColumn {
+                            table: Some("w".into()),
+                            column: "id".into(),
+                            value: "$3".into(),
+                            placeholder_number: None,
+                        },
+                        FilterColumn {
+                            table: Some("w".into()),
+                            column: "tenant_id".into(),
+                            value: "$2".into(),
+                            placeholder_number: None,
+                        },
+                    ],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![],
+                    filters: vec![],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![],
+                    filters: vec![],
+                    insert_columns: None,
+                },
+            ]
+        );
     }
 
     #[test]
