@@ -95,13 +95,45 @@ fn analyze_statement(stmt: &Statement, results: &mut Vec<SqlQueryResult>) -> Res
         | Statement::StartTransaction { .. }
         | Statement::Savepoint { .. }
         | Statement::SetTransaction { .. }
-        | Statement::ReleaseSavepoint { .. } => {
-            // Ignore safe transaction-related statements
-        }
+        | Statement::ReleaseSavepoint { .. }
+        | Statement::CreateTable { .. }
+        | Statement::AlterTable { .. }
+        | Statement::Drop { .. }
+        | Statement::CreateIndex { .. }
+        | Statement::CreateView { .. }
+        | Statement::AlterView { .. }
+        | Statement::CreateSchema { .. }
+        | Statement::CreateDatabase { .. }
+        | Statement::CreateFunction { .. }
+        | Statement::CreateProcedure { .. }
+        | Statement::CreateTrigger { .. }
+        | Statement::CreateSequence { .. }
+        | Statement::CreateExtension { .. }
+        | Statement::DropFunction { .. }
+        | Statement::DropProcedure { .. }
+        | Statement::DropTrigger { .. }
+        | Statement::Truncate { .. }
+        | Statement::Grant { .. }
+        | Statement::Revoke { .. }
+        | Statement::SetVariable { .. }
+        | Statement::SetNames { .. }
+        | Statement::SetNamesDefault { .. }
+        | Statement::SetTimeZone { .. }
+        | Statement::SetRole { .. }
+        | Statement::ShowVariable { .. }
+        | Statement::ShowStatus { .. }
+        | Statement::ShowVariables { .. }
+        | Statement::ShowCreate { .. }
+        | Statement::ShowColumns { .. }
+        | Statement::ShowTables { .. }
+        | Statement::ShowCollation { .. }
+        | Statement::Use { .. }
+        | Statement::ExplainTable { .. }
+        | Statement::Explain { .. }
+        | Statement::Fetch { .. }
+        | Statement::Close { .. } => {}
         _ => {
-            return Err(
-                "Unsupported SQL statement type: only SELECT, INSERT, UPDATE, and DELETE are supported".to_string()
-            );
+            return Err("Unrecognized SQL statement".to_string());
         }
     }
     Ok(())
