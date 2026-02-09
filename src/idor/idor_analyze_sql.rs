@@ -571,9 +571,9 @@ fn walk_expr(
 
     match expr {
         Expr::BinaryOp { left, op, right } => {
-            let child_in_or = in_or || *op == BinaryOperator::Or;
-            walk_expr(left, counter, filters, subqueries, child_in_or);
-            walk_expr(right, counter, filters, subqueries, child_in_or);
+            let in_or = in_or || *op == BinaryOperator::Or;
+            walk_expr(left, counter, filters, subqueries, in_or);
+            walk_expr(right, counter, filters, subqueries, in_or);
         }
         Expr::Nested(inner) => {
             walk_expr(inner, counter, filters, subqueries, in_or);
