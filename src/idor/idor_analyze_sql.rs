@@ -372,6 +372,10 @@ struct SelectVisitor {
     /// process subqueries separately (they're stored in `subqueries` for later processing).
     /// Incremented when entering a subquery, decremented when leaving.
     skip_depth: usize,
+    /// Tracks nesting depth inside OR expressions. When > 0, we skip collecting filters
+    /// because filters inside OR branches may not be applied (e.g. `WHERE tenant_id = 1 OR admin = true`
+    /// does not guarantee that `tenant_id = 1` is enforced).
+    or_depth: usize,
     /// Common table expression names to skip when collecting tables (virtual tables, not real ones)
     cte_names: HashSet<String>,
 }
@@ -384,6 +388,7 @@ impl SelectVisitor {
             placeholder_counter: initial_placeholder_count,
             subqueries: Vec::new(),
             skip_depth: 0,
+            or_depth: 0,
             cte_names,
         }
     }
@@ -438,6 +443,21 @@ impl Visitor for SelectVisitor {
             self.skip_depth += 1;
         }
 
+        if matches!(
+            expr,
+            Expr::BinaryOp {
+                op: BinaryOperator::Or,
+                ..
+            }
+        ) {
+            self.or_depth += 1;
+        }
+
+        // Skip filters inside OR branches: OR does not guarantee the filter is enforced
+        if self.or_depth > 0 {
+            return ControlFlow::Continue(());
+        }
+
         if let Some(filter) = try_extract_filter(expr, self.placeholder_counter) {
             self.filters.push(filter);
         }
@@ -448,6 +468,15 @@ impl Visitor for SelectVisitor {
     fn post_visit_expr(&mut self, expr: &Expr) -> ControlFlow<Self::Break> {
         if extract_subquery(expr).is_some() {
             self.skip_depth = self.skip_depth.saturating_sub(1);
+        }
+        if matches!(
+            expr,
+            Expr::BinaryOp {
+                op: BinaryOperator::Or,
+                ..
+            }
+        ) {
+            self.or_depth = self.or_depth.saturating_sub(1);
         }
         ControlFlow::Continue(())
     }
@@ -544,7 +573,8 @@ fn object_name_to_string(name: &ObjectName) -> String {
 fn extract_filters_from_where(expr: &Expr, counter: &mut usize) -> (Vec<FilterColumn>, Vec<Query>) {
     let mut filters = Vec::new();
     let mut subqueries = Vec::new();
-    walk_expr(expr, counter, &mut filters, &mut subqueries);
+    // Start with in_or=false: the top-level WHERE clause is not inside an OR branch
+    walk_expr(expr, counter, &mut filters, &mut subqueries, false);
     (filters, subqueries)
 }
 
@@ -553,13 +583,17 @@ fn walk_expr(
     counter: &mut usize,
     filters: &mut Vec<FilterColumn>,
     subqueries: &mut Vec<Query>,
+    in_or: bool,
 ) {
     if is_mysql_placeholder(expr) {
         *counter += 1;
     }
 
-    if let Some(filter) = try_extract_filter(expr, *counter) {
-        filters.push(filter);
+    // Skip filters inside OR branches: OR does not guarantee the filter is enforced
+    if !in_or {
+        if let Some(filter) = try_extract_filter(expr, *counter) {
+            filters.push(filter);
+        }
     }
 
     if let Some(subquery) = extract_subquery(expr) {
@@ -568,12 +602,13 @@ fn walk_expr(
     }
 
     match expr {
-        Expr::BinaryOp { left, right, .. } => {
-            walk_expr(left, counter, filters, subqueries);
-            walk_expr(right, counter, filters, subqueries);
+        Expr::BinaryOp { left, op, right } => {
+            let in_or = in_or || *op == BinaryOperator::Or;
+            walk_expr(left, counter, filters, subqueries, in_or);
+            walk_expr(right, counter, filters, subqueries, in_or);
         }
         Expr::Nested(inner) => {
-            walk_expr(inner, counter, filters, subqueries);
+            walk_expr(inner, counter, filters, subqueries, in_or);
         }
         _ => {}
     }
