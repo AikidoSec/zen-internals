@@ -131,7 +131,8 @@ fn analyze_statement(stmt: &Statement, results: &mut Vec<SqlQueryResult>) -> Res
         | Statement::ExplainTable { .. }
         | Statement::Explain { .. }
         | Statement::Fetch { .. }
-        | Statement::Close { .. } => {}
+        | Statement::Close { .. }
+        | Statement::Analyze { .. } => {}
         _ => {
             return Err("Unrecognized SQL statement".to_string());
         }

@@ -1072,6 +1072,11 @@ mod tests {
     }
 
     #[test]
+    fn test_analyze_ignored() {
+        assert_eq!(idor_analyze_sql("ANALYZE TABLE cats", 9).unwrap(), vec![]);
+    }
+
+    #[test]
     fn test_cte_simple() {
         assert_eq!(
             idor_analyze_sql(
