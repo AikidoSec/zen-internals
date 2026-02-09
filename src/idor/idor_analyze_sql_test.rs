@@ -1885,11 +1885,7 @@ mod tests {
     #[test]
     fn test_delete_where_or_extracts_no_filters() {
         assert_eq!(
-            idor_analyze_sql(
-                "DELETE FROM users WHERE tenant_id = $1 OR admin = true",
-                9,
-            )
-            .unwrap(),
+            idor_analyze_sql("DELETE FROM users WHERE tenant_id = $1 OR admin = true", 9,).unwrap(),
             vec![SqlQueryResult {
                 kind: "delete".into(),
                 tables: vec![TableRef {

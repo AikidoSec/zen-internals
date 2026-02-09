@@ -411,7 +411,13 @@ impl Visitor for SelectVisitor {
             self.skip_depth += 1;
         }
 
-        if matches!(expr, Expr::BinaryOp { op: BinaryOperator::Or, .. }) {
+        if matches!(
+            expr,
+            Expr::BinaryOp {
+                op: BinaryOperator::Or,
+                ..
+            }
+        ) {
             self.or_depth += 1;
         }
 
@@ -429,7 +435,13 @@ impl Visitor for SelectVisitor {
         if extract_subquery(expr).is_some() {
             self.skip_depth = self.skip_depth.saturating_sub(1);
         }
-        if matches!(expr, Expr::BinaryOp { op: BinaryOperator::Or, .. }) {
+        if matches!(
+            expr,
+            Expr::BinaryOp {
+                op: BinaryOperator::Or,
+                ..
+            }
+        ) {
             self.or_depth = self.or_depth.saturating_sub(1);
         }
         ControlFlow::Continue(())
