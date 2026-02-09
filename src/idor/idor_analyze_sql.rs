@@ -422,10 +422,12 @@ impl Visitor for SelectVisitor {
         }
 
         // Skip filters inside OR branches: OR does not guarantee the filter is enforced
-        if self.or_depth == 0 {
-            if let Some(filter) = try_extract_filter(expr, self.placeholder_counter) {
-                self.filters.push(filter);
-            }
+        if self.or_depth > 0 {
+            return ControlFlow::Continue(());
+        }
+
+        if let Some(filter) = try_extract_filter(expr, self.placeholder_counter) {
+            self.filters.push(filter);
         }
 
         ControlFlow::Continue(())
