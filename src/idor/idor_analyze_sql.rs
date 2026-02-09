@@ -539,6 +539,7 @@ fn object_name_to_string(name: &ObjectName) -> String {
 fn extract_filters_from_where(expr: &Expr, counter: &mut usize) -> (Vec<FilterColumn>, Vec<Query>) {
     let mut filters = Vec::new();
     let mut subqueries = Vec::new();
+    // Start with in_or=false: the top-level WHERE clause is not inside an OR branch
     walk_expr(expr, counter, &mut filters, &mut subqueries, false);
     (filters, subqueries)
 }
