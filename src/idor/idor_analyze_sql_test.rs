@@ -1059,7 +1059,7 @@ mod tests {
     #[test]
     fn test_unsupported_statement_returns_error() {
         assert_eq!(
-            idor_analyze_sql("CREATE TABLE users (id INT)", 9)
+            idor_analyze_sql("MERGE INTO target USING source ON target.id = source.id WHEN MATCHED THEN UPDATE SET target.name = source.name;", 9)
                 .unwrap_err()
                 .contains("Unsupported SQL statement type"),
             true
@@ -1067,8 +1067,8 @@ mod tests {
     }
 
     #[test]
-    fn test_truncate_returns_error() {
-        assert_eq!(idor_analyze_sql("TRUNCATE users", 9).is_err(), true);
+    fn test_truncate_ignored() {
+        assert_eq!(idor_analyze_sql("TRUNCATE users", 9).unwrap(), vec![]);
     }
 
     #[test]
@@ -3246,5 +3246,171 @@ mod tests {
             idor_analyze_sql("RELEASE SAVEPOINT sp1;", 9).unwrap(),
             vec![]
         );
+    }
+
+    #[test]
+    fn test_ddl_statements_ignored() {
+        assert_eq!(
+            idor_analyze_sql("CREATE TABLE users (id INT PRIMARY KEY, name TEXT);", 9).unwrap(),
+            vec![]
+        );
+        assert_eq!(
+            idor_analyze_sql("ALTER TABLE users ADD COLUMN email TEXT;", 9).unwrap(),
+            vec![]
+        );
+        assert_eq!(idor_analyze_sql("DROP TABLE users;", 9).unwrap(), vec![]);
+        assert_eq!(
+            idor_analyze_sql("DROP TABLE IF EXISTS users;", 9).unwrap(),
+            vec![]
+        );
+        assert_eq!(
+            idor_analyze_sql("CREATE INDEX idx_users_email ON users (email);", 9).unwrap(),
+            vec![]
+        );
+        assert_eq!(
+            idor_analyze_sql(
+                "CREATE VIEW active_users AS SELECT * FROM users WHERE active = true;",
+                9
+            )
+            .unwrap(),
+            vec![]
+        );
+        assert_eq!(
+            idor_analyze_sql("CREATE SCHEMA myschema;", 9).unwrap(),
+            vec![]
+        );
+        assert_eq!(
+            idor_analyze_sql("CREATE DATABASE mydb;", 9).unwrap(),
+            vec![]
+        );
+        assert_eq!(
+            idor_analyze_sql("CREATE SEQUENCE users_id_seq;", 9).unwrap(),
+            vec![]
+        );
+        assert_eq!(
+            idor_analyze_sql("CREATE EXTENSION IF NOT EXISTS pgcrypto;", 9).unwrap(),
+            vec![]
+        );
+        assert_eq!(
+            idor_analyze_sql("ALTER VIEW myview AS SELECT * FROM users;", 9).unwrap(),
+            vec![]
+        );
+        assert_eq!(
+            idor_analyze_sql(
+                "CREATE FUNCTION my_func() RETURNS INT LANGUAGE SQL AS 'SELECT 1';",
+                9
+            )
+            .unwrap(),
+            vec![]
+        );
+        assert_eq!(
+            idor_analyze_sql(
+                "CREATE TRIGGER check_insert BEFORE INSERT ON accounts FOR EACH ROW EXECUTE FUNCTION check_account_insert();",
+                9
+            )
+            .unwrap(),
+            vec![]
+        );
+        assert_eq!(
+            idor_analyze_sql("DROP FUNCTION my_func;", 9).unwrap(),
+            vec![]
+        );
+        assert_eq!(
+            idor_analyze_sql("DROP TRIGGER check_update ON accounts;", 9).unwrap(),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn test_ddl_statements_ignored_mysql() {
+        assert_eq!(
+            idor_analyze_sql(
+                "CREATE TABLE users (id INT PRIMARY KEY, name VARCHAR(255));",
+                8
+            )
+            .unwrap(),
+            vec![]
+        );
+        assert_eq!(
+            idor_analyze_sql("ALTER TABLE users ADD COLUMN email VARCHAR(255);", 8).unwrap(),
+            vec![]
+        );
+        assert_eq!(
+            idor_analyze_sql("DROP TABLE IF EXISTS users;", 8).unwrap(),
+            vec![]
+        );
+        assert_eq!(
+            idor_analyze_sql("CREATE INDEX idx_email ON users (email);", 8).unwrap(),
+            vec![]
+        );
+        assert_eq!(
+            idor_analyze_sql("TRUNCATE TABLE users;", 8).unwrap(),
+            vec![]
+        );
+        assert_eq!(
+            idor_analyze_sql("DROP PROCEDURE my_proc;", 8).unwrap(),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn test_dcl_statements_ignored() {
+        assert_eq!(
+            idor_analyze_sql("GRANT SELECT ON users TO myuser;", 9).unwrap(),
+            vec![]
+        );
+        assert_eq!(
+            idor_analyze_sql("REVOKE SELECT ON users FROM myuser;", 9).unwrap(),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn test_session_statements_ignored() {
+        assert_eq!(
+            idor_analyze_sql("SET search_path TO myschema;", 9).unwrap(),
+            vec![]
+        );
+        assert_eq!(idor_analyze_sql("SET TIME ZONE 'UTC';", 9).unwrap(), vec![]);
+        assert_eq!(idor_analyze_sql("SHOW server_version;", 9).unwrap(), vec![]);
+        assert_eq!(
+            idor_analyze_sql("EXPLAIN SELECT * FROM users;", 9).unwrap(),
+            vec![]
+        );
+        assert_eq!(idor_analyze_sql("SET ROLE myrole;", 9).unwrap(), vec![]);
+    }
+
+    #[test]
+    fn test_session_statements_ignored_mysql() {
+        assert_eq!(idor_analyze_sql("SET NAMES 'utf8mb4';", 8).unwrap(), vec![]);
+        assert_eq!(idor_analyze_sql("SET NAMES DEFAULT;", 8).unwrap(), vec![]);
+        assert_eq!(idor_analyze_sql("SHOW TABLES;", 8).unwrap(), vec![]);
+        assert_eq!(
+            idor_analyze_sql("SHOW COLUMNS FROM users;", 8).unwrap(),
+            vec![]
+        );
+        assert_eq!(idor_analyze_sql("USE mydb;", 8).unwrap(), vec![]);
+        assert_eq!(idor_analyze_sql("SHOW STATUS;", 8).unwrap(), vec![]);
+        assert_eq!(idor_analyze_sql("SHOW VARIABLES;", 8).unwrap(), vec![]);
+        assert_eq!(
+            idor_analyze_sql("SHOW CREATE TABLE users;", 8).unwrap(),
+            vec![]
+        );
+        assert_eq!(idor_analyze_sql("SHOW COLLATION;", 8).unwrap(), vec![]);
+        assert_eq!(idor_analyze_sql("DESCRIBE users;", 8).unwrap(), vec![]);
+    }
+
+    #[test]
+    fn test_cursor_statements_ignored() {
+        assert_eq!(
+            idor_analyze_sql("FETCH NEXT IN my_cursor;", 9).unwrap(),
+            vec![]
+        );
+        assert_eq!(idor_analyze_sql("CLOSE my_cursor;", 9).unwrap(), vec![]);
+    }
+
+    #[test]
+    fn test_declare_cursor_not_ignored() {
+        assert!(idor_analyze_sql("DECLARE my_cursor CURSOR FOR SELECT * FROM users;", 9).is_err());
     }
 }
