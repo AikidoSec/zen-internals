@@ -133,9 +133,7 @@ fn analyze_statement(stmt: &Statement, results: &mut Vec<SqlQueryResult>) -> Res
         | Statement::Fetch { .. }
         | Statement::Close { .. } => {}
         _ => {
-            return Err(
-                "Unsupported SQL statement type: only SELECT, INSERT, UPDATE, and DELETE are supported".to_string()
-            );
+            return Err("Unrecognized SQL statement".to_string());
         }
     }
     Ok(())

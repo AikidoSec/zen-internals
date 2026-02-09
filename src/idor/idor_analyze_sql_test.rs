@@ -1061,7 +1061,7 @@ mod tests {
         assert_eq!(
             idor_analyze_sql("MERGE INTO target USING source ON target.id = source.id WHEN MATCHED THEN UPDATE SET target.name = source.name;", 9)
                 .unwrap_err()
-                .contains("Unsupported SQL statement type"),
+                .contains("Unrecognized SQL statement"),
             true
         );
     }
