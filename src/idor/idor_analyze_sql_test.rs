@@ -1994,6 +1994,198 @@ mod tests {
     }
 
     #[test]
+    fn test_select_left_joins_with_or_across_joined_tables() {
+        assert_eq!(
+            idor_analyze_sql(
+                r#"SELECT count(*) FROM a
+                   LEFT JOIN b ON b.id = a.b_id AND a.b_id > 0
+                   LEFT JOIN c ON c.id = a.c_id AND a.c_id > 0
+                   WHERE a.tenant_id = $1
+                   AND a.name != ''
+                   AND (b.active = $2 OR c.active = $3)"#,
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "a".into(),
+                        alias: None,
+                    },
+                    TableRef {
+                        name: "b".into(),
+                        alias: None,
+                    },
+                    TableRef {
+                        name: "c".into(),
+                        alias: None,
+                    },
+                ],
+                filters: vec![FilterColumn {
+                    table: Some("a".into()),
+                    column: "tenant_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_select_union_both_with_or_in_where() {
+        assert_eq!(
+            idor_analyze_sql(
+                r#"SELECT DISTINCT a.id
+                   FROM b
+                   INNER JOIN a ON a.id = b.a_id AND a.tenant_id = $1
+                   WHERE b.tenant_id = $2
+                   AND a.status = 'open'
+                   AND (a.x_id = $3 OR a.y_id = $4)
+                   UNION
+                   SELECT DISTINCT a.id
+                   FROM c
+                   INNER JOIN a ON a.id = c.a_id AND a.tenant_id = $5
+                   WHERE c.tenant_id = $6
+                   AND a.status = 'open'
+                   AND (a.x_id = $7 OR a.y_id = $8)"#,
+                9,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![
+                        TableRef {
+                            name: "b".into(),
+                            alias: None,
+                        },
+                        TableRef {
+                            name: "a".into(),
+                            alias: None,
+                        },
+                    ],
+                    filters: vec![
+                        FilterColumn {
+                            table: Some("a".into()),
+                            column: "tenant_id".into(),
+                            value: "$1".into(),
+                            placeholder_number: None,
+                        },
+                        FilterColumn {
+                            table: Some("b".into()),
+                            column: "tenant_id".into(),
+                            value: "$2".into(),
+                            placeholder_number: None,
+                        },
+                        FilterColumn {
+                            table: Some("a".into()),
+                            column: "status".into(),
+                            value: "open".into(),
+                            placeholder_number: None,
+                        },
+                    ],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![
+                        TableRef {
+                            name: "c".into(),
+                            alias: None,
+                        },
+                        TableRef {
+                            name: "a".into(),
+                            alias: None,
+                        },
+                    ],
+                    filters: vec![
+                        FilterColumn {
+                            table: Some("a".into()),
+                            column: "tenant_id".into(),
+                            value: "$5".into(),
+                            placeholder_number: None,
+                        },
+                        FilterColumn {
+                            table: Some("c".into()),
+                            column: "tenant_id".into(),
+                            value: "$6".into(),
+                            placeholder_number: None,
+                        },
+                        FilterColumn {
+                            table: Some("a".into()),
+                            column: "status".into(),
+                            value: "open".into(),
+                            placeholder_number: None,
+                        },
+                    ],
+                    insert_columns: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_select_search_with_or_across_columns_and_subquery() {
+        assert_eq!(
+            idor_analyze_sql(
+                r#"SELECT * FROM a
+                   WHERE a.tenant_id = $1
+                   AND (
+                       a.title LIKE $2
+                       OR a.name LIKE $3
+                       OR EXISTS (
+                           SELECT 1 FROM b
+                           INNER JOIN c ON c.id = b.c_id
+                           WHERE b.a_id = a.id
+                           AND c.ref LIKE $4
+                           AND b.tenant_id = $5
+                       )
+                   )"#,
+                9,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "a".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: Some("a".into()),
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                    }],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![
+                        TableRef {
+                            name: "b".into(),
+                            alias: None,
+                        },
+                        TableRef {
+                            name: "c".into(),
+                            alias: None,
+                        },
+                    ],
+                    filters: vec![FilterColumn {
+                        table: Some("b".into()),
+                        column: "tenant_id".into(),
+                        value: "$5".into(),
+                        placeholder_number: None,
+                    }],
+                    insert_columns: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn test_schema_qualified_table() {
         assert_eq!(
             idor_analyze_sql("SELECT * FROM public.users WHERE tenant_id = $1", 9,).unwrap(),
