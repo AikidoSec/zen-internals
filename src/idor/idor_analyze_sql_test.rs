@@ -1949,6 +1949,51 @@ mod tests {
     }
 
     #[test]
+    fn test_select_join_with_mixed_and_or_nesting() {
+        assert_eq!(
+            idor_analyze_sql(
+                r#"SELECT * FROM orders o
+                   JOIN users u ON u.id = o.user_id
+                   WHERE o.tenant_id = $1
+                   AND u.tenant_id = $2
+                   AND (o.status = $3 OR (o.priority > 5 AND o.flagged = true))
+                   AND (u.active = true OR u.verified = true)
+                   AND o.amount > $4"#,
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "orders".into(),
+                        alias: Some("o".into()),
+                    },
+                    TableRef {
+                        name: "users".into(),
+                        alias: Some("u".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("o".into()),
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                    },
+                    FilterColumn {
+                        table: Some("u".into()),
+                        column: "tenant_id".into(),
+                        value: "$2".into(),
+                        placeholder_number: None,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
     fn test_schema_qualified_table() {
         assert_eq!(
             idor_analyze_sql("SELECT * FROM public.users WHERE tenant_id = $1", 9,).unwrap(),
