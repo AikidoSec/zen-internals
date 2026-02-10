@@ -1040,6 +1040,54 @@ mod tests {
     }
 
     #[test]
+    fn test_safe_two_char_payloads() {
+        not_injection!("UPDATE a SET b=b+1, c=NOW() WHERE (id=:parentid)", ":p");
+        not_injection!(r#"select * from "a" where ("id") in (($1))"#, "((");
+        not_injection!("UPDATE a SET b = NOW() WHERE (id = :user_id)", "d)");
+        not_injection!("UPDATE a SET b = NOW() WHERE (id = :device_id)", ":d");
+        not_injection!(
+            "UPDATE a SET b=ifnull(:timezone,c) WHERE (id = :device_id)",
+            "(:"
+        );
+        not_injection!(r#"select a.*, b.c from a inner join b on a.d = b.e"#, ".*");
+        not_injection!(r#"select * from "a" where "slug" in ($1)"#, "1)");
+        not_injection!(r#"select * from "a" where "slug" in (1)"#, "1)");
+        not_injection!(r#"select * from a where a.id in (5)"#, "(5");
+        not_injection!(
+            "select a from b where b.c = ? and exists (select * from d where b.e = d.f)",
+            "(s"
+        );
+        not_injection!("UPDATE a SET b=b+1, c=NOW() WHERE (id=:parentid)", "+1");
+        not_injection!(
+            "UPDATE a SET b = NOW(), c=ifnull(:languages,c) WHERE (id = :device_id)",
+            ":l"
+        );
+
+        is_injection!("UPDATE a SET b=b+1, c=NOW() WHERE (id=:parentid)", ":pa");
+        is_injection!(r#"select * from "a" where ("id") in (($1))"#, "(($");
+        is_injection!("UPDATE a SET b = NOW() WHERE (id = :user_id)", "id)");
+        is_injection!("UPDATE a SET b = NOW() WHERE (id = :device_id)", ":de");
+        is_injection!(
+            "UPDATE a SET b=ifnull(:timezone,c) WHERE (id = :device_id)",
+            "(:t"
+        );
+        is_injection!(r#"select a.*, b.c from a inner join b on a.d = b.e"#, ".*,");
+        is_injection!(r#"select * from "a" where "slug" in ($1)"#, "$1)");
+        is_injection!(r#"select * from "a" where "slug" in (1)"#, "(1)");
+        is_injection!(r#"select * from a where a.id in (5)"#, "(5)");
+        is_injection!(
+            "select a from b where b.c = ? and exists (select * from d where b.e = d.f)",
+            "(se"
+        );
+        is_injection!("UPDATE a SET b=b+1, c=NOW() WHERE (id=:parentid)", "b+1");
+        is_injection!("UPDATE a SET b=b+1, c=NOW() WHERE (id=:parentid)", "+1,");
+        is_injection!(
+            "UPDATE a SET b = NOW(), c=ifnull(:languages,c) WHERE (id = :device_id)",
+            ":la"
+        );
+    }
+
+    #[test]
     fn test_time_zone() {
         not_injection!(
             r#"
