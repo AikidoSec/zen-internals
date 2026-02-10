@@ -1031,6 +1031,14 @@ mod tests {
     }
 
     #[test]
+    fn test_is_not_keyword_in_query() {
+        not_injection!(
+            r#"select * from `a` where `a`.`b` = ? and `a`.`b` is not null and `a`.`c` is null order by `id` asc"#,
+            "is not"
+        );
+    }
+
+    #[test]
     fn test_time_zone() {
         not_injection!(
             r#"
