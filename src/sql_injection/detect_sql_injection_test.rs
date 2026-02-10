@@ -1031,6 +1031,11 @@ mod tests {
     }
 
     #[test]
+    fn test_short_alphanumeric_with_single_space() {
+        not_injection!(r#"select * from "a" where "id" = $1 limit $2"#, "1 li");
+    }
+
+    #[test]
     fn test_time_zone() {
         not_injection!(
             r#"

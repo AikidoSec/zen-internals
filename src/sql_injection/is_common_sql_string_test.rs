@@ -58,11 +58,11 @@ mod tests {
             false
         );
         assert_eq!(is_common_sql_string("1 "), true);
-        assert_eq!(is_common_sql_string("asc1"), false);
+        assert_eq!(is_common_sql_string("asc1"), true);
         assert_eq!(is_common_sql_string("desc1"), false);
         assert_eq!(is_common_sql_string("asc 1"), false);
         assert_eq!(is_common_sql_string("desc 1"), false);
-        assert_eq!(is_common_sql_string("1asc"), false);
+        assert_eq!(is_common_sql_string("1asc"), true);
         assert_eq!(is_common_sql_string("1desc"), false);
         assert_eq!(is_common_sql_string("1;"), false);
         assert_eq!(is_common_sql_string("1--"), false);
@@ -225,11 +225,11 @@ mod tests {
         assert_eq!(is_common_sql_string("9 z"), true);
         assert_eq!(is_common_sql_string("0 m"), true);
 
-        assert_eq!(is_common_sql_string("0  m"), false);
+        assert_eq!(is_common_sql_string("0  m"), true);
         assert_eq!(is_common_sql_string("'0 m"), false);
         assert_eq!(is_common_sql_string("0;m"), false);
-        assert_eq!(is_common_sql_string("00 m"), false);
-        assert_eq!(is_common_sql_string("0 mm"), false);
+        assert_eq!(is_common_sql_string("00 m"), true);
+        assert_eq!(is_common_sql_string("0 mm"), true);
         assert_eq!(is_common_sql_string("00 mm"), false);
     }
 
@@ -246,6 +246,17 @@ mod tests {
         assert_eq!(is_common_sql_string("--"), false);
         assert_eq!(is_common_sql_string("--'"), false);
         assert_eq!(is_common_sql_string("'--"), false);
+    }
+
+    #[test]
+    fn test_short_alphanumeric_with_spaces() {
+        assert_eq!(is_common_sql_string("1 li"), true);
+        assert_eq!(is_common_sql_string("1 ab"), true);
+        assert_eq!(is_common_sql_string("ab 1"), true);
+
+        assert_eq!(is_common_sql_string("1 abc"), false);
+        assert_eq!(is_common_sql_string("1;li"), false);
+        assert_eq!(is_common_sql_string("1'li"), false);
     }
 
     #[test]
