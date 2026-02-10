@@ -1033,6 +1033,10 @@ mod tests {
     #[test]
     fn test_short_alphanumeric_with_single_space() {
         not_injection!(r#"select * from "a" where "id" = $1 limit $2"#, "1 li");
+        is_injection!(
+            r#"select * from "a" where "id" = 1 or 1=1 limit $2"#,
+            "1 or 1=1"
+        );
     }
 
     #[test]
