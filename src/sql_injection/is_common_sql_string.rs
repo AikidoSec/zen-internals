@@ -23,6 +23,7 @@ pub const COMMON_SQL_STRINGS: [&str; 27] = [
     "COUNT(*)",
     "IS NULL",
     "IS NOT NULL",
+    "IS NOT",
     "NOT EXISTS",
     "DISTINCT ON",
     "[]",

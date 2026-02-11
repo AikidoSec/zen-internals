@@ -1031,6 +1031,14 @@ mod tests {
     }
 
     #[test]
+    fn test_is_not_keyword_in_query() {
+        not_injection!(
+            r#"select * from `a` where `a`.`b` = ? and `a`.`b` is not null and `a`.`c` is null order by `id` asc"#,
+            "is not"
+        );
+    }
+
+    #[test]
     fn test_safe_two_char_payloads() {
         not_injection!("UPDATE a SET b=b+1, c=NOW() WHERE (id=:parentid)", ":p");
         not_injection!(r#"select * from "a" where ("id") in (($1))"#, "((");
