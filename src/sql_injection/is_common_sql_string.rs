@@ -49,15 +49,15 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         return true;
     }
 
-    if user_input.len() <= 5 && regex!(r"^[a-z]+ [a-z]+$").is_match(user_input) {
+    if user_input.len() <= 5 && regex!(r"^[0-9a-z]+ [0-9a-z]+$").is_match(user_input) {
         // It's very difficult to exploit a query using a short string of only letters and space.
         return true;
     }
 
     // Allow short strings with letters, digits and spaces
     // e.g. `select * from "table" where "id" = $1 limit $2`
-    //                                           ^^^^ `1 li`
-    if user_input.len() <= 4 && regex!(r"^[ 0-9a-z]+$").is_match(user_input) {
+    //                                           ^^^ `1 l`
+    if user_input.len() <= 3 && regex!(r"^[ 0-9a-z]+$").is_match(user_input) {
         return true;
     }
 
