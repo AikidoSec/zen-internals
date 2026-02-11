@@ -1,7 +1,7 @@
 use regex::Regex;
 use std::sync::LazyLock;
 
-pub const COMMON_SQL_STRINGS: [&str; 27] = [
+pub const COMMON_SQL_STRINGS: [&str; 28] = [
     "SELECT *",
     "SELECT COUNT(*)",
     "INSERT INTO",
@@ -29,6 +29,7 @@ pub const COMMON_SQL_STRINGS: [&str; 27] = [
     "[]",
     "NOT IN",
     "TIME ZONE",
+    ".*",
 ];
 
 // Macro to create a static regex that is compiled only once.
@@ -71,6 +72,14 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         && regex!(r"^[a-z]=$").is_match(user_input)
     {
         // If the user input is just a single letter followed by an equal sign, it's not an injection.
+        return true;
+    }
+
+    // `:p` from `:param`
+    // `1)` from `(1)`
+    // `(s` from `(select`
+    // `+1` from `version+1`
+    if user_input.len() == 2 && regex!(r"^[a-z0-9:()+]+$").is_match(user_input) {
         return true;
     }
 

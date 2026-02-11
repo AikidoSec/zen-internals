@@ -109,6 +109,39 @@ mod tests {
     }
 
     #[test]
+    fn test_safe_two_char_payloads() {
+        assert_eq!(is_common_sql_string(":p"), true);
+        assert_eq!(is_common_sql_string(":d"), true);
+        assert_eq!(is_common_sql_string(":l"), true);
+        assert_eq!(is_common_sql_string("(:"), true);
+        assert_eq!(is_common_sql_string("(("), true);
+        assert_eq!(is_common_sql_string("d)"), true);
+        assert_eq!(is_common_sql_string("1)"), true);
+        assert_eq!(is_common_sql_string("(5"), true);
+        assert_eq!(is_common_sql_string("(s"), true);
+        assert_eq!(is_common_sql_string("+1"), true);
+
+        assert_eq!(is_common_sql_string("--"), false);
+        assert_eq!(is_common_sql_string("/*"), false);
+        assert_eq!(is_common_sql_string("*/"), false);
+        assert_eq!(is_common_sql_string("';"), false);
+        assert_eq!(is_common_sql_string("1;"), false);
+        assert_eq!(is_common_sql_string("#1"), false);
+
+        assert_eq!(is_common_sql_string("(1)"), false);
+        assert_eq!(is_common_sql_string("(0)"), false);
+        assert_eq!(is_common_sql_string("(a)"), false);
+        assert_eq!(is_common_sql_string("(1)+"), false);
+        assert_eq!(is_common_sql_string("1)+"), false);
+        assert_eq!(is_common_sql_string("+(1"), false);
+    }
+
+    #[test]
+    fn test_dot_star_common_sql_string() {
+        assert_eq!(is_common_sql_string(".*"), true);
+    }
+
+    #[test]
     fn test_it_returns_false_for_special_chars() {
         assert_eq!(is_common_sql_string("'"), false);
         assert_eq!(is_common_sql_string("\""), false);
