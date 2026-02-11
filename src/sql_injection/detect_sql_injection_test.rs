@@ -1031,6 +1031,14 @@ mod tests {
     }
 
     #[test]
+    fn test_short_alphanumeric_with_single_space() {
+        not_injection!(r#"select * from "a" where "id" = $1 limit $2"#, "1 li");
+
+        is_injection!(r#"select * from "a" where "id" = $1 limit $2"#, "$1 li");
+        is_injection!(r#"select * from "a" where "id" = $1 limit $2"#, "1 limit");
+    }
+
+    #[test]
     fn test_is_not_keyword_in_query() {
         not_injection!(
             r#"select * from `a` where `a`.`b` = ? and `a`.`b` is not null and `a`.`c` is null order by `id` asc"#,
