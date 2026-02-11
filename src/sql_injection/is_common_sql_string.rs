@@ -1,7 +1,7 @@
 use regex::Regex;
 use std::sync::LazyLock;
 
-pub const COMMON_SQL_STRINGS: [&str; 26] = [
+pub const COMMON_SQL_STRINGS: [&str; 27] = [
     "SELECT *",
     "SELECT COUNT(*)",
     "INSERT INTO",
@@ -23,6 +23,7 @@ pub const COMMON_SQL_STRINGS: [&str; 26] = [
     "COUNT(*)",
     "IS NULL",
     "IS NOT NULL",
+    "IS NOT",
     "NOT EXISTS",
     "DISTINCT ON",
     "[]",
