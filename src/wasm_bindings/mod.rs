@@ -1,5 +1,8 @@
 use crate::idor::idor_analyze_sql::idor_analyze_sql;
 use crate::js_injection::detect_js_injection::detect_js_injection_str;
+use crate::shell_injection::detect_shell_injection::{
+    detect_shell_injection_str, DetectionReason as ShellDetectionReason,
+};
 use crate::sql_injection::detect_sql_injection::{detect_sql_injection_str, DetectionReason};
 use wasm_bindgen::prelude::*;
 
@@ -22,6 +25,21 @@ pub fn wasm_detect_sql_injection(query: &str, userinput: &str, dialect: i32) -> 
 #[wasm_bindgen]
 pub fn wasm_detect_js_injection(code: &str, userinput: &str, sourcetype: i32) -> bool {
     detect_js_injection_str(code, userinput, sourcetype)
+}
+
+#[wasm_bindgen]
+pub fn wasm_detect_shell_injection(command: &str, userinput: &str) -> i32 {
+    let result = detect_shell_injection_str(command, userinput);
+
+    if let ShellDetectionReason::FailedToTokenize = result.reason {
+        return 3;
+    }
+
+    if result.detected {
+        1
+    } else {
+        0
+    }
 }
 
 #[wasm_bindgen]

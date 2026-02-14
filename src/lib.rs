@@ -2,6 +2,7 @@
  * Using FFI. Currently we support the following algorithms :
  * - JS Injection
  * - SQL Injection
+ * - Shell Injection
  */
 mod helpers;
 
@@ -30,3 +31,9 @@ pub mod idor;
 
 #[cfg(not(feature = "benchmarking"))]
 mod idor;
+
+#[cfg(feature = "benchmarking")]
+pub mod shell_injection;
+
+#[cfg(not(feature = "benchmarking"))]
+mod shell_injection;
