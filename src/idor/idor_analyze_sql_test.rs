@@ -4095,6 +4095,205 @@ mod tests {
     }
 
     #[test]
+    fn test_pdo_named_placeholder_select() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE tenant_id = :tenant_id", 8,).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: ":tenant_id".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_pdo_named_placeholder_select_multiple() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM users WHERE tenant_id = :tenant_id AND status = :status AND role = :role",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![
+                    FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: ":tenant_id".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: None,
+                        column: "status".into(),
+                        value: ":status".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: None,
+                        column: "role".into(),
+                        value: ":role".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_pdo_named_placeholder_update() {
+        assert_eq!(
+            idor_analyze_sql(
+                "UPDATE users SET name = :name WHERE tenant_id = :tenant_id",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "update".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: ":tenant_id".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_pdo_named_placeholder_delete() {
+        assert_eq!(
+            idor_analyze_sql("DELETE FROM users WHERE tenant_id = :tenant_id", 8,).unwrap(),
+            vec![SqlQueryResult {
+                kind: "delete".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: ":tenant_id".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_pdo_named_placeholder_insert() {
+        assert_eq!(
+            idor_analyze_sql(
+                "INSERT INTO users (name, tenant_id) VALUES (:name, :tenant_id)",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "insert".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![],
+                insert_columns: Some(vec![vec![
+                    InsertColumn {
+                        column: "name".into(),
+                        value: ":name".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    InsertColumn {
+                        column: "tenant_id".into(),
+                        value: ":tenant_id".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ]]),
+            }]
+        );
+    }
+
+    #[test]
+    fn test_pdo_named_placeholder_with_generic_dialect() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE tenant_id = :tenant_id", 0,).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: ":tenant_id".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_pdo_named_placeholder_with_join() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM users u JOIN orders o ON o.user_id = u.id WHERE u.tenant_id = :tenant_id",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "users".into(),
+                        alias: Some("u".into()),
+                    },
+                    TableRef {
+                        name: "orders".into(),
+                        alias: Some("o".into()),
+                    },
+                ],
+                filters: vec![FilterColumn {
+                    table: Some("u".into()),
+                    column: "tenant_id".into(),
+                    value: ":tenant_id".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
     fn test_quoted_postgres_placeholder_is_not_placeholder() {
         assert_eq!(
             idor_analyze_sql("SELECT * FROM orders WHERE tenant_id = '$1'", 9).unwrap(),
