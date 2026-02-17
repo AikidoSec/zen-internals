@@ -18,6 +18,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$1".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -49,6 +50,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$1".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -71,6 +73,7 @@ mod tests {
 
                     value: "?".into(),
                     placeholder_number: Some(0),
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -98,6 +101,7 @@ mod tests {
 
                         value: "?".into(),
                         placeholder_number: Some(0),
+                        is_placeholder: true,
                     },
                     FilterColumn {
                         table: None,
@@ -105,6 +109,7 @@ mod tests {
 
                         value: "?".into(),
                         placeholder_number: Some(1),
+                        is_placeholder: true,
                     },
                     FilterColumn {
                         table: None,
@@ -112,6 +117,7 @@ mod tests {
 
                         value: "?".into(),
                         placeholder_number: Some(2),
+                        is_placeholder: true,
                     },
                 ],
                 insert_columns: None,
@@ -140,6 +146,7 @@ mod tests {
 
                     value: "$1".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -167,6 +174,7 @@ mod tests {
 
                     value: "?".into(),
                     placeholder_number: Some(2),
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -205,6 +213,7 @@ mod tests {
 
                     value: "?".into(),
                     placeholder_number: Some(1),
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -227,6 +236,7 @@ mod tests {
 
                     value: "$1".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -249,6 +259,7 @@ mod tests {
 
                     value: "?".into(),
                     placeholder_number: Some(0),
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -287,11 +298,13 @@ mod tests {
                         column: "name".into(),
                         value: "x".into(),
                         placeholder_number: None,
+                        is_placeholder: false,
                     },
                     InsertColumn {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     },
                 ]]),
             }]
@@ -314,11 +327,13 @@ mod tests {
                         column: "name".into(),
                         value: "?".into(),
                         placeholder_number: Some(0),
+                        is_placeholder: true,
                     },
                     InsertColumn {
                         column: "tenant_id".into(),
                         value: "?".into(),
                         placeholder_number: Some(1),
+                        is_placeholder: true,
                     },
                 ]]),
             }]
@@ -340,6 +355,7 @@ mod tests {
                     column: "name".into(),
                     value: "x".into(),
                     placeholder_number: None,
+                    is_placeholder: false,
                 }]]),
             }]
         );
@@ -366,11 +382,13 @@ mod tests {
                             column: "name".into(),
                             value: "x".into(),
                             placeholder_number: None,
+                            is_placeholder: false,
                         },
                         InsertColumn {
                             column: "tenant_id".into(),
                             value: "org_1".into(),
                             placeholder_number: None,
+                            is_placeholder: false,
                         },
                     ],
                     vec![
@@ -378,11 +396,13 @@ mod tests {
                             column: "name".into(),
                             value: "y".into(),
                             placeholder_number: None,
+                            is_placeholder: false,
                         },
                         InsertColumn {
                             column: "tenant_id".into(),
                             value: "org_2".into(),
                             placeholder_number: None,
+                            is_placeholder: false,
                         },
                     ],
                 ]),
@@ -410,11 +430,13 @@ mod tests {
                         column: "name".into(),
                         value: "x".into(),
                         placeholder_number: None,
+                        is_placeholder: false,
                     },
                     InsertColumn {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     },
                 ]]),
             }]
@@ -441,11 +463,13 @@ mod tests {
                         column: "name".into(),
                         value: "x".into(),
                         placeholder_number: None,
+                        is_placeholder: false,
                     },
                     InsertColumn {
                         column: "tenant_id".into(),
                         value: "?".into(),
                         placeholder_number: Some(0),
+                        is_placeholder: true,
                     },
                 ]]),
             }]
@@ -472,6 +496,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -486,6 +511,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$2".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -513,6 +539,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "?".into(),
                         placeholder_number: Some(0),
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -527,6 +554,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "?".into(),
                         placeholder_number: Some(1),
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -554,6 +582,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -568,6 +597,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$2".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -582,6 +612,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$3".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -609,6 +640,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -645,6 +677,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -687,6 +720,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -707,6 +741,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$2".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -734,6 +769,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -748,6 +784,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$2".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -775,6 +812,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -789,6 +827,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$2".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -821,6 +860,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$1".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -847,6 +887,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -883,6 +924,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -919,6 +961,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$2".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -933,6 +976,7 @@ mod tests {
                         column: "status".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -959,6 +1003,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$1".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -985,6 +1030,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -999,6 +1045,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$2".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -1035,6 +1082,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -1049,6 +1097,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$2".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -1096,6 +1145,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -1107,6 +1157,7 @@ mod tests {
                         column: "status".into(),
                         value: "active".into(),
                         placeholder_number: None,
+                        is_placeholder: false,
                     }],
                     insert_columns: None,
                 },
@@ -1134,6 +1185,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -1148,6 +1200,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$2".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -1181,6 +1234,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -1195,6 +1249,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$2".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -1222,6 +1277,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -1233,6 +1289,7 @@ mod tests {
                         column: "status".into(),
                         value: "active".into(),
                         placeholder_number: None,
+                        is_placeholder: false,
                     }],
                     insert_columns: None,
                 },
@@ -1266,6 +1323,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -1280,6 +1338,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -1313,6 +1372,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -1357,11 +1417,13 @@ mod tests {
                             column: "name".into(),
                             value: "test".into(),
                             placeholder_number: None,
+                            is_placeholder: false,
                         },
                         InsertColumn {
                             column: "tenant_id".into(),
                             value: "$1".into(),
                             placeholder_number: None,
+                            is_placeholder: true,
                         },
                     ]]),
                 },
@@ -1399,12 +1461,14 @@ mod tests {
                             column: "project_id".into(),
                             value: "$1".into(),
                             placeholder_number: None,
+                            is_placeholder: true,
                         },
                         FilterColumn {
                             table: None,
                             column: "tenant_id".into(),
                             value: "$2".into(),
                             placeholder_number: None,
+                            is_placeholder: true,
                         },
                     ],
                     insert_columns: None,
@@ -1420,6 +1484,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$2".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -1435,12 +1500,14 @@ mod tests {
                             column: "id".into(),
                             value: "$3".into(),
                             placeholder_number: None,
+                            is_placeholder: true,
                         },
                         FilterColumn {
                             table: Some("w".into()),
                             column: "tenant_id".into(),
                             value: "$2".into(),
                             placeholder_number: None,
+                            is_placeholder: true,
                         },
                     ],
                     insert_columns: None,
@@ -1487,6 +1554,7 @@ mod tests {
                         column: "status".into(),
                         value: "active".into(),
                         placeholder_number: None,
+                        is_placeholder: false,
                     }],
                     insert_columns: None,
                 },
@@ -1514,6 +1582,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -1550,6 +1619,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -1592,6 +1662,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -1628,6 +1699,7 @@ mod tests {
                         column: "id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -1686,6 +1758,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$2".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -1711,6 +1784,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$2".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -1788,6 +1862,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$1".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -1854,12 +1929,14 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     },
                     FilterColumn {
                         table: None,
                         column: "status".into(),
                         value: "$2".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     },
                 ],
                 insert_columns: None,
@@ -1922,6 +1999,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$2".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -1947,6 +2025,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "?".into(),
                     placeholder_number: Some(2),
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -1985,12 +2064,14 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     },
                     FilterColumn {
                         table: Some("u".into()),
                         column: "tenant_id".into(),
                         value: "$2".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     },
                 ],
                 insert_columns: None,
@@ -2032,6 +2113,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$1".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -2077,18 +2159,21 @@ mod tests {
                             column: "tenant_id".into(),
                             value: "$1".into(),
                             placeholder_number: None,
+                            is_placeholder: true,
                         },
                         FilterColumn {
                             table: Some("b".into()),
                             column: "tenant_id".into(),
                             value: "$2".into(),
                             placeholder_number: None,
+                            is_placeholder: true,
                         },
                         FilterColumn {
                             table: Some("a".into()),
                             column: "status".into(),
                             value: "open".into(),
                             placeholder_number: None,
+                            is_placeholder: false,
                         },
                     ],
                     insert_columns: None,
@@ -2111,18 +2196,21 @@ mod tests {
                             column: "tenant_id".into(),
                             value: "$5".into(),
                             placeholder_number: None,
+                            is_placeholder: true,
                         },
                         FilterColumn {
                             table: Some("c".into()),
                             column: "tenant_id".into(),
                             value: "$6".into(),
                             placeholder_number: None,
+                            is_placeholder: true,
                         },
                         FilterColumn {
                             table: Some("a".into()),
                             column: "status".into(),
                             value: "open".into(),
                             placeholder_number: None,
+                            is_placeholder: false,
                         },
                     ],
                     insert_columns: None,
@@ -2163,6 +2251,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -2183,6 +2272,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$5".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -2205,6 +2295,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$1".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -2226,6 +2317,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$1".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -2261,6 +2353,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$1".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -2292,6 +2385,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$1".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -2318,6 +2412,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -2359,6 +2454,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$1".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -2390,6 +2486,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$1".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -2415,6 +2512,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$3".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -2440,6 +2538,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$1".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -2465,6 +2564,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$1".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -2490,6 +2590,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$2".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -2512,12 +2613,14 @@ mod tests {
                         column: "id".into(),
                         value: "3".into(),
                         placeholder_number: None,
+                        is_placeholder: false,
                     },
                     FilterColumn {
                         table: None,
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     },
                 ],
                 insert_columns: None,
@@ -2550,6 +2653,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$1".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -2575,6 +2679,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$1".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -2601,11 +2706,13 @@ mod tests {
                         column: "name".into(),
                         value: "x".into(),
                         placeholder_number: None,
+                        is_placeholder: false,
                     },
                     InsertColumn {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     },
                 ]]),
             }]
@@ -2628,6 +2735,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$1".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -2649,6 +2757,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$1".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -2670,6 +2779,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$1".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -2691,6 +2801,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "?".into(),
                     placeholder_number: Some(0),
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -2712,6 +2823,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "?".into(),
                     placeholder_number: Some(0),
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -2733,6 +2845,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$1".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -2759,12 +2872,14 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     },
                     FilterColumn {
                         table: None,
                         column: "status".into(),
                         value: "active".into(),
                         placeholder_number: None,
+                        is_placeholder: false,
                     },
                 ],
                 insert_columns: None,
@@ -2792,12 +2907,14 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     },
                     FilterColumn {
                         table: None,
                         column: "status".into(),
                         value: "active".into(),
                         placeholder_number: None,
+                        is_placeholder: false,
                     },
                 ],
                 insert_columns: None,
@@ -2865,6 +2982,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -2901,6 +3019,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -2928,11 +3047,13 @@ mod tests {
                         column: "name".into(),
                         value: "x".into(),
                         placeholder_number: None,
+                        is_placeholder: false,
                     },
                     InsertColumn {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     },
                 ]]),
             }]
@@ -2960,11 +3081,13 @@ mod tests {
                             column: "name".into(),
                             value: "?".into(),
                             placeholder_number: Some(0),
+                            is_placeholder: true,
                         },
                         InsertColumn {
                             column: "tenant_id".into(),
                             value: "?".into(),
                             placeholder_number: Some(1),
+                            is_placeholder: true,
                         },
                     ],
                     vec![
@@ -2972,11 +3095,13 @@ mod tests {
                             column: "name".into(),
                             value: "?".into(),
                             placeholder_number: Some(2),
+                            is_placeholder: true,
                         },
                         InsertColumn {
                             column: "tenant_id".into(),
                             value: "?".into(),
                             placeholder_number: Some(3),
+                            is_placeholder: true,
                         },
                     ],
                 ]),
@@ -3003,6 +3128,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "?".into(),
                     placeholder_number: Some(3),
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -3029,12 +3155,14 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "?".into(),
                         placeholder_number: Some(1),
+                        is_placeholder: true,
                     },
                     FilterColumn {
                         table: None,
                         column: "status".into(),
                         value: "?".into(),
                         placeholder_number: Some(2),
+                        is_placeholder: true,
                     },
                 ],
                 insert_columns: None,
@@ -3057,6 +3185,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$1".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -3078,6 +3207,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$1".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -3109,6 +3239,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "?".into(),
                     placeholder_number: Some(0),
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -3130,6 +3261,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "org_123".into(),
                     placeholder_number: None,
+                    is_placeholder: false,
                 }],
                 insert_columns: None,
             }]
@@ -3156,18 +3288,21 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     },
                     FilterColumn {
                         table: None,
                         column: "status".into(),
                         value: "$2".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     },
                     FilterColumn {
                         table: None,
                         column: "role".into(),
                         value: "$3".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     },
                 ],
                 insert_columns: None,
@@ -3190,6 +3325,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$1".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -3216,6 +3352,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -3230,6 +3367,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$2".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -3257,6 +3395,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$2".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -3271,6 +3410,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -3293,6 +3433,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "org_123".into(),
                     placeholder_number: None,
+                    is_placeholder: false,
                 }],
                 insert_columns: None,
             }]
@@ -3319,12 +3460,14 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     },
                     FilterColumn {
                         table: None,
                         column: "role".into(),
                         value: "admin".into(),
                         placeholder_number: None,
+                        is_placeholder: false,
                     },
                 ],
                 insert_columns: None,
@@ -3352,12 +3495,14 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     },
                     FilterColumn {
                         table: None,
                         column: "status".into(),
                         value: "deleted".into(),
                         placeholder_number: None,
+                        is_placeholder: false,
                     },
                 ],
                 insert_columns: None,
@@ -3385,12 +3530,14 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     },
                     FilterColumn {
                         table: None,
                         column: "role".into(),
                         value: "admin".into(),
                         placeholder_number: None,
+                        is_placeholder: false,
                     },
                 ],
                 insert_columns: None,
@@ -3417,6 +3564,7 @@ mod tests {
                     column: "name".into(),
                     value: "alice".into(),
                     placeholder_number: None,
+                    is_placeholder: false,
                 }]]),
             }]
         );
@@ -3443,11 +3591,13 @@ mod tests {
                             column: "name".into(),
                             value: "alice".into(),
                             placeholder_number: None,
+                            is_placeholder: false,
                         },
                         InsertColumn {
                             column: "tenant_id".into(),
                             value: "org_1".into(),
                             placeholder_number: None,
+                            is_placeholder: false,
                         },
                     ],
                     vec![
@@ -3455,11 +3605,13 @@ mod tests {
                             column: "name".into(),
                             value: "bob".into(),
                             placeholder_number: None,
+                            is_placeholder: false,
                         },
                         InsertColumn {
                             column: "tenant_id".into(),
                             value: "org_2".into(),
                             placeholder_number: None,
+                            is_placeholder: false,
                         },
                     ],
                 ]),
@@ -3492,6 +3644,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "org_123".into(),
                     placeholder_number: None,
+                    is_placeholder: false,
                 }],
                 insert_columns: None,
             }]
@@ -3513,6 +3666,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "org_123".into(),
                     placeholder_number: None,
+                    is_placeholder: false,
                 }],
                 insert_columns: None,
             }]
@@ -3534,6 +3688,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "org_123".into(),
                     placeholder_number: None,
+                    is_placeholder: false,
                 }],
                 insert_columns: None,
             }]
@@ -3559,6 +3714,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$1".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -3584,6 +3740,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "$1".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -3610,6 +3767,7 @@ mod tests {
                         column: "id".into(),
                         value: "$2".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -3624,6 +3782,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -3647,12 +3806,14 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "?".into(),
                         placeholder_number: Some(0),
+                        is_placeholder: true,
                     },
                     FilterColumn {
                         table: None,
                         column: "status".into(),
                         value: "?".into(),
                         placeholder_number: Some(1),
+                        is_placeholder: true,
                     },
                 ],
                 insert_columns: None,
@@ -3685,6 +3846,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: "123".into(),
                     placeholder_number: None,
+                    is_placeholder: false,
                 }],
                 insert_columns: None,
             }]
@@ -3711,6 +3873,7 @@ mod tests {
                         column: "id".into(),
                         value: "$3".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -3725,6 +3888,7 @@ mod tests {
                         column: "id".into(),
                         value: "$1".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -3739,6 +3903,7 @@ mod tests {
                         column: "tenant_id".into(),
                         value: "$2".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     }],
                     insert_columns: None,
                 },
@@ -3944,6 +4109,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: ":tenant_id".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -3970,18 +4136,21 @@ mod tests {
                         column: "tenant_id".into(),
                         value: ":tenant_id".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     },
                     FilterColumn {
                         table: None,
                         column: "status".into(),
                         value: ":status".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     },
                     FilterColumn {
                         table: None,
                         column: "role".into(),
                         value: ":role".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     },
                 ],
                 insert_columns: None,
@@ -4008,6 +4177,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: ":tenant_id".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -4029,6 +4199,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: ":tenant_id".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -4055,11 +4226,13 @@ mod tests {
                         column: "name".into(),
                         value: ":name".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     },
                     InsertColumn {
                         column: "tenant_id".into(),
                         value: ":tenant_id".into(),
                         placeholder_number: None,
+                        is_placeholder: true,
                     },
                 ]]),
             }]
@@ -4081,6 +4254,7 @@ mod tests {
                     column: "tenant_id".into(),
                     value: ":tenant_id".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
                 }],
                 insert_columns: None,
             }]
@@ -4112,6 +4286,252 @@ mod tests {
                     column: "tenant_id".into(),
                     value: ":tenant_id".into(),
                     placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_quoted_postgres_placeholder_is_not_placeholder() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM orders WHERE tenant_id = '$1'", 9).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "orders".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                    is_placeholder: false,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_unquoted_postgres_placeholder_is_placeholder() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM orders WHERE tenant_id = $1", 9).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "orders".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_quoted_mysql_placeholder_is_not_placeholder() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM orders WHERE tenant_id = '?'", 8).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "orders".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "?".into(),
+                    placeholder_number: None,
+                    is_placeholder: false,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_unquoted_mysql_placeholder_is_placeholder() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM orders WHERE tenant_id = ?", 8).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "orders".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "?".into(),
+                    placeholder_number: Some(0),
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_pdo_named_placeholder_is_placeholder() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM orders WHERE tenant_id = :tenant_id", 8).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "orders".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: ":tenant_id".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_quoted_pdo_named_placeholder_is_not_placeholder() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM orders WHERE tenant_id = ':tenant_id'", 8).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "orders".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: ":tenant_id".into(),
+                    placeholder_number: None,
+                    is_placeholder: false,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_insert_quoted_placeholder_is_not_placeholder() {
+        assert_eq!(
+            idor_analyze_sql("INSERT INTO users (name, tenant_id) VALUES ('x', '$1')", 9,).unwrap(),
+            vec![SqlQueryResult {
+                kind: "insert".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![],
+                insert_columns: Some(vec![vec![
+                    InsertColumn {
+                        column: "name".into(),
+                        value: "x".into(),
+                        placeholder_number: None,
+                        is_placeholder: false,
+                    },
+                    InsertColumn {
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: false,
+                    },
+                ]]),
+            }]
+        );
+    }
+
+    #[test]
+    fn test_insert_quoted_mysql_placeholder_is_not_placeholder() {
+        assert_eq!(
+            idor_analyze_sql("INSERT INTO users (name, tenant_id) VALUES ('x', '?')", 8,).unwrap(),
+            vec![SqlQueryResult {
+                kind: "insert".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![],
+                insert_columns: Some(vec![vec![
+                    InsertColumn {
+                        column: "name".into(),
+                        value: "x".into(),
+                        placeholder_number: None,
+                        is_placeholder: false,
+                    },
+                    InsertColumn {
+                        column: "tenant_id".into(),
+                        value: "?".into(),
+                        placeholder_number: None,
+                        is_placeholder: false,
+                    },
+                ]]),
+            }]
+        );
+    }
+
+    #[test]
+    fn test_insert_quoted_pdo_placeholder_is_not_placeholder() {
+        assert_eq!(
+            idor_analyze_sql(
+                "INSERT INTO users (name, tenant_id) VALUES ('x', ':tenant_id')",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "insert".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![],
+                insert_columns: Some(vec![vec![
+                    InsertColumn {
+                        column: "name".into(),
+                        value: "x".into(),
+                        placeholder_number: None,
+                        is_placeholder: false,
+                    },
+                    InsertColumn {
+                        column: "tenant_id".into(),
+                        value: ":tenant_id".into(),
+                        placeholder_number: None,
+                        is_placeholder: false,
+                    },
+                ]]),
+            }]
+        );
+    }
+
+    #[test]
+    fn test_string_literal_is_not_placeholder() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM orders WHERE tenant_id = 'org_123'", 9).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "orders".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "org_123".into(),
+                    placeholder_number: None,
+                    is_placeholder: false,
                 }],
                 insert_columns: None,
             }]

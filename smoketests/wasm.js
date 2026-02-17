@@ -18,11 +18,11 @@ test("wasm_detect_js_injection", () => {
 test("wasm_idor_analyze_sql", () => {
  deepStrictEqual(
   internals.wasm_idor_analyze_sql("SELECT * FROM users WHERE tenant_id = $1", 9),
-  [{ kind: "select", tables: [{ name: "users" }], filters: [{ column: "tenant_id", value: "$1" }] }]
+  [{ kind: "select", tables: [{ name: "users" }], filters: [{ column: "tenant_id", value: "$1", is_placeholder: true }] }]
  );
  deepStrictEqual(
   internals.wasm_idor_analyze_sql("INSERT INTO users (name, email) VALUES ('test', 'test@example.com')", 9),
-  [{ kind: "insert", tables: [{ name: "users" }], filters: [], insert_columns: [[{ column: "name", value: "test" }, { column: "email", value: "test@example.com" }]] }]
+  [{ kind: "insert", tables: [{ name: "users" }], filters: [], insert_columns: [[{ column: "name", value: "test", is_placeholder: false }, { column: "email", value: "test@example.com", is_placeholder: false }]] }]
  );
  deepStrictEqual(
   internals.wasm_idor_analyze_sql("INVALID SQL QUERY", 9),
