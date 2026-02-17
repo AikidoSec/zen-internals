@@ -15,6 +15,7 @@ pub struct FilterColumn {
     pub value: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub placeholder_number: Option<usize>,
+    pub is_placeholder: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -23,6 +24,7 @@ pub struct InsertColumn {
     pub value: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub placeholder_number: Option<usize>,
+    pub is_placeholder: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]

@@ -487,6 +487,10 @@ fn is_mysql_placeholder(expr: &Expr) -> bool {
     matches!(expr, Expr::Value(Value::Placeholder(p)) if p == "?")
 }
 
+fn is_placeholder(expr: &Expr) -> bool {
+    matches!(expr, Expr::Value(Value::Placeholder(_)))
+}
+
 fn extract_subquery(expr: &Expr) -> Option<&Query> {
     match expr {
         Expr::Subquery(q) => Some(q.as_ref()),
@@ -531,6 +535,7 @@ fn extract_column_value_pair(
         column,
         value: expr_to_value_string(maybe_value),
         placeholder_number,
+        is_placeholder: is_placeholder(maybe_value),
     })
 }
 
@@ -707,6 +712,7 @@ fn extract_insert_columns(
                         column: columns[i].to_string(),
                         value: expr_to_value_string(expr),
                         placeholder_number,
+                        is_placeholder: is_placeholder(expr),
                     })
                 })
                 .collect()
