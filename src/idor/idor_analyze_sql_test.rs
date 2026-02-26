@@ -4582,6 +4582,49 @@ mod tests {
     }
 
     #[test]
+    fn test_join_col_col_unqualified_side_resolved_from_where() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT u.* FROM users u \
+                 JOIN tenants t ON tenant_id = t.tenant_id \
+                 WHERE t.tenant_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "users".into(),
+                        alias: Some("u".into()),
+                    },
+                    TableRef {
+                        name: "tenants".into(),
+                        alias: Some("t".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("t".into()),
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
     fn test_join_col_col_resolved_from_on_clause() {
         assert_eq!(
             idor_analyze_sql(

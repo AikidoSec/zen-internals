@@ -577,6 +577,31 @@ fn tables_to_known_set(tables: &[TableRef]) -> HashSet<String> {
         .collect()
 }
 
+/// Derives a filter for `target_key` by looking up `source_key` in `col_values`.
+/// Returns `None` if `target_key` is already known or `source_key` has no value
+/// or the target table is not in scope.
+fn try_derive_filter(
+    target_key: &(Option<String>, String),
+    source_key: &(Option<String>, String),
+    col_values: &HashMap<(Option<String>, String), FilterColumn>,
+    known_tables: &HashSet<String>,
+) -> Option<FilterColumn> {
+    if col_values.contains_key(target_key) {
+        return None;
+    }
+    let resolved = col_values.get(source_key)?.clone();
+    if !is_table_in_scope(&target_key.0, known_tables) {
+        return None;
+    }
+    Some(FilterColumn {
+        table: target_key.0.clone(),
+        column: target_key.1.clone(),
+        value: resolved.value,
+        placeholder_number: resolved.placeholder_number,
+        is_placeholder: resolved.is_placeholder,
+    })
+}
+
 /// Propagates known values across column-to-column `=` pairs.
 /// Only emits derived filters for tables in the current query scope.
 /// Example: `a.x = b.x`, `b.x = c.x`, `c.x = $1`
@@ -608,39 +633,21 @@ fn resolve_col_col_filters(
             let right_key = (right_table.clone(), right_col.clone());
 
             // Resolve left from right: right side has a known value, derive left
-            if !col_values.contains_key(&left_key) {
-                if let Some(resolved) = col_values.get(&right_key).cloned() {
-                    if is_table_in_scope(left_table, known_tables) {
-                        let new_filter = FilterColumn {
-                            table: left_table.clone(),
-                            column: left_col.clone(),
-                            value: resolved.value,
-                            placeholder_number: resolved.placeholder_number,
-                            is_placeholder: resolved.is_placeholder,
-                        };
-                        col_values.insert(left_key.clone(), new_filter.clone());
-                        additional.push(new_filter);
-                        added_in_pass = true;
-                    }
-                }
+            if let Some(new_filter) =
+                try_derive_filter(&left_key, &right_key, &col_values, known_tables)
+            {
+                col_values.insert(left_key.clone(), new_filter.clone());
+                additional.push(new_filter);
+                added_in_pass = true;
             }
 
             // Resolve right from left: left side has a known value, derive right
-            if !col_values.contains_key(&right_key) {
-                if let Some(resolved) = col_values.get(&left_key).cloned() {
-                    if is_table_in_scope(right_table, known_tables) {
-                        let new_filter = FilterColumn {
-                            table: right_table.clone(),
-                            column: right_col.clone(),
-                            value: resolved.value,
-                            placeholder_number: resolved.placeholder_number,
-                            is_placeholder: resolved.is_placeholder,
-                        };
-                        col_values.insert(right_key.clone(), new_filter.clone());
-                        additional.push(new_filter);
-                        added_in_pass = true;
-                    }
-                }
+            if let Some(new_filter) =
+                try_derive_filter(&right_key, &left_key, &col_values, known_tables)
+            {
+                col_values.insert(right_key.clone(), new_filter.clone());
+                additional.push(new_filter);
+                added_in_pass = true;
             }
         }
 
