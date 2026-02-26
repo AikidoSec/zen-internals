@@ -555,7 +555,7 @@ fn try_extract_col_col_pair(
     Some((left_table, left_col, right_table, right_col))
 }
 
-/// Returns true when a column qualifier (table name or alias) is in scope.
+/// Prevents cross-subquery leakage by ensuring unqualified columns and columns from known tables are considered in scope.
 fn is_table_in_scope(table: &Option<String>, known_tables: &HashSet<String>) -> bool {
     match table {
         None => true,
