@@ -339,6 +339,8 @@ mod tests {
             "catch (err)",
             0
         );
+        is_injection!("switch (x) { case 1: handle(x); }", "case ", 0);
+        is_injection!("do process(item); while (true);", "do ", 0);
     }
 
     #[test]
