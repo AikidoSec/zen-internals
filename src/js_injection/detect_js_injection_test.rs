@@ -333,6 +333,12 @@ mod tests {
             0
         );
         is_injection!("try { connect(host) } finally { cleanup() }", "finally", 0);
+        is_injection!("try { connect() } catch { disconnect() }", " catch", 0);
+        is_injection!(
+            "try { connect(host) } catch (err) { handleError(err) }",
+            "catch (err)",
+            0
+        );
     }
 
     #[test]

@@ -105,26 +105,13 @@ fn contains_js_structural_elements(input: &str) -> bool {
         return true;
     }
     // Control-flow keywords that bridge code blocks.
-    // Uses a simple word-boundary check to ensure these are not part of an identifier.
+    // No word-boundary check is needed: any input where the keyword is embedded inside
+    // an alphanumeric identifier (e.g. "catchError") consists of pure alphanumeric chars,
+    // so the "aaa..." replacement always succeeds and the double-fail path is never reached.
     let lower = input.to_lowercase();
-    for kw in &["catch", "else", "finally", "case", "do"] {
-        if let Some(pos) = lower.find(kw) {
-            let before_ok = pos == 0
-                || !lower
-                    .as_bytes()
-                    .get(pos - 1)
-                    .map(|b| b.is_ascii_alphanumeric() || *b == b'_')
-                    .unwrap_or(false);
-            let after_ok = pos + kw.len() >= lower.len()
-                || !lower
-                    .as_bytes()
-                    .get(pos + kw.len())
-                    .map(|b| b.is_ascii_alphanumeric() || *b == b'_')
-                    .unwrap_or(false);
-            if before_ok && after_ok {
-                return true;
-            }
-        }
-    }
-    false
+    lower.contains("catch")
+        || lower.contains("else")
+        || lower.contains("finally")
+        || lower.contains("case")
+        || lower.contains("do")
 }
