@@ -89,7 +89,7 @@ pub fn detect_js_injection_str(code: &str, userinput: &str, sourcetype: i32) -> 
     return false;
 }
 
-// Returns true if the input contains structural JavaScript syntax tokens.
+// Fallback injection detection when AST comparison is not possible due to parse errors.
 // Only use when replacing and removing the user input both produce parse errors!
 // In that case the user input must be supplying syntax the surrounding code depends on,
 // which is a strong signal of code injection.
