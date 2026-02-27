@@ -63,7 +63,10 @@ pub fn detect_js_injection_str(code: &str, userinput: &str, sourcetype: i32) -> 
             .parse();
 
         if parser_result_without_input.panicked || parser_result_without_input.errors.len() > 0 {
-            return false;
+            // Both the replacement and removal of user input cause parse errors.
+            // This means the user input provides structural syntax to the surrounding code.
+            // If the input contains structural JS tokens, it is almost certainly an injection.
+            return contains_js_structural_elements(userinput);
         }
     }
 
@@ -84,4 +87,31 @@ pub fn detect_js_injection_str(code: &str, userinput: &str, sourcetype: i32) -> 
     }
 
     return false;
+}
+
+// Fallback injection detection when AST comparison is not possible due to parse errors.
+// Only use when replacing and removing the user input both produce parse errors!
+// In that case the user input must be supplying syntax the surrounding code depends on,
+// which is a strong signal of code injection.
+// Also in this case it is not possible that the user input is only a string literal.
+fn contains_js_structural_elements(input: &str) -> bool {
+    // Statement separator, ternary operator, block delimiters, arrow functions
+    if input.contains(';')
+        || input.contains('?')
+        || input.contains('{')
+        || input.contains('}')
+        || input.contains("=>")
+    {
+        return true;
+    }
+    // Control-flow keywords that bridge code blocks.
+    // No word-boundary check is needed: any input where the keyword is embedded inside
+    // an alphanumeric identifier (e.g. "catchError") consists of pure alphanumeric chars,
+    // so the "aaa..." replacement always succeeds and the double-fail path is never reached.
+    let lower = input.to_lowercase();
+    lower.contains("catch")
+        || lower.contains("else")
+        || lower.contains("finally")
+        || lower.contains("case")
+        || lower.contains("do")
 }
