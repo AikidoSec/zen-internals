@@ -1,5 +1,8 @@
 use crate::idor::idor_analyze_sql::idor_analyze_sql;
 use crate::js_injection::detect_js_injection::detect_js_injection_str;
+use crate::shell_injection::detect_shell_injection::{
+    detect_shell_injection_str, DetectionReason as ShellDetectionReason,
+};
 use crate::sql_injection::detect_sql_injection::{detect_sql_injection_str, DetectionReason};
 use std::ffi::CString;
 use std::os::raw::{c_char, c_int};
@@ -119,6 +122,47 @@ pub unsafe extern "C" fn wasm_alloc(size: usize) -> *mut u8 {
 pub unsafe extern "C" fn wasm_free(ptr: *mut u8, size: usize) {
     let layout = Layout::from_size_align(size, 1).unwrap();
     dealloc(ptr, layout)
+}
+
+#[no_mangle]
+pub extern "C" fn detect_shell_injection(
+    command: *const u8,
+    command_len: usize,
+    userinput: *const u8,
+    userinput_len: usize,
+) -> c_int {
+    // Returns 0 = safe, 1 = injection, 2 = error, 3 = failed to tokenize
+    return panic::catch_unwind(|| {
+        if command.is_null() || userinput.is_null() {
+            return 2;
+        }
+
+        if command_len == 0 || userinput_len == 0 {
+            return 2;
+        }
+
+        let command_bytes = unsafe { std::slice::from_raw_parts(command, command_len) };
+        let command_str = match str::from_utf8(command_bytes) {
+            Ok(s) => s,
+            Err(_) => return 2,
+        };
+
+        let userinput_bytes = unsafe { std::slice::from_raw_parts(userinput, userinput_len) };
+        let userinput_str = match str::from_utf8(userinput_bytes) {
+            Ok(s) => s,
+            Err(_) => return 2,
+        };
+
+        let result = detect_shell_injection_str(command_str, userinput_str);
+        if let ShellDetectionReason::FailedToTokenize = result.reason {
+            return 3;
+        }
+        if result.detected {
+            return 1;
+        }
+        return 0;
+    })
+    .unwrap_or(2);
 }
 
 #[no_mangle]

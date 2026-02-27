@@ -15,6 +15,14 @@ test("wasm_detect_js_injection", () => {
  deepStrictEqual(internals.wasm_detect_js_injection("const test = 'Hello World!'; //';", "Hello World!", 0), false);
 });
 
+test("wasm_detect_shell_injection", () => {
+ deepStrictEqual(internals.wasm_detect_shell_injection("ls; rm -rf /", "; rm -rf /"), 1);
+ deepStrictEqual(internals.wasm_detect_shell_injection("echo 'safe'", "safe"), 0);
+
+ // Tokenize error (unclosed quote)
+ deepStrictEqual(internals.wasm_detect_shell_injection("echo 'unclosed", "unclosed"), 3);
+});
+
 test("wasm_idor_analyze_sql", () => {
  deepStrictEqual(
   internals.wasm_idor_analyze_sql("SELECT * FROM users WHERE tenant_id = $1", 9),
