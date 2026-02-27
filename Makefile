@@ -28,8 +28,9 @@ smoketest:
 .PHONY: playground
 playground:
 	wasm-pack build --target web --features wasm-js
-	@echo "Open http://localhost:8080/idor-playground.html"
-	python3 -m http.server 8080
+	ln -sfn ../pkg playground/pkg
+	@echo "Open http://localhost:8080"
+	python3 -m http.server 8080 --directory playground
 
 .PHONY: bench
 bench:
