@@ -4537,4 +4537,1014 @@ mod tests {
             }]
         );
     }
+
+    #[test]
+    fn test_join_col_col_resolved_from_where() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT r.* FROM requests r \
+                 JOIN tenants t ON r.sys_group_id = t.sys_group_id \
+                 WHERE t.sys_group_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "requests".into(),
+                        alias: Some("r".into()),
+                    },
+                    TableRef {
+                        name: "tenants".into(),
+                        alias: Some("t".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("t".into()),
+                        column: "sys_group_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("r".into()),
+                        column: "sys_group_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_join_col_col_unqualified_side_resolved_from_where() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT u.* FROM users u \
+                 JOIN tenants t ON tenant_id = t.tenant_id \
+                 WHERE t.tenant_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "users".into(),
+                        alias: Some("u".into()),
+                    },
+                    TableRef {
+                        name: "tenants".into(),
+                        alias: Some("t".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("t".into()),
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_join_col_col_resolved_from_on_clause() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT r.* FROM requests r \
+                 JOIN tenants t ON r.sys_group_id = t.sys_group_id AND t.sys_group_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "requests".into(),
+                        alias: Some("r".into()),
+                    },
+                    TableRef {
+                        name: "tenants".into(),
+                        alias: Some("t".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("t".into()),
+                        column: "sys_group_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("r".into()),
+                        column: "sys_group_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_join_col_col_reversed_order() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT r.* FROM requests r \
+                 JOIN tenants t ON t.sys_group_id = r.sys_group_id \
+                 WHERE t.sys_group_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "requests".into(),
+                        alias: Some("r".into()),
+                    },
+                    TableRef {
+                        name: "tenants".into(),
+                        alias: Some("t".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("t".into()),
+                        column: "sys_group_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("r".into()),
+                        column: "sys_group_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_join_col_col_no_resolution_when_value_unknown() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM users u JOIN orders o ON o.user_id = u.id \
+                 WHERE u.tenant_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "users".into(),
+                        alias: Some("u".into()),
+                    },
+                    TableRef {
+                        name: "orders".into(),
+                        alias: Some("o".into()),
+                    },
+                ],
+                filters: vec![FilterColumn {
+                    table: Some("u".into()),
+                    column: "tenant_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_join_col_col_no_cross_subquery_leakage() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM users WHERE id IN \
+                 (SELECT 1 FROM orgs WHERE orgs.id = users.tenant_id AND orgs.id = $1)",
+                9,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "users".into(),
+                        alias: None,
+                    }],
+                    filters: vec![],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "orgs".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: Some("orgs".into()),
+                        column: "id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    }],
+                    insert_columns: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_join_col_col_mysql_placeholder() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT r.* FROM requests r \
+                 JOIN tenants t ON r.sys_group_id = t.sys_group_id \
+                 WHERE t.sys_group_id = ?",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "requests".into(),
+                        alias: Some("r".into()),
+                    },
+                    TableRef {
+                        name: "tenants".into(),
+                        alias: Some("t".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("t".into()),
+                        column: "sys_group_id".into(),
+                        value: "?".into(),
+                        placeholder_number: Some(0),
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("r".into()),
+                        column: "sys_group_id".into(),
+                        value: "?".into(),
+                        placeholder_number: Some(0),
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_join_col_col_not_resolved_inside_or() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT r.* FROM requests r \
+                 JOIN tenants t ON t.id = r.tenant_id \
+                 WHERE r.sys_group_id = t.sys_group_id OR t.sys_group_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "requests".into(),
+                        alias: Some("r".into()),
+                    },
+                    TableRef {
+                        name: "tenants".into(),
+                        alias: Some("t".into()),
+                    },
+                ],
+                filters: vec![],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_join_col_col_not_resolved_when_or_in_on_clause() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT r.* FROM requests r \
+                 JOIN tenants t ON r.sys_group_id = t.sys_group_id OR t.sys_group_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "requests".into(),
+                        alias: Some("r".into()),
+                    },
+                    TableRef {
+                        name: "tenants".into(),
+                        alias: Some("t".into()),
+                    },
+                ],
+                filters: vec![],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_join_col_col_not_resolved_inside_or_mysql() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT r.* FROM requests r \
+                 JOIN tenants t ON t.id = r.tenant_id \
+                 WHERE r.sys_group_id = t.sys_group_id OR t.sys_group_id = ?",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "requests".into(),
+                        alias: Some("r".into()),
+                    },
+                    TableRef {
+                        name: "tenants".into(),
+                        alias: Some("t".into()),
+                    },
+                ],
+                filters: vec![],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_three_table_join_both_pairs_independently_resolved() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT a.*, b.*, c.* \
+                 FROM table_a a \
+                 JOIN table_b b ON a.tenant_id = b.tenant_id \
+                 JOIN table_c c ON c.group_id = a.group_id \
+                 WHERE a.tenant_id = $1 AND a.group_id = $2",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "table_a".into(),
+                        alias: Some("a".into()),
+                    },
+                    TableRef {
+                        name: "table_b".into(),
+                        alias: Some("b".into()),
+                    },
+                    TableRef {
+                        name: "table_c".into(),
+                        alias: Some("c".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("a".into()),
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("a".into()),
+                        column: "group_id".into(),
+                        value: "$2".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("b".into()),
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("c".into()),
+                        column: "group_id".into(),
+                        value: "$2".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_three_table_join_chain_fully_resolved() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT a.*, b.*, c.* \
+                 FROM table_a a \
+                 JOIN table_b b ON a.group_id = b.group_id \
+                 JOIN table_c c ON b.group_id = c.group_id \
+                 WHERE c.group_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "table_a".into(),
+                        alias: Some("a".into()),
+                    },
+                    TableRef {
+                        name: "table_b".into(),
+                        alias: Some("b".into()),
+                    },
+                    TableRef {
+                        name: "table_c".into(),
+                        alias: Some("c".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("c".into()),
+                        column: "group_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("b".into()),
+                        column: "group_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("a".into()),
+                        column: "group_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_three_table_join_middle_value_resolves_both_ends() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT a.*, b.*, c.* \
+                 FROM table_a a \
+                 JOIN table_b b ON a.group_id = b.group_id \
+                 JOIN table_c c ON b.group_id = c.group_id \
+                 WHERE b.group_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "table_a".into(),
+                        alias: Some("a".into()),
+                    },
+                    TableRef {
+                        name: "table_b".into(),
+                        alias: Some("b".into()),
+                    },
+                    TableRef {
+                        name: "table_c".into(),
+                        alias: Some("c".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("b".into()),
+                        column: "group_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("a".into()),
+                        column: "group_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("c".into()),
+                        column: "group_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_col_col_both_sides_already_filtered_no_duplicate() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM table_a a \
+                 JOIN table_b b ON a.group_id = b.group_id \
+                 WHERE a.group_id = $1 AND b.group_id = $2",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "table_a".into(),
+                        alias: Some("a".into()),
+                    },
+                    TableRef {
+                        name: "table_b".into(),
+                        alias: Some("b".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("a".into()),
+                        column: "group_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("b".into()),
+                        column: "group_id".into(),
+                        value: "$2".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_col_col_not_resolved_when_value_only_in_in_subquery() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM users u \
+                 JOIN orders o ON u.tenant_id = o.tenant_id \
+                 WHERE u.id IN (SELECT user_id FROM vip_users WHERE tenant_id = $1)",
+                9,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![
+                        TableRef {
+                            name: "users".into(),
+                            alias: Some("u".into()),
+                        },
+                        TableRef {
+                            name: "orders".into(),
+                            alias: Some("o".into()),
+                        },
+                    ],
+                    filters: vec![],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "vip_users".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    }],
+                    insert_columns: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_col_col_scalar_subquery_outer_ref_not_leaked() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT o.*, \
+                 (SELECT t.name FROM tenants t \
+                  WHERE t.tenant_id = o.tenant_id AND t.tenant_id = $1) AS tname \
+                 FROM orders o",
+                9,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "orders".into(),
+                        alias: Some("o".into()),
+                    }],
+                    filters: vec![],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "tenants".into(),
+                        alias: Some("t".into()),
+                    }],
+                    filters: vec![FilterColumn {
+                        table: Some("t".into()),
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    }],
+                    insert_columns: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_update_from_col_col_resolved() {
+        assert_eq!(
+            idor_analyze_sql(
+                "UPDATE requests SET status = 'active' \
+                 FROM tenants \
+                 WHERE requests.tenant_id = tenants.tenant_id AND tenants.tenant_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "update".into(),
+                tables: vec![
+                    TableRef {
+                        name: "requests".into(),
+                        alias: None,
+                    },
+                    TableRef {
+                        name: "tenants".into(),
+                        alias: None,
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("tenants".into()),
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("requests".into()),
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_four_table_join_chain_fully_resolved() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT a.*, b.*, c.*, d.* \
+                 FROM table_a a \
+                 JOIN table_b b ON a.group_id = b.group_id \
+                 JOIN table_c c ON b.group_id = c.group_id \
+                 JOIN table_d d ON c.group_id = d.group_id \
+                 WHERE d.group_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "table_a".into(),
+                        alias: Some("a".into()),
+                    },
+                    TableRef {
+                        name: "table_b".into(),
+                        alias: Some("b".into()),
+                    },
+                    TableRef {
+                        name: "table_c".into(),
+                        alias: Some("c".into()),
+                    },
+                    TableRef {
+                        name: "table_d".into(),
+                        alias: Some("d".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("d".into()),
+                        column: "group_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("c".into()),
+                        column: "group_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("b".into()),
+                        column: "group_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("a".into()),
+                        column: "group_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_chain_fan_out_via_intermediate_node() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * \
+                 FROM table_a a \
+                 JOIN table_b b ON a.group_id = b.group_id \
+                 JOIN table_c c ON a.group_id = c.group_id \
+                 WHERE b.group_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "table_a".into(),
+                        alias: Some("a".into()),
+                    },
+                    TableRef {
+                        name: "table_b".into(),
+                        alias: Some("b".into()),
+                    },
+                    TableRef {
+                        name: "table_c".into(),
+                        alias: Some("c".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("b".into()),
+                        column: "group_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("a".into()),
+                        column: "group_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("c".into()),
+                        column: "group_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_chain_mysql_placeholder_number_inherited() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT a.*, b.*, c.* \
+                 FROM table_a a \
+                 JOIN table_b b ON a.group_id = b.group_id \
+                 JOIN table_c c ON b.group_id = c.group_id \
+                 WHERE c.group_id = ?",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "table_a".into(),
+                        alias: Some("a".into()),
+                    },
+                    TableRef {
+                        name: "table_b".into(),
+                        alias: Some("b".into()),
+                    },
+                    TableRef {
+                        name: "table_c".into(),
+                        alias: Some("c".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("c".into()),
+                        column: "group_id".into(),
+                        value: "?".into(),
+                        placeholder_number: Some(0),
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("b".into()),
+                        column: "group_id".into(),
+                        value: "?".into(),
+                        placeholder_number: Some(0),
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("a".into()),
+                        column: "group_id".into(),
+                        value: "?".into(),
+                        placeholder_number: Some(0),
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_col_col_ignores_non_equal_comparison() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT r.* FROM requests r \
+                 JOIN tenants t ON r.sys_group_id = t.sys_group_id \
+                 WHERE t.sys_group_id != $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "requests".into(),
+                        alias: Some("r".into()),
+                    },
+                    TableRef {
+                        name: "tenants".into(),
+                        alias: Some("t".into()),
+                    },
+                ],
+                filters: vec![],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_col_col_combines_on_and_where_pairs() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT r.* FROM requests r \
+                 JOIN tenants t ON r.sys_group_id = t.sys_group_id \
+                 WHERE t.sys_group_id = $1 AND r.account_id = t.account_id",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "requests".into(),
+                        alias: Some("r".into()),
+                    },
+                    TableRef {
+                        name: "tenants".into(),
+                        alias: Some("t".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("t".into()),
+                        column: "sys_group_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("r".into()),
+                        column: "sys_group_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_col_col_not_resolved_when_filter_is_in_subquery() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT r.* FROM requests r \
+                 JOIN tenants t ON r.sys_group_id = t.sys_group_id \
+                 WHERE t.sys_group_id IN (SELECT sys_group_id FROM allowed_groups WHERE tenant_id = $1)",
+                9,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![
+                        TableRef {
+                            name: "requests".into(),
+                            alias: Some("r".into()),
+                        },
+                        TableRef {
+                            name: "tenants".into(),
+                            alias: Some("t".into()),
+                        },
+                    ],
+                    filters: vec![],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "allowed_groups".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    }],
+                    insert_columns: None,
+                },
+            ]
+        );
+    }
 }

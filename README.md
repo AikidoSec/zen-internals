@@ -4,8 +4,8 @@
 
 Zen Internals is a library that can be used via FFI in different languages. Contains algorithms to detect:
 
--   SQL Injections
--   JS Code Injections
+- SQL Injections
+- JS Code Injections
 
 ## Return codes
 
@@ -57,7 +57,7 @@ const { wasm_detect_sql_injection } = require("./some-directory/zen_internals");
 const detected = wasm_detect_sql_injection(
     `SELECT * FROM users WHERE id = '' OR 1=1 -- '`, // query
     `' OR 1=1 -- `, // user input
-    9 // MySQL dialect
+    9, // MySQL dialect
 );
 
 console.log(detected); // 1
@@ -72,7 +72,7 @@ const { wasm_detect_js_injection } = require("./some-directory/zen_internals");
 
 const detected = wasm_detect_js_injection(
     `const x = 1; console.log(x); // ;`, // code
-    `1; console.log(x); // ` // user input
+    `1; console.log(x); // `, // user input
 );
 
 console.log(detected); // 1
@@ -89,7 +89,7 @@ const { wasm_idor_analyze_sql } = require("./some-directory/zen_internals");
 
 const result = wasm_idor_analyze_sql(
     `SELECT * FROM users u WHERE u.tenant_id = $1`, // query
-    9 // PostgreSQL dialect
+    9, // PostgreSQL dialect
 );
 
 console.log(JSON.parse(result));
@@ -103,7 +103,7 @@ console.log(JSON.parse(result));
 
 const insertResult = wasm_idor_analyze_sql(
     `INSERT INTO users (name, tenant_id) VALUES ('John', $1)`,
-    9
+    9,
 );
 
 console.log(JSON.parse(insertResult));
@@ -113,6 +113,25 @@ console.log(JSON.parse(insertResult));
 //     tables: [{ name: "users" }],
 //     filters: [],
 //     insert_columns: [[{ column: "name", value: "John" }, { column: "tenant_id", value: "$1" }]]
+//   }
+// ]
+
+// Column-to-column equality in JOIN ON / WHERE conditions is resolved transitively.
+// If one side has a known value, the other inherits it as an additional filter.
+const joinResult = wasm_idor_analyze_sql(
+    `SELECT r.* FROM requests r JOIN tenants t ON r.sys_group_id = t.sys_group_id WHERE t.sys_group_id = $1`,
+    9,
+);
+
+console.log(JSON.parse(joinResult));
+// [
+//   {
+//     kind: "select",
+//     tables: [{ name: "requests", alias: "r" }, { name: "tenants", alias: "t" }],
+//     filters: [
+//       { table: "t", column: "sys_group_id", value: "$1", "is_placeholder": true },
+//       { table: "r", column: "sys_group_id", value: "$1", "is_placeholder": true }
+//     ]
 //   }
 // ]
 ```
@@ -158,3 +177,4 @@ print(analyze_sql("INSERT INTO users (name, tenant_id) VALUES ('John', $1)", 9))
 #     "insert_columns": [[{ "column": "name", "value": "John" }, { "column": "tenant_id", "value": "$1" }]]
 #   }
 # ]
+```
