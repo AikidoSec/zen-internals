@@ -63,7 +63,10 @@ pub fn detect_js_injection_str(code: &str, userinput: &str, sourcetype: i32) -> 
             .parse();
 
         if parser_result_without_input.panicked || parser_result_without_input.errors.len() > 0 {
-            return false;
+            // Both the replacement and removal of user input cause parse errors.
+            // This means the user input provides structural syntax to the surrounding code.
+            // If the input contains structural JS tokens, it is almost certainly an injection.
+            return contains_js_structural_elements(userinput);
         }
     }
 
@@ -84,4 +87,44 @@ pub fn detect_js_injection_str(code: &str, userinput: &str, sourcetype: i32) -> 
     }
 
     return false;
+}
+
+// Returns true if the input contains structural JavaScript syntax tokens.
+// Only use when replacing and removing the user input both produce parse errors!
+// In that case the user input must be supplying syntax the surrounding code depends on,
+// which is a strong signal of code injection.
+// Also in this case it is not possible that the user input is only a string literal.
+fn contains_js_structural_elements(input: &str) -> bool {
+    // Statement separator, ternary operator, block delimiters, arrow functions
+    if input.contains(';')
+        || input.contains('?')
+        || input.contains('{')
+        || input.contains('}')
+        || input.contains("=>")
+    {
+        return true;
+    }
+    // Control-flow keywords that bridge code blocks.
+    // Uses a simple word-boundary check to ensure these are not part of an identifier.
+    let lower = input.to_lowercase();
+    for kw in &["catch", "else", "finally", "case", "do"] {
+        if let Some(pos) = lower.find(kw) {
+            let before_ok = pos == 0
+                || !lower
+                    .as_bytes()
+                    .get(pos - 1)
+                    .map(|b| b.is_ascii_alphanumeric() || *b == b'_')
+                    .unwrap_or(false);
+            let after_ok = pos + kw.len() >= lower.len()
+                || !lower
+                    .as_bytes()
+                    .get(pos + kw.len())
+                    .map(|b| b.is_ascii_alphanumeric() || *b == b'_')
+                    .unwrap_or(false);
+            if before_ok && after_ok {
+                return true;
+            }
+        }
+    }
+    false
 }
