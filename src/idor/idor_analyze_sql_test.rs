@@ -4852,6 +4852,61 @@ mod tests {
     }
 
     #[test]
+    fn test_join_col_col_not_resolved_when_or_in_on_clause() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT r.* FROM requests r \
+                 JOIN tenants t ON r.sys_group_id = t.sys_group_id OR t.sys_group_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "requests".into(),
+                        alias: Some("r".into()),
+                    },
+                    TableRef {
+                        name: "tenants".into(),
+                        alias: Some("t".into()),
+                    },
+                ],
+                filters: vec![],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_join_col_col_not_resolved_inside_or_mysql() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT r.* FROM requests r \
+                 JOIN tenants t ON t.id = r.tenant_id \
+                 WHERE r.sys_group_id = t.sys_group_id OR t.sys_group_id = ?",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "requests".into(),
+                        alias: Some("r".into()),
+                    },
+                    TableRef {
+                        name: "tenants".into(),
+                        alias: Some("t".into()),
+                    },
+                ],
+                filters: vec![],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
     fn test_three_table_join_both_pairs_independently_resolved() {
         assert_eq!(
             idor_analyze_sql(
