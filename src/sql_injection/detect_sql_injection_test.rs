@@ -26,12 +26,14 @@ mod tests {
     macro_rules! is_injection {
         ($query:expr, $input:expr) => {
             for dia in get_supported_dialects().iter() {
+                let result = detect_sql_injection_str($query, $input, dia.clone());
                 assert!(
-                    detect_sql_injection_str($query, $input, dia.clone()).detected,
-                    "should be an injection\nquery: {}\ninput: {}\ndialect: {}\n",
+                    result.detected,
+                    "should be an injection\nquery: {}\ninput: {}\ndialect: {}\nreason: {:?}\n",
                     $query,
                     $input,
-                    dia.clone()
+                    dia.clone(),
+                    result.reason
                 )
             }
         };
@@ -42,12 +44,14 @@ mod tests {
     macro_rules! not_injection {
         ($query:expr, $input:expr) => {
             for dia in get_supported_dialects().iter() {
+                let result = detect_sql_injection_str($query, $input, dia.clone());
                 assert!(
-                    !(detect_sql_injection_str($query, $input, dia.clone()).detected),
-                    "should not be an injection\nquery: {}\ninput: {}\ndialect: {}\n",
+                    !(result.detected),
+                    "should not be an injection\nquery: {}\ninput: {}\ndialect: {}\nreason: {:?}\n",
                     $query,
                     $input,
-                    dia.clone()
+                    dia.clone(),
+                    result.reason
                 )
             }
         };
@@ -1107,6 +1111,60 @@ mod tests {
                 SELECT *::timestamptz AT TIME ZONE 'UTC' AS created_at_utc FROM events
             "#,
             "TIME ZONE 'UTC'"
+        );
+    }
+
+    #[test]
+    fn test_safely_encapsulated_single_quoted_string() {
+        not_injection!(
+            r#"
+                SELECT '''_''';
+            "#,
+            "'_'"
+        );
+        not_injection!(
+            r#"
+                SELECT '''_';
+            "#,
+            "'_"
+        );
+        not_injection!(
+            r#"
+                SELECT '_''';
+            "#,
+            "_'"
+        );
+        not_injection!(
+            r#"
+                SELECT a FROM b WHERE b.a = '1; SELECT SLEEP(10) -- -''';
+            "#,
+            "1; SELECT SLEEP(10) -- -'"
+        );
+        not_injection!(
+            r#"
+                SELECT a FROM b WHERE (b.a ILIKE '''; sleep 15 ;''' OR b.c ILIKE 'x y');
+            "#,
+            "'; sleep 15 ;'"
+        );
+
+        // We do flag as SQL injection when the input occurs multiple times
+        is_injection!(
+            r#"
+                SELECT '_''', '_''';
+            "#,
+            "_'"
+        );
+        is_injection!(
+            r#"
+                SELECT '''_', '''_';
+            "#,
+            "'_"
+        );
+        is_injection!(
+            r#"
+                SELECT '''_''', '''_''';
+            "#,
+            "'_'"
         );
     }
 }
