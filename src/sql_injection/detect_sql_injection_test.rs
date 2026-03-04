@@ -1095,6 +1095,39 @@ mod tests {
     }
 
     #[test]
+    fn test_trailing_comma() {
+        not_injection!(
+            "SELECT id, username, email FROM users WHERE id IN (1,2,3)",
+            "username,"
+        );
+        not_injection!(
+            "SELECT id, username, email FROM users WHERE id IN (1,2,3)",
+            "id,"
+        );
+        not_injection!(
+            "SELECT id, username, email FROM users WHERE id IN (1,2,3)",
+            "email"
+        );
+        not_injection!(
+            "SELECT id, username, email FROM users WHERE id IN (1,2,3)",
+            "email,"
+        );
+
+        is_injection!(
+            "SELECT id, username, email FROM users WHERE id IN (1,2,3)",
+            "username, email"
+        );
+        is_injection!(
+            "SELECT id, username, email FROM users WHERE id IN (1,2,3)",
+            "id, username"
+        );
+        is_injection!(
+            "SELECT id, username, email FROM users WHERE id IN (1,2,3)",
+            "username, email FROM"
+        );
+    }
+
+    #[test]
     fn test_time_zone() {
         not_injection!(
             r#"
