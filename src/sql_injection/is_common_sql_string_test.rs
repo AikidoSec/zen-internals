@@ -405,4 +405,20 @@ mod tests {
             false
         );
     }
+
+    #[test]
+    fn test_trailing_comma() {
+        assert_eq!(is_common_sql_string("username,"), true);
+        assert_eq!(is_common_sql_string("user name,"), true);
+
+        assert_eq!(is_common_sql_string(",username,"), false);
+        assert_eq!(is_common_sql_string("user,name,"), false);
+        assert_eq!(is_common_sql_string(",user,name"), false);
+        assert_eq!(is_common_sql_string("user,name"), false);
+        assert_eq!(is_common_sql_string(",user name,"), false);
+        assert_eq!(is_common_sql_string("username,,"), false);
+        assert_eq!(is_common_sql_string(",,username"), false);
+        assert_eq!(is_common_sql_string(",username"), false);
+        assert_eq!(is_common_sql_string(",user name"), false);
+    }
 }
