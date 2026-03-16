@@ -2,6 +2,7 @@ use super::have_comments_changed::have_comments_changed;
 use super::is_common_sql_string::is_common_sql_string;
 use super::tokenize_query::tokenize_query;
 use crate::diff_in_vec_len;
+use sqlparser::tokenizer::Token::SingleQuotedString;
 
 const SPACE_CHAR: char = ' ';
 
@@ -19,6 +20,7 @@ pub enum DetectionReason {
     FailedToTokenizeQuery,
     UserInputTooSmall,
     NoChangesFound,
+    SafelyEscapedUserInput,
     // injection
     TokensHaveDelta,
     CommentStructureAltered,
@@ -58,6 +60,40 @@ pub fn detect_sql_injection_str(
             detected: false,
             reason: DetectionReason::FailedToTokenizeQuery,
         };
+    }
+
+    // Handle edge case where user input starts or ends with a single quote
+    // You can escape single quotes by prepending them with another single quote
+    // e.g. SELECT a FROM b WHERE b.a = '1; SELECT SLEEP(10) -- -''';
+    //                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^ 1; SELECT SLEEP(10) -- -'
+    // This will only occur when the user input starts or ends with a single quote
+    // We wouldn't find an exact match if there's a single quote in the middle of the user input
+    if userinput.starts_with('\'') || userinput.ends_with('\'') {
+        let expected_single_quotes = if userinput.starts_with('\'') { 1 } else { 0 }
+            + if userinput.ends_with('\'') { 1 } else { 0 };
+
+        let amount_of_single_quotes = userinput.matches('\'').count();
+        if amount_of_single_quotes == expected_single_quotes {
+            let escaped_userinput = userinput.replace('\'', "''");
+            let escaped_userinput_occurrences = query.matches(&escaped_userinput).count();
+            let userinput_occurrences = query.matches(&userinput).count();
+
+            if escaped_userinput_occurrences == 1 && userinput_occurrences == 1 {
+                for token in tokens.iter() {
+                    match token {
+                        SingleQuotedString(s) => {
+                            if *s == escaped_userinput {
+                                return SqlInjectionDetectionResult {
+                                    detected: false,
+                                    reason: DetectionReason::SafelyEscapedUserInput,
+                                };
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
     }
 
     // Remove leading and trailing spaces from userinput :
