@@ -13,6 +13,10 @@ pub mod ffi_bindings;
 #[cfg(feature = "wasm-js")]
 mod wasm_bindings;
 
+// PyO3 Bindings
+#[cfg(feature = "python")]
+mod pyo3_bindings;
+
 #[cfg(feature = "benchmarking")]
 pub mod sql_injection;
 

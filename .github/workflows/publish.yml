@@ -199,8 +199,40 @@ jobs:
           name: wasm-node-binaries
           path: pkg/zen_internals.tgz*
 
+  build-python-wheels:
+    needs: [tests, lint]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            artifact_name: python-wheels-linux
+          - runner: macos-latest
+            artifact_name: python-wheels-macos
+          - runner: windows-latest
+            artifact_name: python-wheels-windows
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Rust toolchain
+        run: |
+          rustup update --no-self-update stable
+          rustup default stable
+      - name: Install maturin
+        run: pip install maturin
+      - name: Build wheels
+        run: maturin build --release --features python --out dist
+      - name: Store artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: dist/*.whl
+
   upload-release-assets:
-    needs: [build, build-wasm-node]
+    needs: [build, build-wasm-node, build-python-wheels]
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
     steps:
@@ -223,5 +255,8 @@ jobs:
             ./artifacts/mac-binaries-arm64/*
             ./artifacts/wasm-node-binaries/*
             ./artifacts/wasm-binaries/*
+            ./artifacts/python-wheels-linux/*
+            ./artifacts/python-wheels-macos/*
+            ./artifacts/python-wheels-windows/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

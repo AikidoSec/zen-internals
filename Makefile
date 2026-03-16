@@ -2,6 +2,10 @@
 build:
 	cargo build --release
 
+.PHONY: build-python
+build-python:
+	maturin develop --features python
+
 .PHONY: test
 test:
 	cargo test
@@ -24,6 +28,11 @@ smoketest:
 			echo "✅ Smoketest passed (no panics detected)"; \
 		fi \
 	}
+
+.PHONY: smoketest-python
+smoketest-python:
+	maturin develop --features python
+	python3 smoketests/pyo3.py
 
 .PHONY: playground
 playground:

@@ -20,6 +20,7 @@ sqlparser = { git = "https://github.com/AikidoSec/datafusion-sqlparser-rs.git", 
 js-sys = { version = "0.3.85", optional = true }
 serde-wasm-bindgen = { version = "0.6.5", optional = true }
 wasm-bindgen = { version = "0.2", optional = true }
+pyo3 = { version = "0.22", optional = true, features = ["extension-module"] }
 
 [profile.release]
 strip = true
@@ -35,6 +36,7 @@ codegen-units = 1
 default = []
 benchmarking = []
 wasm-js = ["wasm-bindgen", "serde-wasm-bindgen", "js-sys"]
+python = ["pyo3"]
 
 [workspace]
 members = [
