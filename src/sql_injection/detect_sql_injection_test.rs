@@ -977,6 +977,24 @@ mod tests {
     }
 
     #[test]
+    fn test_digit_ending_with_parenthesis() {
+        not_injection!("SELECT * FROM table WHERE (a = 1 OR b = 2) AND a = 1", "2)");
+        not_injection!(
+            "SELECT * FROM table WHERE (a = 1 OR b = 12) AND a = 1",
+            "12)"
+        );
+
+        is_injection!(
+            "SELECT * FROM table WHERE (a = 1 OR b = 2) AND a = 1",
+            "2) AND a = 1"
+        );
+        is_injection!(
+            "SELECT * FROM table WHERE (a = 1 OR b = 12) AND a = 1",
+            "12) AND a = 1"
+        );
+    }
+
+    #[test]
     fn test_sleep_pentest() {
         is_injection!(
             r#"INSERT INTO pets (pet_name, owner) VALUES ('x', 'Aikido Security'), ((SELECT 'x' FROM pg_sleep(5)), 'Aikido Security') -- ', 'Aikido Security')"#,
