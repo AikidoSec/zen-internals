@@ -4517,6 +4517,197 @@ mod tests {
     }
 
     #[test]
+    fn test_sqlite_question_mark_placeholder() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE tenant_id = ?", 12).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "?".into(),
+                    placeholder_number: Some(0),
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_sqlite_numbered_question_mark_placeholder() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM users WHERE tenant_id = ?1 AND status = ?2",
+                12
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![
+                    FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "?1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: None,
+                        column: "status".into(),
+                        value: "?2".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_sqlite_colon_named_placeholder() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE tenant_id = :tenant_id", 12,).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: ":tenant_id".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_sqlite_at_sign_named_placeholder() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE tenant_id = @tenant_id", 12,).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "@tenant_id".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_sqlite_dollar_sign_named_placeholder() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE tenant_id = $tenant_id", 12,).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "$tenant_id".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_sqlite_insert_with_at_sign_placeholders() {
+        assert_eq!(
+            idor_analyze_sql(
+                "INSERT INTO users (name, tenant_id) VALUES (@name, @tenant_id)",
+                12,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "insert".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![],
+                insert_columns: Some(vec![vec![
+                    InsertColumn {
+                        column: "name".into(),
+                        value: "@name".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    InsertColumn {
+                        column: "tenant_id".into(),
+                        value: "@tenant_id".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ]]),
+            }]
+        );
+    }
+
+    #[test]
+    fn test_sqlite_mixed_placeholder_styles() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM users WHERE tenant_id = :tenant_id AND status = @status",
+                12,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![
+                    FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: ":tenant_id".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: None,
+                        column: "status".into(),
+                        value: "@status".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
     fn test_string_literal_is_not_placeholder() {
         assert_eq!(
             idor_analyze_sql("SELECT * FROM orders WHERE tenant_id = 'org_123'", 9).unwrap(),
