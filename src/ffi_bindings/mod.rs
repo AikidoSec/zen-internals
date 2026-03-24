@@ -178,10 +178,7 @@ thread_local! {
 }
 
 #[no_mangle]
-pub extern "C" fn waf_set_rules(
-    rules_json: *const u8,
-    rules_json_len: usize,
-) -> *mut c_char {
+pub extern "C" fn waf_set_rules(rules_json: *const u8, rules_json_len: usize) -> *mut c_char {
     let result = panic::catch_unwind(|| {
         if rules_json.is_null() || rules_json_len == 0 {
             return CString::new(r#"{"success":false,"error":"Invalid input"}"#)
@@ -223,17 +220,13 @@ pub extern "C" fn waf_set_rules(
 }
 
 #[no_mangle]
-pub extern "C" fn waf_evaluate(
-    request_json: *const u8,
-    request_json_len: usize,
-) -> *mut c_char {
+pub extern "C" fn waf_evaluate(request_json: *const u8, request_json_len: usize) -> *mut c_char {
     let result = panic::catch_unwind(|| {
         if request_json.is_null() || request_json_len == 0 {
             return CString::new(r#"{"matched":false}"#).unwrap().into_raw();
         }
 
-        let json_bytes =
-            unsafe { std::slice::from_raw_parts(request_json, request_json_len) };
+        let json_bytes = unsafe { std::slice::from_raw_parts(request_json, request_json_len) };
         let json_str = match str::from_utf8(json_bytes) {
             Ok(s) => s,
             Err(_) => return CString::new(r#"{"matched":false}"#).unwrap().into_raw(),
@@ -254,7 +247,5 @@ pub extern "C" fn waf_evaluate(
         })
     });
 
-    result.unwrap_or_else(|_| {
-        CString::new(r#"{"matched":false}"#).unwrap().into_raw()
-    })
+    result.unwrap_or_else(|_| CString::new(r#"{"matched":false}"#).unwrap().into_raw())
 }

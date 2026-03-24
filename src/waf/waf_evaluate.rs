@@ -97,11 +97,7 @@ impl WafEngine {
     }
 }
 
-fn populate_context<'a>(
-    ctx: &mut ExecutionContext<'a>,
-    request: &'a RequestData,
-    ip: IpAddr,
-) {
+fn populate_context<'a>(ctx: &mut ExecutionContext<'a>, request: &'a RequestData, ip: IpAddr) {
     let _ = ctx.set_field_value("http.host", request.host.as_str());
     let _ = ctx.set_field_value("http.request.method", request.method.as_str());
     let _ = ctx.set_field_value("http.request.uri", request.uri.as_str());
@@ -113,10 +109,7 @@ fn populate_context<'a>(
         request.user_agent.as_deref().unwrap_or(""),
     );
     let _ = ctx.set_field_value("http.cookie", request.cookie.as_deref().unwrap_or(""));
-    let _ = ctx.set_field_value(
-        "http.referer",
-        request.referer.as_deref().unwrap_or(""),
-    );
+    let _ = ctx.set_field_value("http.referer", request.referer.as_deref().unwrap_or(""));
     let _ = ctx.set_field_value(
         "http.x_forwarded_for",
         request.x_forwarded_for.as_deref().unwrap_or(""),

@@ -24,9 +24,7 @@ pub fn build_http_scheme() -> Scheme {
     scheme
         .add_field("http.user_agent".into(), Type::Bytes)
         .unwrap();
-    scheme
-        .add_field("http.cookie".into(), Type::Bytes)
-        .unwrap();
+    scheme.add_field("http.cookie".into(), Type::Bytes).unwrap();
     scheme
         .add_field("http.referer".into(), Type::Bytes)
         .unwrap();
