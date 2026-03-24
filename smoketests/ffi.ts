@@ -361,6 +361,25 @@ assertEquals(
     { matched: false }
 );
 
+// Update rules - old rule should no longer match
+callWafSetRules(JSON.stringify([
+    { id: "block-api", expression: 'http.request.uri.path contains "/api"', action: "block" }
+]));
+assertEquals(
+    callWafEvaluate(JSON.stringify({
+        host: "example.com", method: "GET", path: "/admin/users", query: "",
+        uri: "/admin/users", full_uri: "https://example.com/admin/users", ip_src: "1.2.3.4"
+    })),
+    { matched: false }
+);
+assertEquals(
+    callWafEvaluate(JSON.stringify({
+        host: "example.com", method: "GET", path: "/api/users", query: "",
+        uri: "/api/users", full_uri: "https://example.com/api/users", ip_src: "1.2.3.4"
+    })),
+    { matched: true, rule_id: "block-api", action: "block" }
+);
+
 // Invalid expression
 const badResult = callWafSetRules(JSON.stringify([
     { id: "bad", expression: "not valid !!!", action: "block" }

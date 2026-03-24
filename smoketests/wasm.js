@@ -58,6 +58,22 @@ test("wasm_waf_set_rules and wasm_waf_evaluate", () => {
  }));
  deepStrictEqual(noMatchResult.matched, false);
 
+ // Update rules - old rule should no longer match
+ internals.wasm_waf_set_rules(JSON.stringify([
+  { id: "block-api", expression: 'http.request.uri.path contains "/api"', action: "block" }
+ ]));
+ const oldRuleResult = internals.wasm_waf_evaluate(JSON.stringify({
+  host: "example.com", method: "GET", path: "/admin/users", query: "",
+  uri: "/admin/users", full_uri: "https://example.com/admin/users", ip_src: "1.2.3.4"
+ }));
+ deepStrictEqual(oldRuleResult.matched, false);
+ const newRuleResult = internals.wasm_waf_evaluate(JSON.stringify({
+  host: "example.com", method: "GET", path: "/api/users", query: "",
+  uri: "/api/users", full_uri: "https://example.com/api/users", ip_src: "1.2.3.4"
+ }));
+ deepStrictEqual(newRuleResult.matched, true);
+ deepStrictEqual(newRuleResult.rule_id, "block-api");
+
  // Invalid expression
  const badResult = internals.wasm_waf_set_rules(JSON.stringify([
   { id: "bad", expression: "not valid !!!", action: "block" }
