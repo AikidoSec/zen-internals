@@ -30,3 +30,5 @@ pub mod idor;
 
 #[cfg(not(feature = "benchmarking"))]
 mod idor;
+
+pub mod waf;
