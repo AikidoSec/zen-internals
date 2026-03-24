@@ -6,6 +6,7 @@ Zen Internals is a library that can be used via FFI in different languages. Cont
 
 -   SQL Injections
 -   JS Code Injections
+-   WAF (Web Application Firewall) rule evaluation using wirefilter compatible format
 
 ## Return codes
 
