@@ -28,7 +28,9 @@ fn test_path_traversal_match() {
     }]);
     assert!(result.success);
 
-    let result = engine.evaluate(&make_request("/files/../etc/passwd")).unwrap();
+    let result = engine
+        .evaluate(&make_request("/files/../etc/passwd"))
+        .unwrap();
     assert!(result.matched);
     assert_eq!(result.rule_id.unwrap(), "rule1");
 }
@@ -88,9 +90,8 @@ fn test_compound_expression() {
     let mut engine = WafEngine::new();
     engine.set_rules(&[RuleInput {
         id: "compound".to_string(),
-        expression:
-            r#"http.request.method == "POST" and http.request.uri.path contains "/admin""#
-                .to_string(),
+        expression: r#"http.request.method == "POST" and http.request.uri.path contains "/admin""#
+            .to_string(),
         action: "block".to_string(),
     }]);
 
