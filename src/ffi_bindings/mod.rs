@@ -1,6 +1,9 @@
 use crate::idor::idor_analyze_sql::idor_analyze_sql;
 use crate::js_injection::detect_js_injection::detect_js_injection_str;
 use crate::sql_injection::detect_sql_injection::{detect_sql_injection_str, DetectionReason};
+use crate::waf::waf_evaluate::WafEngine;
+use crate::waf::waf_result::RuleInput;
+use std::cell::RefCell;
 use std::ffi::CString;
 use std::os::raw::{c_char, c_int};
 use std::panic;
@@ -167,4 +170,82 @@ pub unsafe extern "C" fn free_string(ptr: *mut c_char) {
     if !ptr.is_null() {
         drop(CString::from_raw(ptr));
     }
+}
+
+// WAF engine singleton
+thread_local! {
+    static WAF_ENGINE: RefCell<WafEngine> = RefCell::new(WafEngine::new());
+}
+
+#[no_mangle]
+pub extern "C" fn waf_set_rules(rules_json: *const u8, rules_json_len: usize) -> *mut c_char {
+    let result = panic::catch_unwind(|| {
+        if rules_json.is_null() || rules_json_len == 0 {
+            return CString::new(r#"{"success":false,"error":"Invalid input"}"#)
+                .unwrap()
+                .into_raw();
+        }
+
+        let json_bytes = unsafe { std::slice::from_raw_parts(rules_json, rules_json_len) };
+        let json_str = match str::from_utf8(json_bytes) {
+            Ok(s) => s,
+            Err(_) => {
+                return CString::new(r#"{"success":false,"error":"Invalid UTF-8"}"#)
+                    .unwrap()
+                    .into_raw();
+            }
+        };
+
+        let rule_inputs: Vec<RuleInput> = match serde_json::from_str(json_str) {
+            Ok(rules) => rules,
+            Err(e) => {
+                let json = format!(r#"{{"success":false,"error":"{}"}}"#, e);
+                return CString::new(json).unwrap().into_raw();
+            }
+        };
+
+        WAF_ENGINE.with(|engine| {
+            let result = engine.borrow_mut().set_rules(&rule_inputs);
+            let json = serde_json::to_string(&result)
+                .unwrap_or_else(|e| format!(r#"{{"success":false,"error":"{}"}}"#, e));
+            CString::new(json).unwrap().into_raw()
+        })
+    });
+
+    result.unwrap_or_else(|_| {
+        CString::new(r#"{"success":false,"error":"Internal error"}"#)
+            .unwrap()
+            .into_raw()
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn waf_evaluate(request_json: *const u8, request_json_len: usize) -> *mut c_char {
+    let result = panic::catch_unwind(|| {
+        if request_json.is_null() || request_json_len == 0 {
+            return CString::new(r#"{"matched":false}"#).unwrap().into_raw();
+        }
+
+        let json_bytes = unsafe { std::slice::from_raw_parts(request_json, request_json_len) };
+        let json_str = match str::from_utf8(json_bytes) {
+            Ok(s) => s,
+            Err(_) => return CString::new(r#"{"matched":false}"#).unwrap().into_raw(),
+        };
+
+        let request = match serde_json::from_str(json_str) {
+            Ok(req) => req,
+            Err(_) => return CString::new(r#"{"matched":false}"#).unwrap().into_raw(),
+        };
+
+        WAF_ENGINE.with(|engine| {
+            let json = match engine.borrow().evaluate(&request) {
+                Ok(result) => serde_json::to_string(&result)
+                    .unwrap_or_else(|_| r#"{"matched":false}"#.to_string()),
+                Err(e) => format!(r#"{{"matched":false,"error":"{}"}}"#, e),
+            };
+            CString::new(json).unwrap().into_raw()
+        })
+    });
+
+    result.unwrap_or_else(|_| CString::new(r#"{"matched":false}"#).unwrap().into_raw())
 }

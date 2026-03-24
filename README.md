@@ -6,6 +6,7 @@ Zen Internals is a library that can be used via FFI in different languages. Cont
 
 -   SQL Injections
 -   JS Code Injections
+-   WAF (Web Application Firewall) rule evaluation using wirefilter compatible format
 
 ## Return codes
 
@@ -158,3 +159,51 @@ print(analyze_sql("INSERT INTO users (name, tenant_id) VALUES ('John', $1)", 9))
 #     "insert_columns": [[{ "column": "name", "value": "John" }, { "column": "tenant_id", "value": "$1" }]]
 #   }
 # ]
+```
+
+## WAF rule evaluation
+
+Evaluates WAF rules using [wirefilter](https://github.com/cloudflare/wirefilter) syntax. Available fields:
+
+| Field | Type |
+| --- | --- |
+| `http.host` | String |
+| `http.request.method` | String |
+| `http.request.uri` | String |
+| `http.request.uri.path` | String |
+| `http.request.uri.query` | String |
+| `http.request.full_uri` | String |
+| `http.user_agent` | String |
+| `http.cookie` | String |
+| `http.referer` | String |
+| `http.x_forwarded_for` | String |
+| `http.request.body.raw` | String |
+| `ip.src` | IP Address |
+
+#### WASM
+
+```js
+const { wasm_waf_set_rules, wasm_waf_evaluate } = require("./some-directory/zen_internals");
+
+// Set rules
+const setResult = wasm_waf_set_rules(JSON.stringify([
+    {
+        id: "block-admin",
+        expression: 'http.request.uri.path contains "/admin" and http.request.method == "POST"',
+        action: "block"
+    }
+]));
+console.log(setResult); // { success: true }
+
+// Evaluate a request
+const evalResult = wasm_waf_evaluate(JSON.stringify({
+    host: "example.com",
+    method: "POST",
+    path: "/admin/users",
+    query: "",
+    uri: "/admin/users",
+    full_uri: "https://example.com/admin/users",
+    ip_src: "1.2.3.4"
+}));
+console.log(evalResult); // { matched: true, rule_id: "block-admin", action: "block" }
+```

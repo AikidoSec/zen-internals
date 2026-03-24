@@ -303,4 +303,89 @@ assertEquals(
     []
 );
 
+// Test WAF
+const wafLib = Deno.dlopen(fullTargetDir, {
+    waf_set_rules: {
+        parameters: ["pointer", "usize"],
+        result: "pointer",
+    },
+    waf_evaluate: {
+        parameters: ["pointer", "usize"],
+        result: "pointer",
+    },
+    free_string: {
+        parameters: ["pointer"],
+        result: "void",
+    },
+});
+
+function callWafSetRules(json: string): unknown {
+    const [ptr, len] = getBufferAndLength(json);
+    const resultPtr = wafLib.symbols.waf_set_rules(ptr, len);
+    const result = new Deno.UnsafePointerView(resultPtr!).getCString();
+    wafLib.symbols.free_string(resultPtr);
+    return JSON.parse(result);
+}
+
+function callWafEvaluate(json: string): unknown {
+    const [ptr, len] = getBufferAndLength(json);
+    const resultPtr = wafLib.symbols.waf_evaluate(ptr, len);
+    const result = new Deno.UnsafePointerView(resultPtr!).getCString();
+    wafLib.symbols.free_string(resultPtr);
+    return JSON.parse(result);
+}
+
+// Set a rule
+assertEquals(
+    callWafSetRules(JSON.stringify([
+        { id: "block-admin", expression: 'http.request.uri.path contains "/admin"', action: "block" }
+    ])),
+    { success: true }
+);
+
+// Should match
+assertEquals(
+    callWafEvaluate(JSON.stringify({
+        host: "example.com", method: "GET", path: "/admin/users", query: "",
+        uri: "/admin/users", full_uri: "https://example.com/admin/users", ip_src: "1.2.3.4"
+    })),
+    { matched: true, rule_id: "block-admin", action: "block" }
+);
+
+// Should not match
+assertEquals(
+    callWafEvaluate(JSON.stringify({
+        host: "example.com", method: "GET", path: "/index.html", query: "",
+        uri: "/index.html", full_uri: "https://example.com/index.html", ip_src: "1.2.3.4"
+    })),
+    { matched: false }
+);
+
+// Update rules - old rule should no longer match
+callWafSetRules(JSON.stringify([
+    { id: "block-api", expression: 'http.request.uri.path contains "/api"', action: "block" }
+]));
+assertEquals(
+    callWafEvaluate(JSON.stringify({
+        host: "example.com", method: "GET", path: "/admin/users", query: "",
+        uri: "/admin/users", full_uri: "https://example.com/admin/users", ip_src: "1.2.3.4"
+    })),
+    { matched: false }
+);
+assertEquals(
+    callWafEvaluate(JSON.stringify({
+        host: "example.com", method: "GET", path: "/api/users", query: "",
+        uri: "/api/users", full_uri: "https://example.com/api/users", ip_src: "1.2.3.4"
+    })),
+    { matched: true, rule_id: "block-api", action: "block" }
+);
+
+// Invalid expression
+const badResult = callWafSetRules(JSON.stringify([
+    { id: "bad", expression: "not valid !!!", action: "block" }
+])) as { success: boolean; rule_id: string };
+assertEquals(badResult.success, false);
+assertEquals(badResult.rule_id, "bad");
+
+wafLib.close();
 lib.close();
