@@ -34,3 +34,34 @@ test("wasm_idor_analyze_sql", () => {
   []
  );
 });
+
+test("wasm_waf_set_rules and wasm_waf_evaluate", () => {
+ // Set a rule
+ const setResult = internals.wasm_waf_set_rules(JSON.stringify([
+  { id: "block-admin", expression: 'http.request.uri.path contains "/admin"', action: "block" }
+ ]));
+ deepStrictEqual(setResult.success, true);
+
+ // Should match
+ const matchResult = internals.wasm_waf_evaluate(JSON.stringify({
+  host: "example.com", method: "GET", path: "/admin/users", query: "",
+  uri: "/admin/users", full_uri: "https://example.com/admin/users", ip_src: "1.2.3.4"
+ }));
+ deepStrictEqual(matchResult.matched, true);
+ deepStrictEqual(matchResult.rule_id, "block-admin");
+ deepStrictEqual(matchResult.action, "block");
+
+ // Should not match
+ const noMatchResult = internals.wasm_waf_evaluate(JSON.stringify({
+  host: "example.com", method: "GET", path: "/index.html", query: "",
+  uri: "/index.html", full_uri: "https://example.com/index.html", ip_src: "1.2.3.4"
+ }));
+ deepStrictEqual(noMatchResult.matched, false);
+
+ // Invalid expression
+ const badResult = internals.wasm_waf_set_rules(JSON.stringify([
+  { id: "bad", expression: "not valid !!!", action: "block" }
+ ]));
+ deepStrictEqual(badResult.success, false);
+ deepStrictEqual(badResult.rule_id, "bad");
+});
