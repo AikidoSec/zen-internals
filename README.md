@@ -26,7 +26,7 @@ zen_internals = ctypes.CDLL("target/release/libzen_internals.so")
 if __name__ == "__main__":
     query = "SELECT * FROM users WHERE id = '' OR 1=1 -- '".encode("utf-8")
     userinput = "' OR 1=1 -- ".encode("utf-8")
-    dialect = 9  # MySQL dialect
+    dialect = 9  # PostgreSQL dialect
 
     result = zen_internals.detect_sql_injection(
         query, len(query), userinput, len(userinput), dialect
@@ -57,7 +57,7 @@ const { wasm_detect_sql_injection } = require("./some-directory/zen_internals");
 const detected = wasm_detect_sql_injection(
     `SELECT * FROM users WHERE id = '' OR 1=1 -- '`, // query
     `' OR 1=1 -- `, // user input
-    9, // MySQL dialect
+    9, // PostgreSQL dialect
 );
 
 console.log(detected); // 1
