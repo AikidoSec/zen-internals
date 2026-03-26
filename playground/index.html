@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>zen-internals Playground</title>
+        <link rel="stylesheet" href="assets/style.css" />
+        <link rel="icon" type="image/svg+xml" href="assets/zen.svg" />
+    </head>
+    <body>
+        <div class="flex flex-row">
+            <img src="assets/zen.svg" class="zen-logo" alt="zen" />
+            <h1>-internals Playground</h1>
+        </div>
+        <p class="subtitle">
+            Interactive playgrounds for the WASM-compiled analysis functions.
+        </p>
+
+        <div class="cards">
+            <a class="card" href="./idor.html">
+                <h2>IDOR SQL Analyzer</h2>
+                <p>
+                    Analyze SQL queries for insecure direct object reference
+                    vulnerabilities by inspecting WHERE clause filters.
+                </p>
+            </a>
+            <a class="card" href="./sqli.html">
+                <h2>SQL Injection Detector</h2>
+                <p>
+                    Detect SQL injection by comparing the tokens of a query with
+                    and without the user-supplied input.
+                </p>
+            </a>
+            <a class="card" href="./js.html">
+                <h2>JS Injection Detector</h2>
+                <p>
+                    Detect JavaScript injection by checking whether embedding
+                    user input changes the AST structure of the code.
+                </p>
+            </a>
+        </div>
+    </body>
+</html>
