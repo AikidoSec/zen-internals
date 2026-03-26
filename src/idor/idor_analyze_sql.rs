@@ -387,7 +387,7 @@ struct SelectVisitor {
     filters: Vec<FilterColumn>,
     /// Column-to-column equality pairs (e.g. `r.sys_group_id = t.sys_group_id`).
     /// Resolved into additional filters after the visit completes.
-    col_col_pairs: Vec<(Option<String>, String, Option<String>, String)>,
+    col_col_pairs: Vec<ColColPair>,
     placeholder_counter: usize,
     subqueries: Vec<Query>,
     /// Tracks nesting depth inside subqueries. When > 0, we skip collecting tables/filters
@@ -538,10 +538,15 @@ fn try_extract_filter(expr: &Expr, placeholder_counter: usize) -> Option<FilterC
         .or_else(|| extract_column_value_pair(right, left, placeholder_counter))
 }
 
+struct ColColPair {
+    left_table: Option<String>,
+    left_col: String,
+    right_table: Option<String>,
+    right_col: String,
+}
+
 /// Extracts a column-to-column equality pair (e.g. `r.sys_group_id = t.sys_group_id`).
-fn try_extract_col_col_pair(
-    expr: &Expr,
-) -> Option<(Option<String>, String, Option<String>, String)> {
+fn try_extract_col_col_pair(expr: &Expr) -> Option<ColColPair> {
     let Expr::BinaryOp { left, op, right } = expr else {
         return None;
     };
@@ -552,7 +557,12 @@ fn try_extract_col_col_pair(
 
     let (left_table, left_col) = extract_column_ref(left)?;
     let (right_table, right_col) = extract_column_ref(right)?;
-    Some((left_table, left_col, right_table, right_col))
+    Some(ColColPair {
+        left_table,
+        left_col,
+        right_table,
+        right_col,
+    })
 }
 
 /// Prevents cross-subquery leakage by ensuring unqualified columns and columns from known tables are considered in scope.
@@ -608,7 +618,7 @@ fn try_derive_filter(
 /// derives `b.x = $1` and then `a.x = $1`.
 fn resolve_col_col_filters(
     filters: &[FilterColumn],
-    col_col_pairs: &[(Option<String>, String, Option<String>, String)],
+    col_col_pairs: &[ColColPair],
     known_tables: &HashSet<String>,
 ) -> Vec<FilterColumn> {
     if col_col_pairs.is_empty() {
@@ -628,9 +638,9 @@ fn resolve_col_col_filters(
     loop {
         let mut added_in_pass = false;
 
-        for (left_table, left_col, right_table, right_col) in col_col_pairs {
-            let left_key = (left_table.clone(), left_col.clone());
-            let right_key = (right_table.clone(), right_col.clone());
+        for pair in col_col_pairs {
+            let left_key = (pair.left_table.clone(), pair.left_col.clone());
+            let right_key = (pair.right_table.clone(), pair.right_col.clone());
 
             // Resolve left from right: right side has a known value, derive left
             if let Some(new_filter) =
@@ -725,11 +735,7 @@ fn object_name_to_string(name: &ObjectName) -> String {
 fn extract_filters_from_where(
     expr: &Expr,
     counter: &mut usize,
-) -> (
-    Vec<FilterColumn>,
-    Vec<(Option<String>, String, Option<String>, String)>,
-    Vec<Query>,
-) {
+) -> (Vec<FilterColumn>, Vec<ColColPair>, Vec<Query>) {
     let mut filters = Vec::new();
     let mut col_col_pairs = Vec::new();
     let mut subqueries = Vec::new();
@@ -749,7 +755,7 @@ fn walk_expr(
     expr: &Expr,
     counter: &mut usize,
     filters: &mut Vec<FilterColumn>,
-    col_col_pairs: &mut Vec<(Option<String>, String, Option<String>, String)>,
+    col_col_pairs: &mut Vec<ColColPair>,
     subqueries: &mut Vec<Query>,
     in_or: bool,
 ) {
