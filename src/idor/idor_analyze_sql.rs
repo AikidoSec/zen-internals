@@ -21,12 +21,12 @@ use std::collections::{HashMap, HashSet};
 /// Equality comparisons (`=`) where one side is a column and the other is a concrete
 /// value (literal or placeholder) are extracted directly.
 ///
-/// Column-to-column comparisons that arise in JOIN ON or WHERE clauses (e.g.
-/// `r.sys_group_id = t.sys_group_id`) are also captured and resolved by transitive
-/// closure: a fixpoint loop repeatedly propagates known values through the col-col graph
-/// until nothing new can be derived. This handles arbitrary-length JOIN chains (e.g.
-/// `a=b`, `b=c`, `c=$1` → all three resolved). Only columns whose table qualifier is
-/// within the current query's scope are emitted, preventing cross-subquery leakage.
+/// Column-to-column comparisons in JOIN ON or WHERE clauses (e.g.
+/// `r.sys_group_id = t.sys_group_id`) are also collected. After extraction, we
+/// propagate known values through these pairs in a loop until no new filters can
+/// be derived. This means JOIN chains like `a=b`, `b=c`, `c=$1` will resolve all
+/// three columns to `$1`. We only create filters for tables that belong to the
+/// current query, so subquery tables don't leak into the outer query.
 ///
 /// # UNION / INTERSECT / EXCEPT
 ///
@@ -385,8 +385,8 @@ fn visit_select(
 struct SelectVisitor {
     tables: Vec<TableRef>,
     filters: Vec<FilterColumn>,
-    /// Column-to-column equality pairs (e.g. `r.sys_group_id = t.sys_group_id`).
-    /// Resolved into additional filters after the visit completes.
+    /// Pairs like `r.sys_group_id = t.sys_group_id` collected during the visit.
+    /// After visiting, we use these to propagate known values between columns.
     col_col_pairs: Vec<ColColPair>,
     placeholder_counter: usize,
     subqueries: Vec<Query>,
@@ -565,7 +565,8 @@ fn try_extract_col_col_pair(expr: &Expr) -> Option<ColColPair> {
     })
 }
 
-/// Prevents cross-subquery leakage by ensuring unqualified columns and columns from known tables are considered in scope.
+/// Returns true if the column's table qualifier belongs to the current query.
+/// Unqualified columns (no table prefix) are always considered in scope.
 fn is_table_in_scope(table: &Option<String>, known_tables: &HashSet<String>) -> bool {
     match table {
         None => true,
@@ -587,9 +588,9 @@ fn tables_to_known_set(tables: &[TableRef]) -> HashSet<String> {
         .collect()
 }
 
-/// Derives a filter for `target_key` by looking up `source_key` in `col_values`.
-/// Returns `None` if `target_key` is already known or `source_key` has no value
-/// or the target table is not in scope.
+/// If `source_key` has a known value and `target_key` doesn't yet, creates a new
+/// filter for `target_key` with that value. Returns `None` if `target_key` already
+/// has a value, `source_key` has no value, or the target table is out of scope.
 fn try_derive_filter(
     target_key: &(Option<String>, String),
     source_key: &(Option<String>, String),
@@ -612,10 +613,10 @@ fn try_derive_filter(
     })
 }
 
-/// Propagates known values across column-to-column `=` pairs.
-/// Only emits derived filters for tables in the current query scope.
-/// Example: `a.x = b.x`, `b.x = c.x`, `c.x = $1`
-/// derives `b.x = $1` and then `a.x = $1`.
+/// Given pairs like `a.x = b.x` and `b.x = c.x`, spreads known filter values
+/// through the chain. If `c.x = $1` is a known filter, this derives `b.x = $1`
+/// and then `a.x = $1`. Loops until nothing new is found. Only creates filters
+/// for tables that belong to the current query.
 fn resolve_col_col_filters(
     filters: &[FilterColumn],
     col_col_pairs: &[ColColPair],
@@ -625,7 +626,8 @@ fn resolve_col_col_filters(
         return Vec::new();
     }
 
-    // Build an owned lookup so we can extend it with newly derived values mid-loop.
+    // Map from (table, column) to the filter we already know about.
+    // We grow this map as we discover new filters during the loop below.
     let mut col_values: HashMap<(Option<String>, String), FilterColumn> = HashMap::new();
     for filter in filters {
         col_values
@@ -642,7 +644,6 @@ fn resolve_col_col_filters(
             let left_key = (pair.left_table.clone(), pair.left_col.clone());
             let right_key = (pair.right_table.clone(), pair.right_col.clone());
 
-            // Resolve left from right: right side has a known value, derive left
             if let Some(new_filter) =
                 try_derive_filter(&left_key, &right_key, &col_values, known_tables)
             {
@@ -651,7 +652,6 @@ fn resolve_col_col_filters(
                 added_in_pass = true;
             }
 
-            // Resolve right from left: left side has a known value, derive right
             if let Some(new_filter) =
                 try_derive_filter(&right_key, &left_key, &col_values, known_tables)
             {
