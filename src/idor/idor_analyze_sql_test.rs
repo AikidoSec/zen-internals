@@ -5253,6 +5253,50 @@ mod tests {
     }
 
     #[test]
+    fn test_delete_using_col_col_resolved() {
+        assert_eq!(
+            idor_analyze_sql(
+                r#"DELETE FROM requests
+                    USING tenants
+                    WHERE requests.tenant_id = tenants.tenant_id
+                      AND tenants.tenant_id = $1"#,
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "delete".into(),
+                tables: vec![
+                    TableRef {
+                        name: "requests".into(),
+                        alias: None,
+                    },
+                    TableRef {
+                        name: "tenants".into(),
+                        alias: None,
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("tenants".into()),
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("requests".into()),
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
     fn test_four_table_join_chain_fully_resolved() {
         assert_eq!(
             idor_analyze_sql(
