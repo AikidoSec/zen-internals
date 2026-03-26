@@ -5591,4 +5591,306 @@ mod tests {
             ]
         );
     }
+
+    #[test]
+    fn test_join_col_col_different_column_names() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT o.* FROM orders o \
+                 JOIN users u ON o.user_id = u.id \
+                 WHERE u.id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "orders".into(),
+                        alias: Some("o".into()),
+                    },
+                    TableRef {
+                        name: "users".into(),
+                        alias: Some("u".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("u".into()),
+                        column: "id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("o".into()),
+                        column: "user_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_join_col_col_different_column_names_filter_on_fk_side() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT o.* FROM orders o \
+                 JOIN users u ON o.user_id = u.id \
+                 WHERE o.user_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "orders".into(),
+                        alias: Some("o".into()),
+                    },
+                    TableRef {
+                        name: "users".into(),
+                        alias: Some("u".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("o".into()),
+                        column: "user_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("u".into()),
+                        column: "id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_left_join_col_col_resolved_from_where() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT r.* FROM requests r \
+                 LEFT JOIN tenants t ON r.tenant_id = t.tenant_id \
+                 WHERE t.tenant_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "requests".into(),
+                        alias: Some("r".into()),
+                    },
+                    TableRef {
+                        name: "tenants".into(),
+                        alias: Some("t".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("t".into()),
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("r".into()),
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_left_join_col_col_not_resolved_from_on_clause() {
+        // LEFT JOIN with the filter in the ON clause does NOT guarantee
+        // r.tenant_id = $1 — unmatched rows still appear with NULLs.
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT r.* FROM requests r \
+                 LEFT JOIN tenants t ON r.tenant_id = t.tenant_id AND t.tenant_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "requests".into(),
+                        alias: Some("r".into()),
+                    },
+                    TableRef {
+                        name: "tenants".into(),
+                        alias: Some("t".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("t".into()),
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("r".into()),
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_self_join_col_col_resolved() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT u1.* FROM users u1 \
+                 JOIN users u2 ON u1.tenant_id = u2.tenant_id \
+                 WHERE u1.tenant_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "users".into(),
+                        alias: Some("u1".into()),
+                    },
+                    TableRef {
+                        name: "users".into(),
+                        alias: Some("u2".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("u1".into()),
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("u2".into()),
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_col_col_with_literal_value() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT r.* FROM requests r \
+                 JOIN tenants t ON r.tenant_id = t.tenant_id \
+                 WHERE t.tenant_id = 42",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "requests".into(),
+                        alias: Some("r".into()),
+                    },
+                    TableRef {
+                        name: "tenants".into(),
+                        alias: Some("t".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("t".into()),
+                        column: "tenant_id".into(),
+                        value: "42".into(),
+                        placeholder_number: None,
+                        is_placeholder: false,
+                    },
+                    FilterColumn {
+                        table: Some("r".into()),
+                        column: "tenant_id".into(),
+                        value: "42".into(),
+                        placeholder_number: None,
+                        is_placeholder: false,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_col_col_with_string_literal_value() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT r.* FROM requests r \
+                 JOIN tenants t ON r.tenant_id = t.tenant_id \
+                 WHERE t.tenant_id = 'abc'",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "requests".into(),
+                        alias: Some("r".into()),
+                    },
+                    TableRef {
+                        name: "tenants".into(),
+                        alias: Some("t".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("t".into()),
+                        column: "tenant_id".into(),
+                        value: "abc".into(),
+                        placeholder_number: None,
+                        is_placeholder: false,
+                    },
+                    FilterColumn {
+                        table: Some("r".into()),
+                        column: "tenant_id".into(),
+                        value: "abc".into(),
+                        placeholder_number: None,
+                        is_placeholder: false,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
 }
