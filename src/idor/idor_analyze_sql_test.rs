@@ -6194,4 +6194,245 @@ mod tests {
             }]
         );
     }
+
+    #[test]
+    fn test_delete_join_col_col_resolved_mysql() {
+        assert_eq!(
+            idor_analyze_sql(
+                "DELETE t1 FROM orders t1 \
+                 INNER JOIN users t2 ON t1.tenant_id = t2.tenant_id \
+                 WHERE t2.tenant_id = ?",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "delete".into(),
+                tables: vec![
+                    TableRef {
+                        name: "orders".into(),
+                        alias: Some("t1".into()),
+                    },
+                    TableRef {
+                        name: "users".into(),
+                        alias: Some("t2".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("t2".into()),
+                        column: "tenant_id".into(),
+                        value: "?".into(),
+                        placeholder_number: Some(0),
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("t1".into()),
+                        column: "tenant_id".into(),
+                        value: "?".into(),
+                        placeholder_number: Some(0),
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_update_join_col_col_resolved_mysql() {
+        assert_eq!(
+            idor_analyze_sql(
+                "UPDATE orders t1 \
+                 INNER JOIN users t2 ON t1.tenant_id = t2.tenant_id \
+                 SET t1.status = 'active' \
+                 WHERE t2.tenant_id = ?",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "update".into(),
+                tables: vec![
+                    TableRef {
+                        name: "orders".into(),
+                        alias: Some("t1".into()),
+                    },
+                    TableRef {
+                        name: "users".into(),
+                        alias: Some("t2".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("t2".into()),
+                        column: "tenant_id".into(),
+                        value: "?".into(),
+                        placeholder_number: Some(0),
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("t1".into()),
+                        column: "tenant_id".into(),
+                        value: "?".into(),
+                        placeholder_number: Some(0),
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_update_from_join_col_col_resolved_postgres() {
+        assert_eq!(
+            idor_analyze_sql(
+                "UPDATE requests r SET status = 'active' \
+                 FROM tenants t INNER JOIN groups g ON t.group_id = g.group_id \
+                 WHERE g.group_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "update".into(),
+                tables: vec![
+                    TableRef {
+                        name: "requests".into(),
+                        alias: Some("r".into()),
+                    },
+                    TableRef {
+                        name: "tenants".into(),
+                        alias: Some("t".into()),
+                    },
+                    TableRef {
+                        name: "groups".into(),
+                        alias: Some("g".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("g".into()),
+                        column: "group_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("t".into()),
+                        column: "group_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_delete_left_join_col_col_not_resolved_mysql() {
+        assert_eq!(
+            idor_analyze_sql(
+                "DELETE t1 FROM orders t1 \
+                 LEFT JOIN users t2 ON t1.tenant_id = t2.tenant_id \
+                 WHERE t2.tenant_id = ?",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "delete".into(),
+                tables: vec![
+                    TableRef {
+                        name: "orders".into(),
+                        alias: Some("t1".into()),
+                    },
+                    TableRef {
+                        name: "users".into(),
+                        alias: Some("t2".into()),
+                    },
+                ],
+                filters: vec![FilterColumn {
+                    table: Some("t2".into()),
+                    column: "tenant_id".into(),
+                    value: "?".into(),
+                    placeholder_number: Some(0),
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_update_left_join_col_col_not_resolved_mysql() {
+        assert_eq!(
+            idor_analyze_sql(
+                "UPDATE orders t1 \
+                 LEFT JOIN users t2 ON t1.tenant_id = t2.tenant_id \
+                 SET t1.status = 'active' \
+                 WHERE t2.tenant_id = ?",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "update".into(),
+                tables: vec![
+                    TableRef {
+                        name: "orders".into(),
+                        alias: Some("t1".into()),
+                    },
+                    TableRef {
+                        name: "users".into(),
+                        alias: Some("t2".into()),
+                    },
+                ],
+                filters: vec![FilterColumn {
+                    table: Some("t2".into()),
+                    column: "tenant_id".into(),
+                    value: "?".into(),
+                    placeholder_number: Some(0),
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_update_from_left_join_col_col_not_resolved_postgres() {
+        assert_eq!(
+            idor_analyze_sql(
+                "UPDATE requests r SET status = 'active' \
+                 FROM tenants t LEFT JOIN groups g ON t.group_id = g.group_id \
+                 WHERE g.group_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "update".into(),
+                tables: vec![
+                    TableRef {
+                        name: "requests".into(),
+                        alias: Some("r".into()),
+                    },
+                    TableRef {
+                        name: "tenants".into(),
+                        alias: Some("t".into()),
+                    },
+                    TableRef {
+                        name: "groups".into(),
+                        alias: Some("g".into()),
+                    },
+                ],
+                filters: vec![FilterColumn {
+                    table: Some("g".into()),
+                    column: "group_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
 }

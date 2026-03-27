@@ -167,10 +167,19 @@ fn analyze_update(
     let assignment_subqueries = extract_subqueries_from_exprs(&assignment_exprs);
     *counter += count_placeholders_in_exprs(&assignment_exprs);
 
-    let (mut filters, col_col_pairs, subqueries) = match selection {
+    let (mut filters, mut col_col_pairs, subqueries) = match selection {
         Some(expr) => extract_filters_from_where(expr, counter),
         None => (Vec::new(), Vec::new(), Vec::new()),
     };
+
+    col_col_pairs.extend(collect_col_col_pairs_from_joins(std::slice::from_ref(
+        table,
+    )));
+    if let Some(from_clause) = from {
+        col_col_pairs.extend(collect_col_col_pairs_from_joins(std::slice::from_ref(
+            from_clause,
+        )));
+    }
 
     let known_tables = tables_to_known_set(&tables);
     let resolved = resolve_col_col_filters(&filters, &col_col_pairs, &known_tables);
@@ -216,10 +225,18 @@ fn analyze_delete(
     // Filter out common table expression names
     tables.retain(|t| !cte_names.contains(&t.name.to_lowercase()));
 
-    let (mut filters, col_col_pairs, subqueries) = match &delete.selection {
+    let (mut filters, mut col_col_pairs, subqueries) = match &delete.selection {
         Some(expr) => extract_filters_from_where(expr, counter),
         None => (Vec::new(), Vec::new(), Vec::new()),
     };
+
+    let from_twjs: &[TableWithJoins] = match &delete.from {
+        FromTable::WithFromKeyword(twjs) | FromTable::WithoutKeyword(twjs) => twjs,
+    };
+    col_col_pairs.extend(collect_col_col_pairs_from_joins(from_twjs));
+    if let Some(using_clauses) = &delete.using {
+        col_col_pairs.extend(collect_col_col_pairs_from_joins(using_clauses));
+    }
 
     let known_tables = tables_to_known_set(&tables);
     let resolved = resolve_col_col_filters(&filters, &col_col_pairs, &known_tables);
@@ -610,24 +627,29 @@ fn try_derive_filter(
     })
 }
 
-/// Collects col-col pairs for a SELECT statement from INNER JOIN ON conditions,
-/// the WHERE clause, and the HAVING clause. Outer join (LEFT/RIGHT/FULL) ON
-/// conditions are intentionally excluded.
-fn collect_col_col_pairs_for_select(set_expr: &SetExpr) -> Vec<ColColPair> {
-    let select = match set_expr {
-        SetExpr::Select(s) => s.as_ref(),
-        _ => return Vec::new(),
-    };
-
+/// Collects col-col pairs from INNER JOIN ON conditions.
+/// Outer join (LEFT/RIGHT/FULL) ON conditions are excluded.
+fn collect_col_col_pairs_from_joins(tables: &[TableWithJoins]) -> Vec<ColColPair> {
     let mut pairs = Vec::new();
-
-    for twj in &select.from {
+    for twj in tables {
         for join in &twj.joins {
             if let JoinOperator::Inner(JoinConstraint::On(on_expr)) = &join.join_operator {
                 collect_col_col_pairs_only(on_expr, &mut pairs, false);
             }
         }
     }
+    pairs
+}
+
+/// Collects col-col pairs for a SELECT statement from INNER JOIN ON conditions,
+/// the WHERE clause, and the HAVING clause.
+fn collect_col_col_pairs_for_select(set_expr: &SetExpr) -> Vec<ColColPair> {
+    let select = match set_expr {
+        SetExpr::Select(s) => s.as_ref(),
+        _ => return Vec::new(),
+    };
+
+    let mut pairs = collect_col_col_pairs_from_joins(&select.from);
 
     if let Some(selection) = &select.selection {
         collect_col_col_pairs_only(selection, &mut pairs, false);
