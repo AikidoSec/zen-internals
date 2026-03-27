@@ -5679,11 +5679,78 @@ mod tests {
     }
 
     #[test]
-    fn test_left_join_col_col_resolved_from_where() {
+    fn test_left_join_col_col_not_resolved_from_where() {
         assert_eq!(
             idor_analyze_sql(
                 "SELECT r.* FROM requests r \
                  LEFT JOIN tenants t ON r.tenant_id = t.tenant_id \
+                 WHERE t.tenant_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "requests".into(),
+                        alias: Some("r".into()),
+                    },
+                    TableRef {
+                        name: "tenants".into(),
+                        alias: Some("t".into()),
+                    },
+                ],
+                filters: vec![FilterColumn {
+                    table: Some("t".into()),
+                    column: "tenant_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_left_join_col_col_not_resolved_from_on_clause() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT r.* FROM requests r \
+                 LEFT JOIN tenants t ON r.tenant_id = t.tenant_id AND t.tenant_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "requests".into(),
+                        alias: Some("r".into()),
+                    },
+                    TableRef {
+                        name: "tenants".into(),
+                        alias: Some("t".into()),
+                    },
+                ],
+                filters: vec![FilterColumn {
+                    table: Some("t".into()),
+                    column: "tenant_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_inner_join_explicit_col_col_resolved_from_where() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT r.* FROM requests r \
+                 INNER JOIN tenants t ON r.tenant_id = t.tenant_id \
                  WHERE t.tenant_id = $1",
                 9,
             )
@@ -5722,13 +5789,81 @@ mod tests {
     }
 
     #[test]
-    fn test_left_join_col_col_not_resolved_from_on_clause() {
-        // LEFT JOIN with the filter in the ON clause does NOT guarantee
-        // r.tenant_id = $1 — unmatched rows still appear with NULLs.
+    fn test_right_join_col_col_not_resolved_from_where() {
         assert_eq!(
             idor_analyze_sql(
                 "SELECT r.* FROM requests r \
-                 LEFT JOIN tenants t ON r.tenant_id = t.tenant_id AND t.tenant_id = $1",
+                 RIGHT JOIN tenants t ON r.tenant_id = t.tenant_id \
+                 WHERE t.tenant_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "requests".into(),
+                        alias: Some("r".into()),
+                    },
+                    TableRef {
+                        name: "tenants".into(),
+                        alias: Some("t".into()),
+                    },
+                ],
+                filters: vec![FilterColumn {
+                    table: Some("t".into()),
+                    column: "tenant_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_full_outer_join_col_col_not_resolved_from_where() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT r.* FROM requests r \
+                 FULL OUTER JOIN tenants t ON r.tenant_id = t.tenant_id \
+                 WHERE t.tenant_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "requests".into(),
+                        alias: Some("r".into()),
+                    },
+                    TableRef {
+                        name: "tenants".into(),
+                        alias: Some("t".into()),
+                    },
+                ],
+                filters: vec![FilterColumn {
+                    table: Some("t".into()),
+                    column: "tenant_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_having_filter_with_inner_join_col_col_resolved() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT r.tenant_id, COUNT(*) FROM requests r \
+                 INNER JOIN tenants t ON r.tenant_id = t.tenant_id \
+                 GROUP BY r.tenant_id \
+                 HAVING t.tenant_id = $1",
                 9,
             )
             .unwrap(),
@@ -5754,6 +5889,172 @@ mod tests {
                     },
                     FilterColumn {
                         table: Some("r".into()),
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_having_col_col_pair_resolved() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT a.tenant_id FROM a \
+                 INNER JOIN b ON a.id = b.a_id \
+                 WHERE b.tenant_id = $1 \
+                 GROUP BY a.tenant_id \
+                 HAVING a.tenant_id = b.tenant_id",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "a".into(),
+                        alias: None,
+                    },
+                    TableRef {
+                        name: "b".into(),
+                        alias: None,
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("b".into()),
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("a".into()),
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_subquery_col_col_resolved_within_subquery() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM users u WHERE u.id IN \
+                 (SELECT r.user_id FROM requests r \
+                  INNER JOIN tenants t ON r.tenant_id = t.tenant_id \
+                  WHERE t.tenant_id = $1)",
+                9,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "users".into(),
+                        alias: Some("u".into()),
+                    }],
+                    filters: vec![],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![
+                        TableRef {
+                            name: "requests".into(),
+                            alias: Some("r".into()),
+                        },
+                        TableRef {
+                            name: "tenants".into(),
+                            alias: Some("t".into()),
+                        },
+                    ],
+                    filters: vec![
+                        FilterColumn {
+                            table: Some("t".into()),
+                            column: "tenant_id".into(),
+                            value: "$1".into(),
+                            placeholder_number: None,
+                            is_placeholder: true,
+                        },
+                        FilterColumn {
+                            table: Some("r".into()),
+                            column: "tenant_id".into(),
+                            value: "$1".into(),
+                            placeholder_number: None,
+                            is_placeholder: true,
+                        },
+                    ],
+                    insert_columns: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_complex_group_by_order_by_col_col_resolved() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT t.name, u.email, COUNT(o.id) AS order_count \
+                 FROM orders o \
+                 INNER JOIN users u ON o.tenant_id = u.tenant_id \
+                 INNER JOIN tenants t ON u.tenant_id = t.tenant_id \
+                 WHERE o.status = 'completed' \
+                 GROUP BY t.name, u.email, u.tenant_id \
+                 HAVING t.tenant_id = $1 \
+                 ORDER BY order_count DESC, t.name ASC",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "orders".into(),
+                        alias: Some("o".into()),
+                    },
+                    TableRef {
+                        name: "users".into(),
+                        alias: Some("u".into()),
+                    },
+                    TableRef {
+                        name: "tenants".into(),
+                        alias: Some("t".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("o".into()),
+                        column: "status".into(),
+                        value: "completed".into(),
+                        placeholder_number: None,
+                        is_placeholder: false,
+                    },
+                    FilterColumn {
+                        table: Some("t".into()),
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("u".into()),
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("o".into()),
                         column: "tenant_id".into(),
                         value: "$1".into(),
                         placeholder_number: None,

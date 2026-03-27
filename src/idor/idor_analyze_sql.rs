@@ -2,8 +2,8 @@ use crate::idor::sql_query_result::{FilterColumn, InsertColumn, SqlQueryResult, 
 use crate::sql_injection::helpers::select_dialect_based_on_enum::select_dialect_based_on_enum;
 use core::ops::ControlFlow;
 use sqlparser::ast::{
-    BinaryOperator, Expr, FromTable, ObjectName, Query, SetExpr, Statement, TableFactor,
-    TableWithJoins, Value, Visit, Visitor,
+    BinaryOperator, Expr, FromTable, JoinConstraint, JoinOperator, ObjectName, Query, SetExpr,
+    Statement, TableFactor, TableWithJoins, Value, Visit, Visitor,
 };
 use sqlparser::parser::Parser;
 use std::collections::{HashMap, HashSet};
@@ -364,9 +364,12 @@ fn visit_select(
     let _ = set_expr.visit(&mut visitor);
     *counter = visitor.placeholder_counter;
 
+    // Collect col-col pairs from INNER JOINs
+    let col_col_pairs = collect_col_col_pairs_for_select(set_expr);
+
     let known_tables = tables_to_known_set(&visitor.tables);
     let mut filters = visitor.filters;
-    let resolved = resolve_col_col_filters(&filters, &visitor.col_col_pairs, &known_tables);
+    let resolved = resolve_col_col_filters(&filters, &col_col_pairs, &known_tables);
     filters.extend(resolved);
 
     results.push(SqlQueryResult {
@@ -385,9 +388,6 @@ fn visit_select(
 struct SelectVisitor {
     tables: Vec<TableRef>,
     filters: Vec<FilterColumn>,
-    /// Pairs like `r.sys_group_id = t.sys_group_id` collected during the visit.
-    /// After visiting, we use these to propagate known values between columns.
-    col_col_pairs: Vec<ColColPair>,
     placeholder_counter: usize,
     subqueries: Vec<Query>,
     /// Tracks nesting depth inside subqueries. When > 0, we skip collecting tables/filters
@@ -408,7 +408,6 @@ impl SelectVisitor {
         Self {
             tables: Vec::new(),
             filters: Vec::new(),
-            col_col_pairs: Vec::new(),
             placeholder_counter: initial_placeholder_count,
             subqueries: Vec::new(),
             skip_depth: 0,
@@ -484,8 +483,6 @@ impl Visitor for SelectVisitor {
 
         if let Some(filter) = try_extract_filter(expr, self.placeholder_counter) {
             self.filters.push(filter);
-        } else if let Some(pair) = try_extract_col_col_pair(expr) {
-            self.col_col_pairs.push(pair);
         }
 
         ControlFlow::Continue(())
@@ -611,6 +608,56 @@ fn try_derive_filter(
         placeholder_number: resolved.placeholder_number,
         is_placeholder: resolved.is_placeholder,
     })
+}
+
+/// Collects col-col pairs for a SELECT statement from INNER JOIN ON conditions,
+/// the WHERE clause, and the HAVING clause. Outer join (LEFT/RIGHT/FULL) ON
+/// conditions are intentionally excluded.
+fn collect_col_col_pairs_for_select(set_expr: &SetExpr) -> Vec<ColColPair> {
+    let select = match set_expr {
+        SetExpr::Select(s) => s.as_ref(),
+        _ => return Vec::new(),
+    };
+
+    let mut pairs = Vec::new();
+
+    for twj in &select.from {
+        for join in &twj.joins {
+            if let JoinOperator::Inner(JoinConstraint::On(on_expr)) = &join.join_operator {
+                collect_col_col_pairs_only(on_expr, &mut pairs, false);
+            }
+        }
+    }
+
+    if let Some(selection) = &select.selection {
+        collect_col_col_pairs_only(selection, &mut pairs, false);
+    }
+
+    if let Some(having) = &select.having {
+        collect_col_col_pairs_only(having, &mut pairs, false);
+    }
+
+    pairs
+}
+
+fn collect_col_col_pairs_only(expr: &Expr, pairs: &mut Vec<ColColPair>, in_or: bool) {
+    if !in_or {
+        if let Some(pair) = try_extract_col_col_pair(expr) {
+            pairs.push(pair);
+        }
+    }
+    if extract_subquery(expr).is_some() {
+        return;
+    }
+    match expr {
+        Expr::BinaryOp { left, op, right } => {
+            let in_or = in_or || *op == BinaryOperator::Or;
+            collect_col_col_pairs_only(left, pairs, in_or);
+            collect_col_col_pairs_only(right, pairs, in_or);
+        }
+        Expr::Nested(inner) => collect_col_col_pairs_only(inner, pairs, in_or),
+        _ => {}
+    }
 }
 
 /// Given pairs like `a.x = b.x` and `b.x = c.x`, spreads known filter values
