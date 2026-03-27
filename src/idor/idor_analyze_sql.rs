@@ -2,11 +2,11 @@ use crate::idor::sql_query_result::{FilterColumn, InsertColumn, SqlQueryResult, 
 use crate::sql_injection::helpers::select_dialect_based_on_enum::select_dialect_based_on_enum;
 use core::ops::ControlFlow;
 use sqlparser::ast::{
-    BinaryOperator, Expr, FromTable, ObjectName, Query, SetExpr, Statement, TableFactor,
-    TableWithJoins, Value, Visit, Visitor,
+    BinaryOperator, Expr, FromTable, JoinConstraint, JoinOperator, ObjectName, Query, SetExpr,
+    Statement, TableFactor, TableWithJoins, Value, Visit, Visitor,
 };
 use sqlparser::parser::Parser;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 /// Analyzes a SQL query for IDOR (Insecure Direct Object Reference) protection.
 ///
@@ -18,9 +18,15 @@ use std::collections::HashSet;
 ///
 /// # Filter Extraction
 ///
-/// Only equality comparisons (`=`) where one side is a column and the other is a
-/// concrete value (literal or placeholder) are extracted. Column-to-column comparisons
-/// (e.g., JOIN conditions like `a.id = b.user_id`) are ignored.
+/// Equality comparisons (`=`) where one side is a column and the other is a concrete
+/// value (literal or placeholder) are extracted directly.
+///
+/// Column-to-column comparisons in JOIN ON or WHERE clauses (e.g.
+/// `r.sys_group_id = t.sys_group_id`) are also collected. After extraction, we
+/// propagate known values through these pairs in a loop until no new filters can
+/// be derived. This means JOIN chains like `a=b`, `b=c`, `c=$1` will resolve all
+/// three columns to `$1`. We only create filters for tables that belong to the
+/// current query, so subquery tables don't leak into the outer query.
 ///
 /// # UNION / INTERSECT / EXCEPT
 ///
@@ -161,10 +167,23 @@ fn analyze_update(
     let assignment_subqueries = extract_subqueries_from_exprs(&assignment_exprs);
     *counter += count_placeholders_in_exprs(&assignment_exprs);
 
-    let (filters, subqueries) = match selection {
+    let (mut filters, mut col_col_pairs, subqueries) = match selection {
         Some(expr) => extract_filters_from_where(expr, counter),
-        None => (Vec::new(), Vec::new()),
+        None => (Vec::new(), Vec::new(), Vec::new()),
     };
+
+    col_col_pairs.extend(collect_col_col_pairs_from_joins(std::slice::from_ref(
+        table,
+    )));
+    if let Some(from_clause) = from {
+        col_col_pairs.extend(collect_col_col_pairs_from_joins(std::slice::from_ref(
+            from_clause,
+        )));
+    }
+
+    let known_tables = tables_to_known_set(&tables);
+    let resolved = resolve_col_col_filters(&filters, &col_col_pairs, &known_tables);
+    filters.extend(resolved);
 
     results.push(SqlQueryResult {
         kind: "update".into(),
@@ -206,10 +225,22 @@ fn analyze_delete(
     // Filter out common table expression names
     tables.retain(|t| !cte_names.contains(&t.name.to_lowercase()));
 
-    let (filters, subqueries) = match &delete.selection {
+    let (mut filters, mut col_col_pairs, subqueries) = match &delete.selection {
         Some(expr) => extract_filters_from_where(expr, counter),
-        None => (Vec::new(), Vec::new()),
+        None => (Vec::new(), Vec::new(), Vec::new()),
     };
+
+    let from_twjs: &[TableWithJoins] = match &delete.from {
+        FromTable::WithFromKeyword(twjs) | FromTable::WithoutKeyword(twjs) => twjs,
+    };
+    col_col_pairs.extend(collect_col_col_pairs_from_joins(from_twjs));
+    if let Some(using_clauses) = &delete.using {
+        col_col_pairs.extend(collect_col_col_pairs_from_joins(using_clauses));
+    }
+
+    let known_tables = tables_to_known_set(&tables);
+    let resolved = resolve_col_col_filters(&filters, &col_col_pairs, &known_tables);
+    filters.extend(resolved);
 
     results.push(SqlQueryResult {
         kind: "delete".into(),
@@ -350,10 +381,18 @@ fn visit_select(
     let _ = set_expr.visit(&mut visitor);
     *counter = visitor.placeholder_counter;
 
+    // Collect col-col pairs from INNER JOINs
+    let col_col_pairs = collect_col_col_pairs_for_select(set_expr);
+
+    let known_tables = tables_to_known_set(&visitor.tables);
+    let mut filters = visitor.filters;
+    let resolved = resolve_col_col_filters(&filters, &col_col_pairs, &known_tables);
+    filters.extend(resolved);
+
     results.push(SqlQueryResult {
         kind: "select".into(),
         tables: visitor.tables,
-        filters: visitor.filters,
+        filters,
         insert_columns: None,
     });
 
@@ -513,6 +552,192 @@ fn try_extract_filter(expr: &Expr, placeholder_counter: usize) -> Option<FilterC
         .or_else(|| extract_column_value_pair(right, left, placeholder_counter))
 }
 
+struct ColColPair {
+    left_table: Option<String>,
+    left_col: String,
+    right_table: Option<String>,
+    right_col: String,
+}
+
+/// Extracts a column-to-column equality pair (e.g. `r.sys_group_id = t.sys_group_id`).
+fn try_extract_col_col_pair(expr: &Expr) -> Option<ColColPair> {
+    let Expr::BinaryOp { left, op, right } = expr else {
+        return None;
+    };
+
+    if *op != BinaryOperator::Eq {
+        return None;
+    }
+
+    let (left_table, left_col) = extract_column_ref(left)?;
+    let (right_table, right_col) = extract_column_ref(right)?;
+    Some(ColColPair {
+        left_table,
+        left_col,
+        right_table,
+        right_col,
+    })
+}
+
+/// Returns true if the column's table qualifier belongs to the current query.
+/// Unqualified columns (no table prefix) are always considered in scope.
+fn is_table_in_scope(table: &Option<String>, known_tables: &HashSet<String>) -> bool {
+    match table {
+        None => true,
+        Some(t) => known_tables.contains(&t.to_lowercase()),
+    }
+}
+
+/// Builds a set of lowercase table names and aliases from a table list.
+fn tables_to_known_set(tables: &[TableRef]) -> HashSet<String> {
+    tables
+        .iter()
+        .flat_map(|t| {
+            let mut names = vec![t.name.to_lowercase()];
+            if let Some(alias) = &t.alias {
+                names.push(alias.to_lowercase());
+            }
+            names
+        })
+        .collect()
+}
+
+/// If `source_key` has a known value and `target_key` doesn't yet, creates a new
+/// filter for `target_key` with that value. Returns `None` if `target_key` already
+/// has a value, `source_key` has no value, or the target table is out of scope.
+fn try_derive_filter(
+    target_key: &(Option<String>, String),
+    source_key: &(Option<String>, String),
+    col_values: &HashMap<(Option<String>, String), FilterColumn>,
+    known_tables: &HashSet<String>,
+) -> Option<FilterColumn> {
+    if col_values.contains_key(target_key) {
+        return None;
+    }
+    let resolved = col_values.get(source_key)?.clone();
+    if !is_table_in_scope(&target_key.0, known_tables) {
+        return None;
+    }
+    Some(FilterColumn {
+        table: target_key.0.clone(),
+        column: target_key.1.clone(),
+        value: resolved.value,
+        placeholder_number: resolved.placeholder_number,
+        is_placeholder: resolved.is_placeholder,
+    })
+}
+
+/// Collects col-col pairs from INNER JOIN ON conditions.
+/// Outer join (LEFT/RIGHT/FULL) ON conditions are excluded.
+fn collect_col_col_pairs_from_joins(tables: &[TableWithJoins]) -> Vec<ColColPair> {
+    let mut pairs = Vec::new();
+    for twj in tables {
+        for join in &twj.joins {
+            if let JoinOperator::Inner(JoinConstraint::On(on_expr)) = &join.join_operator {
+                collect_col_col_pairs_only(on_expr, &mut pairs, false);
+            }
+        }
+    }
+    pairs
+}
+
+/// Collects col-col pairs for a SELECT statement from INNER JOIN ON conditions,
+/// the WHERE clause, and the HAVING clause.
+fn collect_col_col_pairs_for_select(set_expr: &SetExpr) -> Vec<ColColPair> {
+    let select = match set_expr {
+        SetExpr::Select(s) => s.as_ref(),
+        _ => return Vec::new(),
+    };
+
+    let mut pairs = collect_col_col_pairs_from_joins(&select.from);
+
+    if let Some(selection) = &select.selection {
+        collect_col_col_pairs_only(selection, &mut pairs, false);
+    }
+
+    if let Some(having) = &select.having {
+        collect_col_col_pairs_only(having, &mut pairs, false);
+    }
+
+    pairs
+}
+
+fn collect_col_col_pairs_only(expr: &Expr, pairs: &mut Vec<ColColPair>, in_or: bool) {
+    if !in_or {
+        if let Some(pair) = try_extract_col_col_pair(expr) {
+            pairs.push(pair);
+        }
+    }
+    if extract_subquery(expr).is_some() {
+        return;
+    }
+    match expr {
+        Expr::BinaryOp { left, op, right } => {
+            let in_or = in_or || *op == BinaryOperator::Or;
+            collect_col_col_pairs_only(left, pairs, in_or);
+            collect_col_col_pairs_only(right, pairs, in_or);
+        }
+        Expr::Nested(inner) => collect_col_col_pairs_only(inner, pairs, in_or),
+        _ => {}
+    }
+}
+
+/// Given pairs like `a.x = b.x` and `b.x = c.x`, spreads known filter values
+/// through the chain. If `c.x = $1` is a known filter, this derives `b.x = $1`
+/// and then `a.x = $1`. Loops until nothing new is found. Only creates filters
+/// for tables that belong to the current query.
+fn resolve_col_col_filters(
+    filters: &[FilterColumn],
+    col_col_pairs: &[ColColPair],
+    known_tables: &HashSet<String>,
+) -> Vec<FilterColumn> {
+    if col_col_pairs.is_empty() {
+        return Vec::new();
+    }
+
+    // Map from (table, column) to the filter we already know about.
+    // We grow this map as we discover new filters during the loop below.
+    let mut col_values: HashMap<(Option<String>, String), FilterColumn> = HashMap::new();
+    for filter in filters {
+        col_values
+            .entry((filter.table.clone(), filter.column.clone()))
+            .or_insert_with(|| filter.clone());
+    }
+
+    let mut additional = Vec::new();
+
+    loop {
+        let mut added_in_pass = false;
+
+        for pair in col_col_pairs {
+            let left_key = (pair.left_table.clone(), pair.left_col.clone());
+            let right_key = (pair.right_table.clone(), pair.right_col.clone());
+
+            if let Some(new_filter) =
+                try_derive_filter(&left_key, &right_key, &col_values, known_tables)
+            {
+                col_values.insert(left_key.clone(), new_filter.clone());
+                additional.push(new_filter);
+                added_in_pass = true;
+            }
+
+            if let Some(new_filter) =
+                try_derive_filter(&right_key, &left_key, &col_values, known_tables)
+            {
+                col_values.insert(right_key.clone(), new_filter.clone());
+                additional.push(new_filter);
+                added_in_pass = true;
+            }
+        }
+
+        if !added_in_pass {
+            break;
+        }
+    }
+
+    additional
+}
+
 fn extract_column_value_pair(
     maybe_column: &Expr,
     maybe_value: &Expr,
@@ -576,18 +801,30 @@ fn object_name_to_string(name: &ObjectName) -> String {
         .join(".")
 }
 
-fn extract_filters_from_where(expr: &Expr, counter: &mut usize) -> (Vec<FilterColumn>, Vec<Query>) {
+fn extract_filters_from_where(
+    expr: &Expr,
+    counter: &mut usize,
+) -> (Vec<FilterColumn>, Vec<ColColPair>, Vec<Query>) {
     let mut filters = Vec::new();
+    let mut col_col_pairs = Vec::new();
     let mut subqueries = Vec::new();
     // Start with in_or=false: the top-level WHERE clause is not inside an OR branch
-    walk_expr(expr, counter, &mut filters, &mut subqueries, false);
-    (filters, subqueries)
+    walk_expr(
+        expr,
+        counter,
+        &mut filters,
+        &mut col_col_pairs,
+        &mut subqueries,
+        false,
+    );
+    (filters, col_col_pairs, subqueries)
 }
 
 fn walk_expr(
     expr: &Expr,
     counter: &mut usize,
     filters: &mut Vec<FilterColumn>,
+    col_col_pairs: &mut Vec<ColColPair>,
     subqueries: &mut Vec<Query>,
     in_or: bool,
 ) {
@@ -599,6 +836,8 @@ fn walk_expr(
     if !in_or {
         if let Some(filter) = try_extract_filter(expr, *counter) {
             filters.push(filter);
+        } else if let Some(pair) = try_extract_col_col_pair(expr) {
+            col_col_pairs.push(pair);
         }
     }
 
@@ -610,11 +849,11 @@ fn walk_expr(
     match expr {
         Expr::BinaryOp { left, op, right } => {
             let in_or = in_or || *op == BinaryOperator::Or;
-            walk_expr(left, counter, filters, subqueries, in_or);
-            walk_expr(right, counter, filters, subqueries, in_or);
+            walk_expr(left, counter, filters, col_col_pairs, subqueries, in_or);
+            walk_expr(right, counter, filters, col_col_pairs, subqueries, in_or);
         }
         Expr::Nested(inner) => {
-            walk_expr(inner, counter, filters, subqueries, in_or);
+            walk_expr(inner, counter, filters, col_col_pairs, subqueries, in_or);
         }
         _ => {}
     }
