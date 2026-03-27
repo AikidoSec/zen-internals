@@ -480,7 +480,13 @@ fn is_mysql_placeholder(expr: &Expr) -> bool {
 }
 
 fn is_placeholder(expr: &Expr) -> bool {
-    matches!(expr, Expr::Value(ValueWithSpan { value: Value::Placeholder(_), .. }))
+    matches!(
+        expr,
+        Expr::Value(ValueWithSpan {
+            value: Value::Placeholder(_),
+            ..
+        })
+    )
 }
 
 fn extract_subquery(expr: &Expr) -> Option<&Query> {

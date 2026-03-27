@@ -328,7 +328,12 @@ mod tests {
         // Submission AIKIDO-OCRA7GFG :
         // MySQL treats double-quoted strings as string literals (not identifiers),
         // so the MySQL tokenizer fails on this query.
-        for dia in [dialect("postgresql"), dialect("sqlite"), dialect("clickhouse"), dialect("generic")] {
+        for dia in [
+            dialect("postgresql"),
+            dialect("sqlite"),
+            dialect("clickhouse"),
+            dialect("generic"),
+        ] {
             is_injection!(
                 "INSERT INTO books (title, description) VALUES ('${title}', \"Description set by the user: '\"), (\"exploit\",system_user());--'\")",
                 "\"), (\"exploit\",system_user());--",
@@ -1115,5 +1120,4 @@ mod tests {
             "TIME ZONE 'UTC'"
         );
     }
-
 }
