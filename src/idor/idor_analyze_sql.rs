@@ -2,8 +2,8 @@ use crate::idor::sql_query_result::{FilterColumn, InsertColumn, SqlQueryResult, 
 use crate::sql_injection::helpers::select_dialect_based_on_enum::select_dialect_based_on_enum;
 use core::ops::ControlFlow;
 use sqlparser::ast::{
-    BinaryOperator, Expr, FromTable, ObjectName, Query, SetExpr, Statement, TableFactor,
-    TableWithJoins, Value, Visit, Visitor,
+    BinaryOperator, Expr, FromTable, ObjectName, ObjectNamePart, Query, SetExpr, Statement,
+    TableFactor, TableObject, TableWithJoins, Value, ValueWithSpan, Visit, Visitor,
 };
 use sqlparser::parser::Parser;
 use std::collections::HashSet;
@@ -67,18 +67,12 @@ fn analyze_statement(stmt: &Statement, results: &mut Vec<SqlQueryResult>) -> Res
             let mut counter = 0;
             analyze_query(query, results, &mut counter)?;
         }
-        Statement::Update {
-            table,
-            assignments,
-            from,
-            selection,
-            ..
-        } => {
+        Statement::Update(update) => {
             analyze_update(
-                table,
-                assignments,
-                from.as_ref(),
-                selection.as_ref(),
+                &update.table,
+                &update.assignments,
+                update.from.as_ref(),
+                update.selection.as_ref(),
                 results,
                 &mut 0,
                 &HashSet::new(),
@@ -94,7 +88,6 @@ fn analyze_statement(stmt: &Statement, results: &mut Vec<SqlQueryResult>) -> Res
         | Statement::Rollback { .. }
         | Statement::StartTransaction { .. }
         | Statement::Savepoint { .. }
-        | Statement::SetTransaction { .. }
         | Statement::ReleaseSavepoint { .. }
         | Statement::CreateTable { .. }
         | Statement::AlterTable { .. }
@@ -115,11 +108,7 @@ fn analyze_statement(stmt: &Statement, results: &mut Vec<SqlQueryResult>) -> Res
         | Statement::Truncate { .. }
         | Statement::Grant { .. }
         | Statement::Revoke { .. }
-        | Statement::SetVariable { .. }
-        | Statement::SetNames { .. }
-        | Statement::SetNamesDefault { .. }
-        | Statement::SetTimeZone { .. }
-        | Statement::SetRole { .. }
+        | Statement::Set(_)
         | Statement::ShowVariable { .. }
         | Statement::ShowStatus { .. }
         | Statement::ShowVariables { .. }
@@ -143,15 +132,21 @@ fn analyze_statement(stmt: &Statement, results: &mut Vec<SqlQueryResult>) -> Res
 fn analyze_update(
     table: &TableWithJoins,
     assignments: &[sqlparser::ast::Assignment],
-    from: Option<&TableWithJoins>,
+    from: Option<&sqlparser::ast::UpdateTableFromKind>,
     selection: Option<&Expr>,
     results: &mut Vec<SqlQueryResult>,
     counter: &mut usize,
     cte_names: &HashSet<String>,
 ) -> Result<(), String> {
     let mut tables = extract_tables_from_table_with_joins(table);
-    if let Some(from_clause) = from {
-        tables.extend(extract_tables_from_table_with_joins(from_clause));
+    if let Some(from_kind) = from {
+        let from_tables = match from_kind {
+            sqlparser::ast::UpdateTableFromKind::BeforeSet(twjs)
+            | sqlparser::ast::UpdateTableFromKind::AfterSet(twjs) => twjs,
+        };
+        for twj in from_tables {
+            tables.extend(extract_tables_from_table_with_joins(twj));
+        }
     }
 
     // Filter out common table expression names
@@ -231,8 +226,12 @@ fn analyze_insert(
     counter: &mut usize,
     cte_names: &HashSet<String>,
 ) -> Result<(), String> {
+    let table_name = match &insert.table {
+        TableObject::TableName(name) => object_name_to_string(name),
+        TableObject::TableFunction(func) => format!("{}", func),
+    };
     let table = TableRef {
-        name: object_name_to_string(&insert.table_name),
+        name: table_name,
         alias: insert.table_alias.as_ref().map(|a| a.value.clone()),
     };
     let columns: Vec<&str> = insert.columns.iter().map(|c| c.value.as_str()).collect();
@@ -309,19 +308,12 @@ fn analyze_set_expr(
             analyze_query_with_ctes(query, results, counter, cte_names)?;
         }
         SetExpr::Update(stmt) => {
-            if let Statement::Update {
-                table,
-                assignments,
-                from,
-                selection,
-                ..
-            } = stmt
-            {
+            if let Statement::Update(update) = stmt {
                 analyze_update(
-                    table,
-                    assignments,
-                    from.as_ref(),
-                    selection.as_ref(),
+                    &update.table,
+                    &update.assignments,
+                    update.from.as_ref(),
+                    update.selection.as_ref(),
                     results,
                     counter,
                     cte_names,
@@ -484,11 +476,11 @@ impl Visitor for SelectVisitor {
 }
 
 fn is_mysql_placeholder(expr: &Expr) -> bool {
-    matches!(expr, Expr::Value(Value::Placeholder(p)) if p == "?")
+    matches!(expr, Expr::Value(ValueWithSpan { value: Value::Placeholder(p), .. }) if p == "?")
 }
 
 fn is_placeholder(expr: &Expr) -> bool {
-    matches!(expr, Expr::Value(Value::Placeholder(_)))
+    matches!(expr, Expr::Value(ValueWithSpan { value: Value::Placeholder(_), .. }))
 }
 
 fn extract_subquery(expr: &Expr) -> Option<&Query> {
@@ -557,13 +549,16 @@ fn is_column_ref(expr: &Expr) -> bool {
 
 fn expr_to_value_string(expr: &Expr) -> String {
     match expr {
-        Expr::Value(Value::Placeholder(p)) => p.clone(),
-        Expr::Value(Value::SingleQuotedString(s)) => s.clone(),
-        Expr::Value(Value::DoubleQuotedString(s)) => s.clone(),
-        Expr::Value(Value::Number(n, _)) => n.clone(),
-        Expr::Value(Value::EscapedStringLiteral(s)) => s.clone(),
-        Expr::Value(Value::DollarQuotedString(dqs)) => dqs.value.clone(),
-        Expr::Value(Value::NationalStringLiteral(s)) => s.clone(),
+        Expr::Value(vws) => match &vws.value {
+            Value::Placeholder(p) => p.clone(),
+            Value::SingleQuotedString(s) => s.clone(),
+            Value::DoubleQuotedString(s) => s.clone(),
+            Value::Number(n, _) => n.clone(),
+            Value::EscapedStringLiteral(s) => s.clone(),
+            Value::DollarQuotedString(dqs) => dqs.value.clone(),
+            Value::NationalStringLiteral(s) => s.clone(),
+            _ => format!("{}", expr),
+        },
         _ => format!("{}", expr),
     }
 }
@@ -571,7 +566,10 @@ fn expr_to_value_string(expr: &Expr) -> String {
 fn object_name_to_string(name: &ObjectName) -> String {
     name.0
         .iter()
-        .map(|i| i.value.as_str())
+        .filter_map(|part| match part {
+            ObjectNamePart::Identifier(ident) => Some(ident.value.as_str()),
+            _ => None,
+        })
         .collect::<Vec<_>>()
         .join(".")
 }
