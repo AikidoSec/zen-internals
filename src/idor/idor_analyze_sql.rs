@@ -531,7 +531,7 @@ fn extract_column_value_pair(
     Some(FilterColumn {
         table,
         column,
-        value: expr_to_value_string(maybe_value),
+        value: expr_to_value_string(maybe_value)?,
         placeholder_number,
         is_placeholder: is_placeholder(maybe_value),
     })
@@ -553,19 +553,33 @@ fn is_column_ref(expr: &Expr) -> bool {
     matches!(expr, Expr::Identifier(_) | Expr::CompoundIdentifier(_))
 }
 
-fn expr_to_value_string(expr: &Expr) -> String {
+fn expr_to_value_string(expr: &Expr) -> Option<String> {
     match expr {
         Expr::Value(vws) => match &vws.value {
-            Value::Placeholder(p) => p.clone(),
-            Value::SingleQuotedString(s) => s.clone(),
-            Value::DoubleQuotedString(s) => s.clone(),
-            Value::Number(n, _) => n.clone(),
-            Value::EscapedStringLiteral(s) => s.clone(),
-            Value::DollarQuotedString(dqs) => dqs.value.clone(),
-            Value::NationalStringLiteral(s) => s.clone(),
-            _ => format!("{}", expr),
+            Value::Placeholder(p) => Some(p.clone()),
+            Value::Number(n, _) => Some(n.clone()),
+            Value::SingleQuotedString(s)
+            | Value::DoubleQuotedString(s)
+            | Value::TripleSingleQuotedString(s)
+            | Value::TripleDoubleQuotedString(s)
+            | Value::EscapedStringLiteral(s)
+            | Value::UnicodeStringLiteral(s)
+            | Value::SingleQuotedByteStringLiteral(s)
+            | Value::DoubleQuotedByteStringLiteral(s)
+            | Value::TripleSingleQuotedByteStringLiteral(s)
+            | Value::TripleDoubleQuotedByteStringLiteral(s)
+            | Value::SingleQuotedRawStringLiteral(s)
+            | Value::DoubleQuotedRawStringLiteral(s)
+            | Value::TripleSingleQuotedRawStringLiteral(s)
+            | Value::TripleDoubleQuotedRawStringLiteral(s)
+            | Value::NationalStringLiteral(s)
+            | Value::HexStringLiteral(s) => Some(s.clone()),
+            Value::DollarQuotedString(dqs) => Some(dqs.value.clone()),
+            Value::QuoteDelimitedStringLiteral(qs)
+            | Value::NationalQuoteDelimitedStringLiteral(qs) => Some(qs.value.clone()),
+            Value::Boolean(_) | Value::Null => None,
         },
-        _ => format!("{}", expr),
+        _ => None,
     }
 }
 
@@ -714,7 +728,7 @@ fn extract_insert_columns(
 
                     Some(InsertColumn {
                         column: columns[i].to_string(),
-                        value: expr_to_value_string(expr),
+                        value: expr_to_value_string(expr)?,
                         placeholder_number,
                         is_placeholder: is_placeholder(expr),
                     })
