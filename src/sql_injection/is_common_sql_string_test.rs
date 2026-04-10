@@ -405,4 +405,25 @@ mod tests {
             false
         );
     }
+
+    #[test]
+    fn test_trailing_comma() {
+        assert_eq!(is_common_sql_string("username,"), true);
+        assert_eq!(is_common_sql_string("user name,"), true);
+
+        assert_eq!(is_common_sql_string(",username,"), false);
+        assert_eq!(is_common_sql_string("user,name,"), false);
+        assert_eq!(is_common_sql_string(",user,name"), false);
+        assert_eq!(is_common_sql_string("user,name"), false);
+        assert_eq!(is_common_sql_string(",user name,"), false);
+        assert_eq!(is_common_sql_string("username,,"), false);
+        assert_eq!(is_common_sql_string(",,username"), false);
+        assert_eq!(is_common_sql_string(",username"), false);
+        assert_eq!(is_common_sql_string(",user name"), false);
+
+        let at_limit = format!("{},", "a".repeat(39));
+        assert_eq!(is_common_sql_string(&at_limit), true);
+        let over_limit = format!("{}a,", "a".repeat(39));
+        assert_eq!(is_common_sql_string(&over_limit), false);
+    }
 }
