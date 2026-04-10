@@ -1,8 +1,9 @@
 name: 🚀 Build Release Artifacts
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - "v*"
 
 permissions:
   contents: write
@@ -201,27 +202,32 @@ jobs:
 
   upload-release-assets:
     needs: [build, build-wasm-node]
-    runs-on: ubuntu-latest
-    if: github.event_name == 'release'
+    runs-on: open-source-releaser
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: ./artifacts
 
-      - name: Upload all assets to release
-        uses: softprops/action-gh-release@6cbd405e2c4e67a21c47fa9e383d020e4e28b836 # v2.3.3
-        with:
-          files: |
-            ./artifacts/linux-binaries/*
-            ./artifacts/linux-binaries-musl/*
-            ./artifacts/linux-binaries-arm64/*
-            ./artifacts/linux-binaries-arm64-musl/*
-            ./artifacts/windows-binaries/*
-            ./artifacts/windows-binaries-arm/*
-            ./artifacts/mac-binaries/*
-            ./artifacts/mac-binaries-arm64/*
-            ./artifacts/wasm-node-binaries/*
-            ./artifacts/wasm-binaries/*
+      - name: Create draft release and upload assets
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          if ! gh release view "$VERSION" &>/dev/null; then
+            gh release create "$VERSION" --draft --title "$VERSION" --generate-notes
+          fi
+          gh release upload "$VERSION" --clobber \
+            ./artifacts/linux-binaries/* \
+            ./artifacts/linux-binaries-musl/* \
+            ./artifacts/linux-binaries-arm64/* \
+            ./artifacts/linux-binaries-arm64-musl/* \
+            ./artifacts/windows-binaries/* \
+            ./artifacts/windows-binaries-arm/* \
+            ./artifacts/mac-binaries/* \
+            ./artifacts/mac-binaries-arm64/* \
+            ./artifacts/wasm-node-binaries/* \
+            ./artifacts/wasm-binaries/*
