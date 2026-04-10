@@ -231,3 +231,5 @@ jobs:
             ./artifacts/mac-binaries-arm64/* \
             ./artifacts/wasm-node-binaries/* \
             ./artifacts/wasm-binaries/*
+          gh release edit "$VERSION" --draft=false
+
