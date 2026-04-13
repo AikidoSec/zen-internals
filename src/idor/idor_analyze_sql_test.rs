@@ -4708,6 +4708,256 @@ mod tests {
     }
 
     #[test]
+    fn test_where_null_skipped() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM users WHERE deleted_at = NULL AND tenant_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_boolean_skipped() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM users WHERE active = TRUE AND tenant_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_escaped_string_literal() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE id = E'abc'", 9).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "id".into(),
+                    value: "abc".into(),
+                    placeholder_number: None,
+                    is_placeholder: false,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_unicode_string_literal() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE id = U&'abc'", 9).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "id".into(),
+                    value: "abc".into(),
+                    placeholder_number: None,
+                    is_placeholder: false,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_dollar_quoted_string() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE id = $$abc$$", 9).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "id".into(),
+                    value: "abc".into(),
+                    placeholder_number: None,
+                    is_placeholder: false,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_national_string_literal() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE id = N'abc'", 8).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "id".into(),
+                    value: "abc".into(),
+                    placeholder_number: None,
+                    is_placeholder: false,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_hex_string_literal() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE id = X'1F'", 8).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "id".into(),
+                    value: "1F".into(),
+                    placeholder_number: None,
+                    is_placeholder: false,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_triple_single_quoted_string_bigquery() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE id = '''abc'''", 2).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "id".into(),
+                    value: "abc".into(),
+                    placeholder_number: None,
+                    is_placeholder: false,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_double_quoted_string_bigquery() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE id = \"abc\"", 2,).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "id".into(),
+                    value: "abc".into(),
+                    placeholder_number: None,
+                    is_placeholder: false,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_byte_string_literal_bigquery() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE id = B'abc'", 2).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "id".into(),
+                    value: "abc".into(),
+                    placeholder_number: None,
+                    is_placeholder: false,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_raw_string_literal_bigquery() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE id = R'abc'", 2).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "id".into(),
+                    value: "abc".into(),
+                    placeholder_number: None,
+                    is_placeholder: false,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
     fn test_string_literal_is_not_placeholder() {
         assert_eq!(
             idor_analyze_sql("SELECT * FROM orders WHERE tenant_id = 'org_123'", 9).unwrap(),

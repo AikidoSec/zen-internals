@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>IDOR SQL Analyzer</title>
+        <link rel="stylesheet" href="./assets/style.css" />
+        <link rel="icon" type="image/svg+xml" href="assets/zen.svg" />
+    </head>
+    <body>
+        <a class="back" href="./">← Back</a>
+        <h1>IDOR SQL Analyzer</h1>
+
+        <label for="query">SQL Query</label>
+        <textarea id="query">SELECT * FROM users WHERE tenant_id = $1 AND id = $2</textarea>
+
+        <div class="row">
+            <div>
+                <label for="dialect">Dialect</label>
+                <select id="dialect">
+                    <option value="0">Generic</option>
+                    <option value="1">ANSI</option>
+                    <option value="2">BigQuery</option>
+                    <option value="3">ClickHouse</option>
+                    <option value="4">Databricks</option>
+                    <option value="5">DuckDB</option>
+                    <option value="6">Hive</option>
+                    <option value="7">MSSQL</option>
+                    <option value="8">MySQL</option>
+                    <option value="9" selected>PostgreSQL</option>
+                    <option value="10">Redshift</option>
+                    <option value="11">Snowflake</option>
+                    <option value="12">SQLite</option>
+                </select>
+            </div>
+        </div>
+
+        <label for="output">Result (JSON)</label>
+        <textarea id="output" readonly></textarea>
+
+        <script type="module">
+            import init, {
+                wasm_idor_analyze_sql,
+            } from "./pkg/zen_internals.js";
+
+            const queryEl = document.getElementById("query");
+            const dialectEl = document.getElementById("dialect");
+            const outputEl = document.getElementById("output");
+
+            function run() {
+                try {
+                    const result = wasm_idor_analyze_sql(
+                        queryEl.value,
+                        parseInt(dialectEl.value, 10),
+                    );
+                    outputEl.value = JSON.stringify(result, null, 2);
+                    outputEl.classList.remove("error");
+                } catch (e) {
+                    outputEl.value = String(e);
+                    outputEl.classList.add("error");
+                }
+            }
+
+            queryEl.addEventListener("input", run);
+            dialectEl.addEventListener("change", run);
+
+            await init();
+            run();
+        </script>
+    </body>
+</html>
