@@ -12,6 +12,10 @@ const lib = Deno.dlopen(fullTargetDir, {
         parameters: ["pointer", "usize", "pointer", "usize", "i32"],
         result: "i32",
     },
+    detect_shell_injection: {
+        parameters: ["pointer", "usize", "pointer", "usize"],
+        result: "i32",
+    },
     idor_analyze_sql_ffi: {
         parameters: ["pointer", "usize", "i32"],
         result: "pointer",
@@ -261,6 +265,63 @@ assertEquals(
         0
     ),
     1
+);
+
+// Test shell injection
+assertEquals(
+    lib.symbols.detect_shell_injection(
+        ...getBufferAndLength("ls; rm -rf /"),
+        ...getBufferAndLength("; rm -rf /"),
+    ),
+    1
+);
+
+// Not an injection
+assertEquals(
+    lib.symbols.detect_shell_injection(
+        ...getBufferAndLength("echo 'safe'"),
+        ...getBufferAndLength("safe"),
+    ),
+    0
+);
+
+// Tokenization failure (unclosed quote)
+assertEquals(
+    lib.symbols.detect_shell_injection(
+        ...getBufferAndLength("echo 'unclosed"),
+        ...getBufferAndLength("unclosed"),
+    ),
+    3
+);
+
+// Test unsafe pointer
+assertEquals(
+    lib.symbols.detect_shell_injection(
+        null,
+        0,
+        ...getBufferAndLength("test"),
+    ),
+    2
+);
+
+// Zero length not allowed
+assertEquals(
+    lib.symbols.detect_shell_injection(
+        getBufferAndLength("ls; rm -rf /").at(0),
+        0,
+        ...getBufferAndLength("; rm -rf /"),
+    ),
+    2
+);
+
+// Invalid UTF-8
+assertEquals(
+    lib.symbols.detect_shell_injection(
+        toCStringInvalidUtf8(),
+        2,
+        ...getBufferAndLength("test"),
+    ),
+    2
 );
 
 // Test IDOR SQL analysis
