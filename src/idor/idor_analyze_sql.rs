@@ -2,8 +2,9 @@ use crate::idor::sql_query_result::{FilterColumn, InsertColumn, SqlQueryResult, 
 use crate::sql_injection::helpers::select_dialect_based_on_enum::select_dialect_based_on_enum;
 use core::ops::ControlFlow;
 use sqlparser::ast::{
-    BinaryOperator, Expr, FromTable, ObjectName, ObjectNamePart, Query, SetExpr, Statement,
-    TableFactor, TableObject, TableWithJoins, Value, ValueWithSpan, Visit, Visitor,
+    BinaryOperator, Expr, FromTable, FunctionArg, FunctionArgExpr, ObjectName, ObjectNamePart,
+    Query, SetExpr, Statement, TableFactor, TableObject, TableWithJoins, Value, ValueWithSpan,
+    Visit, Visitor,
 };
 use sqlparser::parser::Parser;
 use std::collections::HashSet;
@@ -392,7 +393,9 @@ impl Visitor for SelectVisitor {
 
     fn pre_visit_table_factor(&mut self, table_factor: &TableFactor) -> ControlFlow<Self::Break> {
         match table_factor {
-            TableFactor::Table { name, alias, .. } if self.skip_depth == 0 => {
+            TableFactor::Table { name, alias, .. }
+                if self.skip_depth == 0 && !is_table_valued_function(table_factor) =>
+            {
                 let table_name = object_name_to_string(name);
                 // Skip common table expression references (virtual tables, not real ones)
                 if !self.cte_names.contains(&table_name.to_lowercase()) {
@@ -673,6 +676,9 @@ fn count_placeholders(expr: &Expr, count: &mut usize) {
 }
 
 fn table_ref_from_factor(factor: &TableFactor) -> Option<TableRef> {
+    if is_table_valued_function(factor) {
+        return None;
+    }
     if let TableFactor::Table { name, alias, .. } = factor {
         Some(TableRef {
             name: object_name_to_string(name),
@@ -681,6 +687,65 @@ fn table_ref_from_factor(factor: &TableFactor) -> Option<TableRef> {
     } else {
         None
     }
+}
+
+/// Returns true if `factor` is a table-valued function call (e.g.
+/// `jsonb_array_elements(metadata) AS elem`, `generate_series(1, 10)`), rather than a real
+/// table reference. These operate on row data or generate rows, so they are not entities
+/// that need their own IDOR filter.
+///
+/// sqlparser represents both real tables and TVF calls as `TableFactor::Table`; the
+/// distinguishing field is `args`: per sqlparser docs, it is `Some(_)` for a TVF call
+/// (even with zero arguments) and `None` for a plain table reference.
+/// https://github.com/apache/datafusion-sqlparser-rs/blob/b6af2aead6c611a34fed9c24943629753c0a6df0/src/ast/query.rs#L1477
+///
+/// One documented exception: the deprecated MSSQL `FROM foo (NOLOCK)` table-hint
+/// syntax also lands in `args`. Those args are always bare hint keywords (e.g. NOLOCK,
+/// READPAST), so we treat that case as a real table reference, not a TVF call.
+fn is_table_valued_function(table_factor: &TableFactor) -> bool {
+    let TableFactor::Table {
+        args: Some(args), ..
+    } = table_factor
+    else {
+        return false;
+    };
+    // Empty arg list -- treat as TVF (rare, e.g. `current_user()`).
+    if args.args.is_empty() {
+        return true;
+    }
+    // If every arg is a bare MSSQL table-hint keyword, this is the deprecated hint
+    // syntax (`FROM foo (NOLOCK)`), not a function call.
+    !args.args.iter().all(is_mssql_table_hint_arg)
+}
+
+/// Recognizes a bare MSSQL table-hint keyword as it appears inside the deprecated
+/// `FROM foo (NOLOCK, READPAST, ...)` syntax: an unnamed positional arg holding a single
+/// bare identifier whose value matches one of the 15 hints MSSQL allows without the
+/// `WITH` keyword. Other hints (HOLDLOCK, KEEPIDENTITY, FORCESEEK, INDEX = ..., etc.)
+/// require `WITH (...)` and land in `with_hints`, so they never reach `args`.
+/// https://learn.microsoft.com/en-us/sql/t-sql/queries/hints-transact-sql-table
+fn is_mssql_table_hint_arg(arg: &FunctionArg) -> bool {
+    let FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Identifier(ident))) = arg else {
+        return false;
+    };
+    matches!(
+        ident.value.to_uppercase().as_str(),
+        "NOLOCK"
+            | "READUNCOMMITTED"
+            | "UPDLOCK"
+            | "REPEATABLEREAD"
+            | "SERIALIZABLE"
+            | "READCOMMITTED"
+            | "TABLOCK"
+            | "TABLOCKX"
+            | "PAGLOCK"
+            | "ROWLOCK"
+            | "NOWAIT"
+            | "READPAST"
+            | "XLOCK"
+            | "SNAPSHOT"
+            | "NOEXPAND"
+    )
 }
 
 fn extract_tables_from_table_with_joins(twj: &TableWithJoins) -> Vec<TableRef> {
