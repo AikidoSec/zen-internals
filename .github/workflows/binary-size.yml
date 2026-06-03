@@ -1,0 +1,71 @@
+name: 📦 Binary Size Check
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  wasm-size:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: .main
+
+      - name: Install Rust toolchain
+        run: |
+          rustup update --no-self-update stable
+          rustup default stable
+
+      - name: Install binaryen (wasm-opt)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y binaryen
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
+
+      - name: Build PR branch (WASM)
+        run: wasm-pack build --target nodejs --features wasm-js
+
+      - name: Build main branch (WASM)
+        working-directory: .main
+        run: wasm-pack build --target nodejs --features wasm-js
+
+      - name: Compare sizes and enforce threshold
+        run: |
+          PR_SIZE=$(wc -c < pkg/zen_internals_bg.wasm)
+          MAIN_SIZE=$(wc -c < .main/pkg/zen_internals_bg.wasm)
+          DIFF=$((PR_SIZE - MAIN_SIZE))
+          PCT=$(echo "scale=1; $DIFF * 100 / $MAIN_SIZE" | bc)
+
+          PR_KB=$(echo "scale=1; $PR_SIZE / 1024" | bc)
+          MAIN_KB=$(echo "scale=1; $MAIN_SIZE / 1024" | bc)
+          DIFF_KB=$(echo "scale=1; $DIFF / 1024" | bc)
+
+          {
+            echo "## 📦 WASM Binary Size"
+            echo ""
+            echo "| Branch | Size |"
+            echo "|--------|------|"
+            echo "| \`main\` | ${MAIN_KB} KB |"
+            echo "| This PR | ${PR_KB} KB |"
+            echo "| Delta | ${DIFF_KB} KB (${PCT}%) |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          THRESHOLD=10
+          if (( $(echo "$PCT > $THRESHOLD" | bc -l) )); then
+            echo "❌ WASM binary grew by ${PCT}% (threshold: ${THRESHOLD}%)"
+            exit 1
+          fi
+
+          echo "✅ WASM size OK: ${PCT}%"
