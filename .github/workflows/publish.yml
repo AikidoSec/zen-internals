@@ -6,9 +6,7 @@ on:
       - "v*"
 
 permissions:
-  contents: write
-  packages: write
-  deployments: write
+  contents: read
 
 jobs:
   tests:
@@ -203,6 +201,8 @@ jobs:
   upload-release-assets:
     needs: [build, build-wasm-node]
     runs-on: open-source-releaser
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
