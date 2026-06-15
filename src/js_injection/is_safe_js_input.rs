@@ -1,11 +1,11 @@
 use oxc::allocator::Allocator;
-use oxc::ast::ast::BinaryOperator;
+use oxc::ast::ast::{BinaryOperator, UnaryOperator};
 use oxc::ast::AstKind;
 use oxc::parser::{ParseOptions, Parser};
 use oxc::span::SourceType;
 use oxc_ast_visit::Visit;
 
-// Safe operators
+// Safe binary operators
 const SAFE_OPERATORS: [BinaryOperator; 6] = [
     BinaryOperator::Addition,
     BinaryOperator::Subtraction,
@@ -14,6 +14,10 @@ const SAFE_OPERATORS: [BinaryOperator; 6] = [
     BinaryOperator::Exponential,
     BinaryOperator::Remainder,
 ];
+
+// Safe unary operators (e.g. negative/positive numbers like -10, +5)
+const SAFE_UNARY_OPERATORS: [UnaryOperator; 2] =
+    [UnaryOperator::UnaryNegation, UnaryOperator::UnaryPlus];
 
 pub fn is_safe_js_input(user_input: &str, allocator: &Allocator, source_type: SourceType) -> bool {
     let parser_result = Parser::new(&allocator, &user_input, source_type)
@@ -57,6 +61,12 @@ impl<'a> Visit<'a> for ASTPass {
             AstKind::BinaryExpression(b) => {
                 // Check if the binary operator is safe
                 if !SAFE_OPERATORS.contains(&b.operator) {
+                    self.contains_only_safe_tokens = false;
+                }
+            }
+            // Check if unary operator is allowed (e.g. -10, +5)
+            AstKind::UnaryExpression(u) => {
+                if !SAFE_UNARY_OPERATORS.contains(&u.operator) {
                     self.contains_only_safe_tokens = false;
                 }
             }

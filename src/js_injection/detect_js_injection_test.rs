@@ -178,6 +178,21 @@ mod tests {
     }
 
     #[test]
+    fn test_js_allow_negative_number() {
+        not_injection!("const test = -10;", "-10", 0);
+        not_injection!("const test = +5;", "+5", 0);
+        not_injection!("const test = -3.14;", "-3.14", 0);
+        not_injection!("if (x > -10) { return true; }", "-10", 0);
+        not_injection!("const test = 1 + -2;", "1 + -2", 0);
+        // Still an injection: a negative number followed by injected code.
+        is_injection!(
+            "const test = -10; console.log('injected'); //;",
+            "-10; console.log('injected'); //",
+            0
+        );
+    }
+
+    #[test]
     fn test_js_real_cve() {
         // CVE-2024-21511
         is_injection!(
