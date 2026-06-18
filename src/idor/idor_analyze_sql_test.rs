@@ -7202,6 +7202,92 @@ mod tests {
     }
 
     #[test]
+    fn test_col_col_resolved_with_mixed_case_table_qualifier() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM orders AS t1 INNER JOIN users AS t2 \
+                 ON T1.tenant_id = T2.tenant_id \
+                 WHERE T2.tenant_id = ?",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "orders".into(),
+                        alias: Some("t1".into()),
+                    },
+                    TableRef {
+                        name: "users".into(),
+                        alias: Some("t2".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("T2".into()),
+                        column: "tenant_id".into(),
+                        value: "?".into(),
+                        placeholder_number: Some(0),
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("T1".into()),
+                        column: "tenant_id".into(),
+                        value: "?".into(),
+                        placeholder_number: Some(0),
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_col_col_resolved_with_mixed_case_table_name() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM orders INNER JOIN users \
+                 ON ORDERS.tenant_id = users.tenant_id \
+                 WHERE users.tenant_id = ?",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "orders".into(),
+                        alias: None,
+                    },
+                    TableRef {
+                        name: "users".into(),
+                        alias: None,
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("users".into()),
+                        column: "tenant_id".into(),
+                        value: "?".into(),
+                        placeholder_number: Some(0),
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("ORDERS".into()),
+                        column: "tenant_id".into(),
+                        value: "?".into(),
+                        placeholder_number: Some(0),
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
     fn test_update_from_left_join_col_col_not_resolved_postgres() {
         assert_eq!(
             idor_analyze_sql(
