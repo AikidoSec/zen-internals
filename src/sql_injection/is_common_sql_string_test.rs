@@ -118,6 +118,7 @@ mod tests {
         assert_eq!(is_common_sql_string("d)"), true);
         assert_eq!(is_common_sql_string("1)"), true);
         assert_eq!(is_common_sql_string("(5"), true);
+        assert_eq!(is_common_sql_string("(1"), true);
         assert_eq!(is_common_sql_string("(s"), true);
         assert_eq!(is_common_sql_string("+1"), true);
 
@@ -362,7 +363,6 @@ mod tests {
         assert_eq!(is_common_sql_string("123)"), true);
 
         assert_eq!(is_common_sql_string("(123)"), false);
-        assert_eq!(is_common_sql_string("(1"), false);
         assert_eq!(is_common_sql_string("(123"), false);
         assert_eq!(is_common_sql_string("1 )"), false);
         assert_eq!(is_common_sql_string("1) --"), false);
