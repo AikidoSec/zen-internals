@@ -52,7 +52,7 @@ pub fn detect_sql_injection_str(
 
     // Tokenize query :
     let tokens = tokenize_query(&query, dialect);
-    if tokens.len() <= 0 {
+    if tokens.is_empty() {
         // Tokens are empty, probably a parsing issue with original query, return false.
         return SqlInjectionDetectionResult {
             detected: false,
@@ -96,8 +96,8 @@ pub fn detect_sql_injection_str(
         };
     }
 
-    return SqlInjectionDetectionResult {
+    SqlInjectionDetectionResult {
         detected: false,
         reason: DetectionReason::NoChangesFound,
-    };
+    }
 }

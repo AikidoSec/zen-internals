@@ -28,7 +28,7 @@ pub unsafe extern "C" fn detect_sql_injection(
     dialect: c_int,
 ) -> c_int {
     // Returns an integer value, representing a boolean (1 = true, 0 = false, 2 = error)
-    return panic::catch_unwind(|| {
+    panic::catch_unwind(|| {
         // Check if the pointers are null
         if query.is_null() || userinput.is_null() {
             return 2;
@@ -60,9 +60,10 @@ pub unsafe extern "C" fn detect_sql_injection(
         if detection_results.detected {
             return 1;
         }
-        return 0;
+
+        0
     })
-    .unwrap_or(2);
+    .unwrap_or(2)
 }
 
 /// # Safety
@@ -78,7 +79,7 @@ pub unsafe extern "C" fn detect_js_injection(
     sourcetype: c_int,
 ) -> c_int {
     // Returns an integer value, representing a boolean (1 = true, 0 = false, 2 = error)
-    return panic::catch_unwind(|| {
+    panic::catch_unwind(|| {
         // Check if the pointers are null
         if code.is_null() || userinput.is_null() {
             return 2;
@@ -106,9 +107,9 @@ pub unsafe extern "C" fn detect_js_injection(
             return 1;
         }
 
-        return 0;
+        0
     })
-    .unwrap_or(2);
+    .unwrap_or(2)
 }
 
 /// Allocates memory in WASM linear memory

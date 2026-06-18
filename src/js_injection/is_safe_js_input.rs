@@ -20,14 +20,14 @@ const SAFE_UNARY_OPERATORS: [UnaryOperator; 2] =
     [UnaryOperator::UnaryNegation, UnaryOperator::UnaryPlus];
 
 pub fn is_safe_js_input(user_input: &str, allocator: &Allocator, source_type: SourceType) -> bool {
-    let parser_result = Parser::new(&allocator, &user_input, source_type)
+    let parser_result = Parser::new(allocator, user_input, source_type)
         .with_options(ParseOptions {
             allow_return_outside_function: true,
             ..ParseOptions::default()
         })
         .parse();
 
-    if parser_result.panicked || parser_result.errors.len() > 0 {
+    if parser_result.panicked || !parser_result.errors.is_empty() {
         return false;
     }
 
@@ -36,7 +36,7 @@ pub fn is_safe_js_input(user_input: &str, allocator: &Allocator, source_type: So
     };
     ast_pass.visit_program(&parser_result.program);
 
-    return ast_pass.contains_only_safe_tokens;
+    ast_pass.contains_only_safe_tokens
 }
 
 struct ASTPass {
@@ -53,7 +53,7 @@ impl<'a> Visit<'a> for ASTPass {
             | AstKind::SequenceExpression(_) => {} // Allow sequences, like 1, 2, 3
             // Check if program comments, directives or hashbang are present
             AstKind::Program(p) => {
-                if p.comments.len() > 0 || p.directives.len() > 0 || p.hashbang.is_some() {
+                if !p.comments.is_empty() || !p.directives.is_empty() || p.hashbang.is_some() {
                     self.contains_only_safe_tokens = false;
                 }
             }

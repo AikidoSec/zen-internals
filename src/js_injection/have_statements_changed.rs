@@ -17,7 +17,7 @@ pub fn have_statements_changed(
         return true;
     }
 
-    return false;
+    false
 }
 
 fn get_ast_kind_tokens<'a>(
@@ -27,8 +27,9 @@ fn get_ast_kind_tokens<'a>(
     let mut ast_pass = ASTPass {
         tokens: Vec::new_in(allocator),
     };
-    ast_pass.visit_program(&program);
-    return ast_pass.tokens;
+    ast_pass.visit_program(program);
+
+    ast_pass.tokens
 }
 
 struct ASTPass<'a> {
