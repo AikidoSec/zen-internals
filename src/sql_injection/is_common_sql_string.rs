@@ -152,5 +152,12 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         return true;
     }
 
+    // Allow strings with letters, digits and spaces that end with a comma,
+    if user_input.len() <= 40 && user_input.ends_with(',') {
+        if regex!(r"^[a-z0-9 ]+,$").is_match(user_input) {
+            return true;
+        }
+    }
+
     return false;
 }

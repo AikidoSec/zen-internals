@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>JS Injection Detector</title>
+        <link rel="stylesheet" href="./assets/style.css" />
+        <link rel="icon" type="image/svg+xml" href="assets/zen.svg" />
+    </head>
+    <body>
+        <a class="back" href="./">← Back</a>
+        <h1>JS Injection Detector</h1>
+
+        <label for="code">JavaScript Code (with user input embedded)</label>
+        <textarea id="code">console.log("Hello, "); process.exit(1); // !");</textarea>
+
+        <div class="row">
+            <div>
+                <label for="userinput">User Input</label>
+                <input
+                    id="userinput"
+                    type="text"
+                    value='"); process.exit(1); //'
+                />
+            </div>
+            <div>
+                <label for="sourcetype">Source Type</label>
+                <select id="sourcetype">
+                    <option value="0" selected>JS (auto CJS/ESM)</option>
+                    <option value="1">TypeScript (ESM)</option>
+                    <option value="2">CJS</option>
+                    <option value="3">MJS (ESM)</option>
+                    <option value="4">TSX</option>
+                </select>
+            </div>
+        </div>
+
+        <label>Result</label>
+        <div id="output" class="result"></div>
+
+        <script type="module">
+            import init, {
+                wasm_detect_js_injection,
+            } from "./pkg/zen_internals.js";
+
+            const codeEl = document.getElementById("code");
+            const userinputEl = document.getElementById("userinput");
+            const sourcetypeEl = document.getElementById("sourcetype");
+            const outputEl = document.getElementById("output");
+
+            function run() {
+                try {
+                    const detected = wasm_detect_js_injection(
+                        codeEl.value,
+                        userinputEl.value,
+                        parseInt(sourcetypeEl.value, 10),
+                    );
+
+                    outputEl.className = "result";
+                    if (detected) {
+                        outputEl.classList.add("detected");
+                        outputEl.textContent = "⚠ Injection detected";
+                    } else {
+                        outputEl.classList.add("safe");
+                        outputEl.textContent = "✓ No injection detected";
+                    }
+                } catch (e) {
+                    outputEl.className = "result warning";
+                    outputEl.textContent = String(e);
+                }
+            }
+
+            codeEl.addEventListener("input", run);
+            userinputEl.addEventListener("input", run);
+            sourcetypeEl.addEventListener("change", run);
+
+            await init();
+            run();
+        </script>
+    </body>
+</html>

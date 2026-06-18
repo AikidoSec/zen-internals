@@ -2,11 +2,12 @@ use crate::idor::sql_query_result::{FilterColumn, InsertColumn, SqlQueryResult, 
 use crate::sql_injection::helpers::select_dialect_based_on_enum::select_dialect_based_on_enum;
 use core::ops::ControlFlow;
 use sqlparser::ast::{
-    BinaryOperator, Expr, FromTable, ObjectName, Query, SetExpr, Statement, TableFactor,
-    TableWithJoins, Value, Visit, Visitor,
+    BinaryOperator, Expr, FromTable, FunctionArg, FunctionArgExpr, JoinConstraint, JoinOperator,
+    ObjectName, ObjectNamePart, Query, SetExpr, Statement, TableFactor, TableObject,
+    TableWithJoins, Value, ValueWithSpan, Visit, Visitor,
 };
 use sqlparser::parser::Parser;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 /// Analyzes a SQL query for IDOR (Insecure Direct Object Reference) protection.
 ///
@@ -18,9 +19,15 @@ use std::collections::HashSet;
 ///
 /// # Filter Extraction
 ///
-/// Only equality comparisons (`=`) where one side is a column and the other is a
-/// concrete value (literal or placeholder) are extracted. Column-to-column comparisons
-/// (e.g., JOIN conditions like `a.id = b.user_id`) are ignored.
+/// Equality comparisons (`=`) where one side is a column and the other is a concrete
+/// value (literal or placeholder) are extracted directly.
+///
+/// Column-to-column comparisons in JOIN ON or WHERE clauses (e.g.
+/// `r.sys_group_id = t.sys_group_id`) are also collected. After extraction, we
+/// propagate known values through these pairs in a loop until no new filters can
+/// be derived. This means JOIN chains like `a=b`, `b=c`, `c=$1` will resolve all
+/// three columns to `$1`. We only create filters for tables that belong to the
+/// current query, so subquery tables don't leak into the outer query.
 ///
 /// # UNION / INTERSECT / EXCEPT
 ///
@@ -67,18 +74,12 @@ fn analyze_statement(stmt: &Statement, results: &mut Vec<SqlQueryResult>) -> Res
             let mut counter = 0;
             analyze_query(query, results, &mut counter)?;
         }
-        Statement::Update {
-            table,
-            assignments,
-            from,
-            selection,
-            ..
-        } => {
+        Statement::Update(update) => {
             analyze_update(
-                table,
-                assignments,
-                from.as_ref(),
-                selection.as_ref(),
+                &update.table,
+                &update.assignments,
+                update.from.as_ref(),
+                update.selection.as_ref(),
                 results,
                 &mut 0,
                 &HashSet::new(),
@@ -94,7 +95,6 @@ fn analyze_statement(stmt: &Statement, results: &mut Vec<SqlQueryResult>) -> Res
         | Statement::Rollback { .. }
         | Statement::StartTransaction { .. }
         | Statement::Savepoint { .. }
-        | Statement::SetTransaction { .. }
         | Statement::ReleaseSavepoint { .. }
         | Statement::CreateTable { .. }
         | Statement::AlterTable { .. }
@@ -115,11 +115,7 @@ fn analyze_statement(stmt: &Statement, results: &mut Vec<SqlQueryResult>) -> Res
         | Statement::Truncate { .. }
         | Statement::Grant { .. }
         | Statement::Revoke { .. }
-        | Statement::SetVariable { .. }
-        | Statement::SetNames { .. }
-        | Statement::SetNamesDefault { .. }
-        | Statement::SetTimeZone { .. }
-        | Statement::SetRole { .. }
+        | Statement::Set(_)
         | Statement::ShowVariable { .. }
         | Statement::ShowStatus { .. }
         | Statement::ShowVariables { .. }
@@ -143,15 +139,21 @@ fn analyze_statement(stmt: &Statement, results: &mut Vec<SqlQueryResult>) -> Res
 fn analyze_update(
     table: &TableWithJoins,
     assignments: &[sqlparser::ast::Assignment],
-    from: Option<&TableWithJoins>,
+    from: Option<&sqlparser::ast::UpdateTableFromKind>,
     selection: Option<&Expr>,
     results: &mut Vec<SqlQueryResult>,
     counter: &mut usize,
     cte_names: &HashSet<String>,
 ) -> Result<(), String> {
     let mut tables = extract_tables_from_table_with_joins(table);
-    if let Some(from_clause) = from {
-        tables.extend(extract_tables_from_table_with_joins(from_clause));
+    if let Some(from_kind) = from {
+        let from_tables = match from_kind {
+            sqlparser::ast::UpdateTableFromKind::BeforeSet(twjs)
+            | sqlparser::ast::UpdateTableFromKind::AfterSet(twjs) => twjs,
+        };
+        for twj in from_tables {
+            tables.extend(extract_tables_from_table_with_joins(twj));
+        }
     }
 
     // Filter out common table expression names
@@ -161,10 +163,25 @@ fn analyze_update(
     let assignment_subqueries = extract_subqueries_from_exprs(&assignment_exprs);
     *counter += count_placeholders_in_exprs(&assignment_exprs);
 
-    let (filters, subqueries) = match selection {
+    let (mut filters, mut col_col_pairs, subqueries) = match selection {
         Some(expr) => extract_filters_from_where(expr, counter),
-        None => (Vec::new(), Vec::new()),
+        None => (Vec::new(), Vec::new(), Vec::new()),
     };
+
+    col_col_pairs.extend(collect_col_col_pairs_from_joins(std::slice::from_ref(
+        table,
+    )));
+    if let Some(from_clause) = from {
+        let from_tables = match from_clause {
+            sqlparser::ast::UpdateTableFromKind::BeforeSet(twjs)
+            | sqlparser::ast::UpdateTableFromKind::AfterSet(twjs) => twjs,
+        };
+        col_col_pairs.extend(collect_col_col_pairs_from_joins(from_tables));
+    }
+
+    let known_tables = tables_to_known_set(&tables);
+    let resolved = resolve_col_col_filters(&filters, &col_col_pairs, &known_tables);
+    filters.extend(resolved);
 
     results.push(SqlQueryResult {
         kind: "update".into(),
@@ -206,10 +223,22 @@ fn analyze_delete(
     // Filter out common table expression names
     tables.retain(|t| !cte_names.contains(&t.name.to_lowercase()));
 
-    let (filters, subqueries) = match &delete.selection {
+    let (mut filters, mut col_col_pairs, subqueries) = match &delete.selection {
         Some(expr) => extract_filters_from_where(expr, counter),
-        None => (Vec::new(), Vec::new()),
+        None => (Vec::new(), Vec::new(), Vec::new()),
     };
+
+    let from_twjs: &[TableWithJoins] = match &delete.from {
+        FromTable::WithFromKeyword(twjs) | FromTable::WithoutKeyword(twjs) => twjs,
+    };
+    col_col_pairs.extend(collect_col_col_pairs_from_joins(from_twjs));
+    if let Some(using_clauses) = &delete.using {
+        col_col_pairs.extend(collect_col_col_pairs_from_joins(using_clauses));
+    }
+
+    let known_tables = tables_to_known_set(&tables);
+    let resolved = resolve_col_col_filters(&filters, &col_col_pairs, &known_tables);
+    filters.extend(resolved);
 
     results.push(SqlQueryResult {
         kind: "delete".into(),
@@ -231,8 +260,12 @@ fn analyze_insert(
     counter: &mut usize,
     cte_names: &HashSet<String>,
 ) -> Result<(), String> {
+    let table_name = match &insert.table {
+        TableObject::TableName(name) => object_name_to_string(name),
+        TableObject::TableFunction(func) => format!("{}", func),
+    };
     let table = TableRef {
-        name: object_name_to_string(&insert.table_name),
+        name: table_name,
         alias: insert.table_alias.as_ref().map(|a| a.value.clone()),
     };
     let columns: Vec<&str> = insert.columns.iter().map(|c| c.value.as_str()).collect();
@@ -309,19 +342,12 @@ fn analyze_set_expr(
             analyze_query_with_ctes(query, results, counter, cte_names)?;
         }
         SetExpr::Update(stmt) => {
-            if let Statement::Update {
-                table,
-                assignments,
-                from,
-                selection,
-                ..
-            } = stmt
-            {
+            if let Statement::Update(update) = stmt {
                 analyze_update(
-                    table,
-                    assignments,
-                    from.as_ref(),
-                    selection.as_ref(),
+                    &update.table,
+                    &update.assignments,
+                    update.from.as_ref(),
+                    update.selection.as_ref(),
                     results,
                     counter,
                     cte_names,
@@ -350,10 +376,18 @@ fn visit_select(
     let _ = set_expr.visit(&mut visitor);
     *counter = visitor.placeholder_counter;
 
+    // Collect col-col pairs from INNER JOINs
+    let col_col_pairs = collect_col_col_pairs_for_select(set_expr);
+
+    let known_tables = tables_to_known_set(&visitor.tables);
+    let mut filters = visitor.filters;
+    let resolved = resolve_col_col_filters(&filters, &col_col_pairs, &known_tables);
+    filters.extend(resolved);
+
     results.push(SqlQueryResult {
         kind: "select".into(),
         tables: visitor.tables,
-        filters: visitor.filters,
+        filters,
         insert_columns: None,
     });
 
@@ -400,7 +434,9 @@ impl Visitor for SelectVisitor {
 
     fn pre_visit_table_factor(&mut self, table_factor: &TableFactor) -> ControlFlow<Self::Break> {
         match table_factor {
-            TableFactor::Table { name, alias, .. } if self.skip_depth == 0 => {
+            TableFactor::Table { name, alias, .. }
+                if self.skip_depth == 0 && !is_table_valued_function(table_factor) =>
+            {
                 let table_name = object_name_to_string(name);
                 // Skip common table expression references (virtual tables, not real ones)
                 if !self.cte_names.contains(&table_name.to_lowercase()) {
@@ -484,11 +520,17 @@ impl Visitor for SelectVisitor {
 }
 
 fn is_mysql_placeholder(expr: &Expr) -> bool {
-    matches!(expr, Expr::Value(Value::Placeholder(p)) if p == "?")
+    matches!(expr, Expr::Value(ValueWithSpan { value: Value::Placeholder(p), .. }) if p == "?")
 }
 
 fn is_placeholder(expr: &Expr) -> bool {
-    matches!(expr, Expr::Value(Value::Placeholder(_)))
+    matches!(
+        expr,
+        Expr::Value(ValueWithSpan {
+            value: Value::Placeholder(_),
+            ..
+        })
+    )
 }
 
 fn extract_subquery(expr: &Expr) -> Option<&Query> {
@@ -513,6 +555,194 @@ fn try_extract_filter(expr: &Expr, placeholder_counter: usize) -> Option<FilterC
         .or_else(|| extract_column_value_pair(right, left, placeholder_counter))
 }
 
+struct ColColPair {
+    left_table: Option<String>,
+    left_col: String,
+    right_table: Option<String>,
+    right_col: String,
+}
+
+/// Extracts a column-to-column equality pair (e.g. `r.sys_group_id = t.sys_group_id`).
+fn try_extract_col_col_pair(expr: &Expr) -> Option<ColColPair> {
+    let Expr::BinaryOp { left, op, right } = expr else {
+        return None;
+    };
+
+    if *op != BinaryOperator::Eq {
+        return None;
+    }
+
+    let (left_table, left_col) = extract_column_ref(left)?;
+    let (right_table, right_col) = extract_column_ref(right)?;
+    Some(ColColPair {
+        left_table,
+        left_col,
+        right_table,
+        right_col,
+    })
+}
+
+/// Returns true if the column's table qualifier belongs to the current query.
+/// Unqualified columns (no table prefix) are always considered in scope.
+fn is_table_in_scope(table: &Option<String>, known_tables: &HashSet<String>) -> bool {
+    match table {
+        None => true,
+        Some(t) => known_tables.contains(&t.to_lowercase()),
+    }
+}
+
+/// Builds a set of lowercase table names and aliases from a table list.
+fn tables_to_known_set(tables: &[TableRef]) -> HashSet<String> {
+    tables
+        .iter()
+        .flat_map(|t| {
+            let mut names = vec![t.name.to_lowercase()];
+            if let Some(alias) = &t.alias {
+                names.push(alias.to_lowercase());
+            }
+            names
+        })
+        .collect()
+}
+
+/// If `source_key` has a known value and `target_key` doesn't yet, creates a new
+/// filter for `target_key` with that value. Returns `None` if `target_key` already
+/// has a value, `source_key` has no value, or the target table is out of scope.
+fn try_derive_filter(
+    target_key: &(Option<String>, String),
+    source_key: &(Option<String>, String),
+    col_values: &HashMap<(Option<String>, String), FilterColumn>,
+    known_tables: &HashSet<String>,
+) -> Option<FilterColumn> {
+    if col_values.contains_key(target_key) {
+        return None;
+    }
+    let resolved = col_values.get(source_key)?.clone();
+    if !is_table_in_scope(&target_key.0, known_tables) {
+        return None;
+    }
+    Some(FilterColumn {
+        table: target_key.0.clone(),
+        column: target_key.1.clone(),
+        value: resolved.value,
+        placeholder_number: resolved.placeholder_number,
+        is_placeholder: resolved.is_placeholder,
+    })
+}
+
+/// Collects col-col pairs from INNER JOIN ON conditions.
+/// Outer join (LEFT/RIGHT/FULL) ON conditions are excluded.
+fn collect_col_col_pairs_from_joins(tables: &[TableWithJoins]) -> Vec<ColColPair> {
+    let mut pairs = Vec::new();
+    for twj in tables {
+        for join in &twj.joins {
+            if let JoinOperator::Join(JoinConstraint::On(on_expr))
+            | JoinOperator::Inner(JoinConstraint::On(on_expr)) = &join.join_operator
+            {
+                collect_col_col_pairs_only(on_expr, &mut pairs, false);
+            }
+        }
+    }
+    pairs
+}
+
+/// Collects col-col pairs for a SELECT statement from INNER JOIN ON conditions,
+/// the WHERE clause, and the HAVING clause.
+fn collect_col_col_pairs_for_select(set_expr: &SetExpr) -> Vec<ColColPair> {
+    let select = match set_expr {
+        SetExpr::Select(s) => s.as_ref(),
+        _ => return Vec::new(),
+    };
+
+    let mut pairs = collect_col_col_pairs_from_joins(&select.from);
+
+    if let Some(selection) = &select.selection {
+        collect_col_col_pairs_only(selection, &mut pairs, false);
+    }
+
+    if let Some(having) = &select.having {
+        collect_col_col_pairs_only(having, &mut pairs, false);
+    }
+
+    pairs
+}
+
+fn collect_col_col_pairs_only(expr: &Expr, pairs: &mut Vec<ColColPair>, in_or: bool) {
+    if !in_or {
+        if let Some(pair) = try_extract_col_col_pair(expr) {
+            pairs.push(pair);
+        }
+    }
+    if extract_subquery(expr).is_some() {
+        return;
+    }
+    match expr {
+        Expr::BinaryOp { left, op, right } => {
+            let in_or = in_or || *op == BinaryOperator::Or;
+            collect_col_col_pairs_only(left, pairs, in_or);
+            collect_col_col_pairs_only(right, pairs, in_or);
+        }
+        Expr::Nested(inner) => collect_col_col_pairs_only(inner, pairs, in_or),
+        _ => {}
+    }
+}
+
+/// Given pairs like `a.x = b.x` and `b.x = c.x`, spreads known filter values
+/// through the chain. If `c.x = $1` is a known filter, this derives `b.x = $1`
+/// and then `a.x = $1`. Loops until nothing new is found. Only creates filters
+/// for tables that belong to the current query.
+fn resolve_col_col_filters(
+    filters: &[FilterColumn],
+    col_col_pairs: &[ColColPair],
+    known_tables: &HashSet<String>,
+) -> Vec<FilterColumn> {
+    if col_col_pairs.is_empty() {
+        return Vec::new();
+    }
+
+    // Map from (table, column) to the filter we already know about.
+    // We grow this map as we discover new filters during the loop below.
+    let mut col_values: HashMap<(Option<String>, String), FilterColumn> = HashMap::new();
+    for filter in filters {
+        col_values
+            .entry((filter.table.clone(), filter.column.clone()))
+            .or_insert_with(|| filter.clone());
+    }
+
+    let mut additional = Vec::new();
+
+    loop {
+        let mut added_in_pass = false;
+
+        for pair in col_col_pairs {
+            let left_key = (pair.left_table.clone(), pair.left_col.clone());
+            let right_key = (pair.right_table.clone(), pair.right_col.clone());
+
+            if let Some(new_filter) =
+                try_derive_filter(&left_key, &right_key, &col_values, known_tables)
+            {
+                col_values.insert(left_key.clone(), new_filter.clone());
+                additional.push(new_filter);
+                added_in_pass = true;
+            }
+
+            if let Some(new_filter) =
+                try_derive_filter(&right_key, &left_key, &col_values, known_tables)
+            {
+                col_values.insert(right_key.clone(), new_filter.clone());
+                additional.push(new_filter);
+                added_in_pass = true;
+            }
+        }
+
+        if !added_in_pass {
+            break;
+        }
+    }
+
+    additional
+}
+
 fn extract_column_value_pair(
     maybe_column: &Expr,
     maybe_value: &Expr,
@@ -533,7 +763,7 @@ fn extract_column_value_pair(
     Some(FilterColumn {
         table,
         column,
-        value: expr_to_value_string(maybe_value),
+        value: expr_to_value_string(maybe_value)?,
         placeholder_number,
         is_placeholder: is_placeholder(maybe_value),
     })
@@ -555,39 +785,71 @@ fn is_column_ref(expr: &Expr) -> bool {
     matches!(expr, Expr::Identifier(_) | Expr::CompoundIdentifier(_))
 }
 
-fn expr_to_value_string(expr: &Expr) -> String {
+fn expr_to_value_string(expr: &Expr) -> Option<String> {
     match expr {
-        Expr::Value(Value::Placeholder(p)) => p.clone(),
-        Expr::Value(Value::SingleQuotedString(s)) => s.clone(),
-        Expr::Value(Value::DoubleQuotedString(s)) => s.clone(),
-        Expr::Value(Value::Number(n, _)) => n.clone(),
-        Expr::Value(Value::EscapedStringLiteral(s)) => s.clone(),
-        Expr::Value(Value::DollarQuotedString(dqs)) => dqs.value.clone(),
-        Expr::Value(Value::NationalStringLiteral(s)) => s.clone(),
-        _ => format!("{}", expr),
+        Expr::Value(vws) => match &vws.value {
+            Value::Placeholder(p) => Some(p.clone()),
+            Value::Number(n, _) => Some(n.clone()),
+            Value::SingleQuotedString(s)
+            | Value::DoubleQuotedString(s)
+            | Value::TripleSingleQuotedString(s)
+            | Value::TripleDoubleQuotedString(s)
+            | Value::EscapedStringLiteral(s)
+            | Value::UnicodeStringLiteral(s)
+            | Value::SingleQuotedByteStringLiteral(s)
+            | Value::DoubleQuotedByteStringLiteral(s)
+            | Value::TripleSingleQuotedByteStringLiteral(s)
+            | Value::TripleDoubleQuotedByteStringLiteral(s)
+            | Value::SingleQuotedRawStringLiteral(s)
+            | Value::DoubleQuotedRawStringLiteral(s)
+            | Value::TripleSingleQuotedRawStringLiteral(s)
+            | Value::TripleDoubleQuotedRawStringLiteral(s)
+            | Value::NationalStringLiteral(s)
+            | Value::HexStringLiteral(s) => Some(s.clone()),
+            Value::DollarQuotedString(dqs) => Some(dqs.value.clone()),
+            Value::QuoteDelimitedStringLiteral(qs)
+            | Value::NationalQuoteDelimitedStringLiteral(qs) => Some(qs.value.clone()),
+            Value::Boolean(_) | Value::Null => None,
+        },
+        _ => None,
     }
 }
 
 fn object_name_to_string(name: &ObjectName) -> String {
     name.0
         .iter()
-        .map(|i| i.value.as_str())
+        .filter_map(|part| match part {
+            ObjectNamePart::Identifier(ident) => Some(ident.value.as_str()),
+            _ => None,
+        })
         .collect::<Vec<_>>()
         .join(".")
 }
 
-fn extract_filters_from_where(expr: &Expr, counter: &mut usize) -> (Vec<FilterColumn>, Vec<Query>) {
+fn extract_filters_from_where(
+    expr: &Expr,
+    counter: &mut usize,
+) -> (Vec<FilterColumn>, Vec<ColColPair>, Vec<Query>) {
     let mut filters = Vec::new();
+    let mut col_col_pairs = Vec::new();
     let mut subqueries = Vec::new();
     // Start with in_or=false: the top-level WHERE clause is not inside an OR branch
-    walk_expr(expr, counter, &mut filters, &mut subqueries, false);
-    (filters, subqueries)
+    walk_expr(
+        expr,
+        counter,
+        &mut filters,
+        &mut col_col_pairs,
+        &mut subqueries,
+        false,
+    );
+    (filters, col_col_pairs, subqueries)
 }
 
 fn walk_expr(
     expr: &Expr,
     counter: &mut usize,
     filters: &mut Vec<FilterColumn>,
+    col_col_pairs: &mut Vec<ColColPair>,
     subqueries: &mut Vec<Query>,
     in_or: bool,
 ) {
@@ -599,6 +861,8 @@ fn walk_expr(
     if !in_or {
         if let Some(filter) = try_extract_filter(expr, *counter) {
             filters.push(filter);
+        } else if let Some(pair) = try_extract_col_col_pair(expr) {
+            col_col_pairs.push(pair);
         }
     }
 
@@ -610,11 +874,11 @@ fn walk_expr(
     match expr {
         Expr::BinaryOp { left, op, right } => {
             let in_or = in_or || *op == BinaryOperator::Or;
-            walk_expr(left, counter, filters, subqueries, in_or);
-            walk_expr(right, counter, filters, subqueries, in_or);
+            walk_expr(left, counter, filters, col_col_pairs, subqueries, in_or);
+            walk_expr(right, counter, filters, col_col_pairs, subqueries, in_or);
         }
         Expr::Nested(inner) => {
-            walk_expr(inner, counter, filters, subqueries, in_or);
+            walk_expr(inner, counter, filters, col_col_pairs, subqueries, in_or);
         }
         _ => {}
     }
@@ -655,6 +919,9 @@ fn count_placeholders(expr: &Expr, count: &mut usize) {
 }
 
 fn table_ref_from_factor(factor: &TableFactor) -> Option<TableRef> {
+    if is_table_valued_function(factor) {
+        return None;
+    }
     if let TableFactor::Table { name, alias, .. } = factor {
         Some(TableRef {
             name: object_name_to_string(name),
@@ -663,6 +930,65 @@ fn table_ref_from_factor(factor: &TableFactor) -> Option<TableRef> {
     } else {
         None
     }
+}
+
+/// Returns true if `factor` is a table-valued function call (e.g.
+/// `jsonb_array_elements(metadata) AS elem`, `generate_series(1, 10)`), rather than a real
+/// table reference. These operate on row data or generate rows, so they are not entities
+/// that need their own IDOR filter.
+///
+/// sqlparser represents both real tables and TVF calls as `TableFactor::Table`; the
+/// distinguishing field is `args`: per sqlparser docs, it is `Some(_)` for a TVF call
+/// (even with zero arguments) and `None` for a plain table reference.
+/// https://github.com/apache/datafusion-sqlparser-rs/blob/b6af2aead6c611a34fed9c24943629753c0a6df0/src/ast/query.rs#L1477
+///
+/// One documented exception: the deprecated MSSQL `FROM foo (NOLOCK)` table-hint
+/// syntax also lands in `args`. Those args are always bare hint keywords (e.g. NOLOCK,
+/// READPAST), so we treat that case as a real table reference, not a TVF call.
+fn is_table_valued_function(table_factor: &TableFactor) -> bool {
+    let TableFactor::Table {
+        args: Some(args), ..
+    } = table_factor
+    else {
+        return false;
+    };
+    // Empty arg list -- treat as TVF (rare, e.g. `current_user()`).
+    if args.args.is_empty() {
+        return true;
+    }
+    // If every arg is a bare MSSQL table-hint keyword, this is the deprecated hint
+    // syntax (`FROM foo (NOLOCK)`), not a function call.
+    !args.args.iter().all(is_mssql_table_hint_arg)
+}
+
+/// Recognizes a bare MSSQL table-hint keyword as it appears inside the deprecated
+/// `FROM foo (NOLOCK, READPAST, ...)` syntax: an unnamed positional arg holding a single
+/// bare identifier whose value matches one of the 15 hints MSSQL allows without the
+/// `WITH` keyword. Other hints (HOLDLOCK, KEEPIDENTITY, FORCESEEK, INDEX = ..., etc.)
+/// require `WITH (...)` and land in `with_hints`, so they never reach `args`.
+/// https://learn.microsoft.com/en-us/sql/t-sql/queries/hints-transact-sql-table
+fn is_mssql_table_hint_arg(arg: &FunctionArg) -> bool {
+    let FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Identifier(ident))) = arg else {
+        return false;
+    };
+    matches!(
+        ident.value.to_uppercase().as_str(),
+        "NOLOCK"
+            | "READUNCOMMITTED"
+            | "UPDLOCK"
+            | "REPEATABLEREAD"
+            | "SERIALIZABLE"
+            | "READCOMMITTED"
+            | "TABLOCK"
+            | "TABLOCKX"
+            | "PAGLOCK"
+            | "ROWLOCK"
+            | "NOWAIT"
+            | "READPAST"
+            | "XLOCK"
+            | "SNAPSHOT"
+            | "NOEXPAND"
+    )
 }
 
 fn extract_tables_from_table_with_joins(twj: &TableWithJoins) -> Vec<TableRef> {
@@ -710,7 +1036,7 @@ fn extract_insert_columns(
 
                     Some(InsertColumn {
                         column: columns[i].to_string(),
-                        value: expr_to_value_string(expr),
+                        value: expr_to_value_string(expr)?,
                         placeholder_number,
                         is_placeholder: is_placeholder(expr),
                     })
