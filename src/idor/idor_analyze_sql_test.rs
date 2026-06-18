@@ -127,7 +127,7 @@ mod tests {
 
     #[test]
     fn test_parse_error() {
-        assert_eq!(idor_analyze_sql("NOT VALID SQL !!!", 9).is_err(), true);
+        assert!(idor_analyze_sql("NOT VALID SQL !!!", 9).is_err());
     }
 
     #[test]
@@ -1107,11 +1107,10 @@ mod tests {
 
     #[test]
     fn test_unsupported_statement_returns_error() {
-        assert_eq!(
+        assert!(
             idor_analyze_sql("MERGE INTO target USING source ON target.id = source.id WHEN MATCHED THEN UPDATE SET target.name = source.name;", 9)
                 .unwrap_err()
-                .contains("Unrecognized SQL statement"),
-            true
+                .contains("Unrecognized SQL statement")
         );
     }
 
@@ -2950,7 +2949,7 @@ mod tests {
 
     #[test]
     fn test_empty_string() {
-        assert_eq!(idor_analyze_sql("", 9).is_err(), true);
+        assert!(idor_analyze_sql("", 9).is_err());
     }
 
     #[test]
