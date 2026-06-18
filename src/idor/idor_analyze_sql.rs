@@ -607,10 +607,7 @@ fn is_table_in_scope(table: &Option<String>, tables: &[TableRef]) -> bool {
         None => true,
         Some(t) => tables.iter().any(|tr| {
             tr.name.eq_ignore_ascii_case(t)
-                || tr
-                    .alias
-                    .as_ref()
-                    .map_or(false, |a| a.eq_ignore_ascii_case(t))
+                || tr.alias.as_ref().is_some_and(|a| a.eq_ignore_ascii_case(t))
         }),
     }
 }
