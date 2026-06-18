@@ -31,6 +31,14 @@ mod tests {
         is_safe!("(1 + 2) * 3", &allocator, source_type);
         is_safe!("1e3 + 2e3", &allocator, source_type);
         is_safe!("1, 2", &allocator, source_type);
+        // Unary plus/minus on numbers
+        is_safe!("-10", &allocator, source_type);
+        is_safe!("+5", &allocator, source_type);
+        is_safe!("-3.14", &allocator, source_type);
+        is_safe!("-1e3", &allocator, source_type);
+        is_safe!("1 + -2", &allocator, source_type);
+        is_safe!("-(1 + 2)", &allocator, source_type);
+        is_safe!("- -10", &allocator, source_type);
     }
 
     #[test]
@@ -60,5 +68,15 @@ mod tests {
         is_unsafe!("new Test()", &allocator, source_type);
         is_unsafe!("'use strict';", &allocator, source_type);
         is_unsafe!("process.env", &allocator, source_type);
+        // Unsafe unary operators
+        is_unsafe!("!x", &allocator, source_type);
+        is_unsafe!("~10", &allocator, source_type);
+        is_unsafe!("typeof x", &allocator, source_type);
+        is_unsafe!("void 0", &allocator, source_type);
+        is_unsafe!("delete obj.x", &allocator, source_type);
+        // Safe unary operator but unsafe operand
+        is_unsafe!("-x", &allocator, source_type);
+        is_unsafe!("-alert()", &allocator, source_type);
+        is_unsafe!("-process.env", &allocator, source_type);
     }
 }

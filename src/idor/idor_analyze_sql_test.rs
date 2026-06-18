@@ -4517,6 +4517,809 @@ mod tests {
     }
 
     #[test]
+    fn test_sqlite_question_mark_placeholder() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE tenant_id = ?", 12).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "?".into(),
+                    placeholder_number: Some(0),
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_sqlite_numbered_question_mark_placeholder() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM users WHERE tenant_id = ?1 AND status = ?2",
+                12
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![
+                    FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "?1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: None,
+                        column: "status".into(),
+                        value: "?2".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_sqlite_colon_named_placeholder() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE tenant_id = :tenant_id", 12,).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: ":tenant_id".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_sqlite_at_sign_named_placeholder() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE tenant_id = @tenant_id", 12,).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "@tenant_id".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_sqlite_dollar_sign_named_placeholder() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE tenant_id = $tenant_id", 12,).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "$tenant_id".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_sqlite_insert_with_at_sign_placeholders() {
+        assert_eq!(
+            idor_analyze_sql(
+                "INSERT INTO users (name, tenant_id) VALUES (@name, @tenant_id)",
+                12,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "insert".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![],
+                insert_columns: Some(vec![vec![
+                    InsertColumn {
+                        column: "name".into(),
+                        value: "@name".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    InsertColumn {
+                        column: "tenant_id".into(),
+                        value: "@tenant_id".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ]]),
+            }]
+        );
+    }
+
+    #[test]
+    fn test_sqlite_mixed_placeholder_styles() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM users WHERE tenant_id = :tenant_id AND status = @status",
+                12,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![
+                    FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: ":tenant_id".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: None,
+                        column: "status".into(),
+                        value: "@status".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_null_skipped() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM users WHERE deleted_at = NULL AND tenant_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_boolean_skipped() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM users WHERE active = TRUE AND tenant_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_escaped_string_literal() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE id = E'abc'", 9).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "id".into(),
+                    value: "abc".into(),
+                    placeholder_number: None,
+                    is_placeholder: false,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_unicode_string_literal() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE id = U&'abc'", 9).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "id".into(),
+                    value: "abc".into(),
+                    placeholder_number: None,
+                    is_placeholder: false,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_dollar_quoted_string() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE id = $$abc$$", 9).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "id".into(),
+                    value: "abc".into(),
+                    placeholder_number: None,
+                    is_placeholder: false,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_national_string_literal() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE id = N'abc'", 8).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "id".into(),
+                    value: "abc".into(),
+                    placeholder_number: None,
+                    is_placeholder: false,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_hex_string_literal() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE id = X'1F'", 8).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "id".into(),
+                    value: "1F".into(),
+                    placeholder_number: None,
+                    is_placeholder: false,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_triple_single_quoted_string_bigquery() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE id = '''abc'''", 2).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "id".into(),
+                    value: "abc".into(),
+                    placeholder_number: None,
+                    is_placeholder: false,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_double_quoted_string_bigquery() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE id = \"abc\"", 2,).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "id".into(),
+                    value: "abc".into(),
+                    placeholder_number: None,
+                    is_placeholder: false,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_byte_string_literal_bigquery() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE id = B'abc'", 2).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "id".into(),
+                    value: "abc".into(),
+                    placeholder_number: None,
+                    is_placeholder: false,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_where_raw_string_literal_bigquery() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM users WHERE id = R'abc'", 2).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "id".into(),
+                    value: "abc".into(),
+                    placeholder_number: None,
+                    is_placeholder: false,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_table_valued_function_in_subquery_not_treated_as_table() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT id, (SELECT string_agg(elem #>> '{}', ' | ') FROM jsonb_array_elements(metadata) AS elem) AS summary FROM assets WHERE tenant_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "assets".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    }],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![],
+                    filters: vec![],
+                    insert_columns: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_mssql_deprecated_nolock_hint_is_real_table() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM users (NOLOCK) WHERE tenant_id = $1",
+                7, // MSSQL
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_mssql_deprecated_multiple_table_hints_is_real_table() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM orders (NOLOCK, READPAST) WHERE tenant_id = $1",
+                7, // MSSQL
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "orders".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_mssql_deprecated_table_hints_various_keywords() {
+        for hint in [
+            "NOLOCK",
+            "READUNCOMMITTED",
+            "UPDLOCK",
+            "REPEATABLEREAD",
+            "SERIALIZABLE",
+            "READCOMMITTED",
+            "TABLOCK",
+            "TABLOCKX",
+            "PAGLOCK",
+            "ROWLOCK",
+            "NOWAIT",
+            "READPAST",
+            "XLOCK",
+            "SNAPSHOT",
+            "NOEXPAND",
+        ] {
+            let query = format!("SELECT * FROM users ({}) WHERE tenant_id = $1", hint);
+            let result = idor_analyze_sql(&query, 7).unwrap();
+            assert_eq!(
+                result,
+                vec![SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "users".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    }],
+                    insert_columns: None,
+                }],
+                "hint `{}` was not recognized as a table reference",
+                hint,
+            );
+        }
+    }
+
+    #[test]
+    fn test_mssql_deprecated_table_hint_is_case_insensitive() {
+        for hint in ["nolock", "NoLock", "noLOCK"] {
+            let query = format!("SELECT * FROM users ({}) WHERE tenant_id = $1", hint);
+            let result = idor_analyze_sql(&query, 7).unwrap();
+            assert_eq!(
+                result,
+                vec![SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "users".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    }],
+                    insert_columns: None,
+                }],
+                "hint `{}` was not recognized as a table reference",
+                hint,
+            );
+        }
+    }
+
+    #[test]
+    fn test_mssql_modern_with_nolock_hint_is_real_table() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM users WITH (NOLOCK) WHERE tenant_id = $1",
+                7, // MSSQL
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_table_valued_function_with_single_identifier_arg_still_stripped() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT id, (SELECT count(*) FROM jsonb_array_elements(tags) AS elem) AS n FROM assets WHERE tenant_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "assets".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    }],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![],
+                    filters: vec![],
+                    insert_columns: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_table_valued_function_stripped_across_dialects() {
+        for (label, dialect) in [
+            ("Generic", 0),
+            ("MSSQL", 7),
+            ("MySQL", 8),
+            ("Postgres", 9),
+            ("SQLite", 12),
+        ] {
+            let result = idor_analyze_sql(
+                "SELECT id, (SELECT count(*) FROM jsonb_array_elements(tags) AS elem) AS n FROM assets WHERE tenant_id = 1",
+                dialect,
+            )
+            .unwrap();
+            assert_eq!(
+                result,
+                vec![
+                    SqlQueryResult {
+                        kind: "select".into(),
+                        tables: vec![TableRef {
+                            name: "assets".into(),
+                            alias: None,
+                        }],
+                        filters: vec![FilterColumn {
+                            table: None,
+                            column: "tenant_id".into(),
+                            value: "1".into(),
+                            placeholder_number: None,
+                            is_placeholder: false,
+                        }],
+                        insert_columns: None,
+                    },
+                    SqlQueryResult {
+                        kind: "select".into(),
+                        tables: vec![],
+                        filters: vec![],
+                        insert_columns: None,
+                    },
+                ],
+                "TVF was not stripped in dialect {}",
+                label,
+            );
+        }
+    }
+
+    #[test]
+    fn test_deprecated_hint_syntax_in_non_mssql_dialects_stays_safe() {
+        for (label, dialect) in [
+            ("Generic", 0),
+            ("MySQL", 8),
+            ("Postgres", 9),
+            ("SQLite", 12),
+        ] {
+            let result =
+                idor_analyze_sql("SELECT * FROM users (NOLOCK) WHERE tenant_id = 1", dialect)
+                    .unwrap();
+            assert_eq!(
+                result,
+                vec![SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "users".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "1".into(),
+                        placeholder_number: None,
+                        is_placeholder: false,
+                    }],
+                    insert_columns: None,
+                }],
+                "deprecated hint syntax was not preserved as a real table in dialect {}",
+                label,
+            );
+        }
+    }
+
+    #[test]
+    fn test_zero_arg_table_valued_function_is_stripped() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM current_user()", 9).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![],
+                filters: vec![],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_update_with_table_valued_function_in_from() {
+        assert_eq!(
+            idor_analyze_sql(
+                "UPDATE users SET name = elem FROM jsonb_array_elements('[\"a\"]') AS elem WHERE tenant_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "update".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_delete_with_table_valued_function_in_using() {
+        assert_eq!(
+            idor_analyze_sql(
+                "DELETE FROM users USING jsonb_array_elements('[1]') AS elem WHERE tenant_id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "delete".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
     fn test_string_literal_is_not_placeholder() {
         assert_eq!(
             idor_analyze_sql("SELECT * FROM orders WHERE tenant_id = 'org_123'", 9).unwrap(),

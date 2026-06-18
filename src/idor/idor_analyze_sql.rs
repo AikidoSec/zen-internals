@@ -2,8 +2,9 @@ use crate::idor::sql_query_result::{FilterColumn, InsertColumn, SqlQueryResult, 
 use crate::sql_injection::helpers::select_dialect_based_on_enum::select_dialect_based_on_enum;
 use core::ops::ControlFlow;
 use sqlparser::ast::{
-    BinaryOperator, Expr, FromTable, JoinConstraint, JoinOperator, ObjectName, Query, SetExpr,
-    Statement, TableFactor, TableWithJoins, Value, Visit, Visitor,
+    BinaryOperator, Expr, FromTable, FunctionArg, FunctionArgExpr, JoinConstraint, JoinOperator,
+    ObjectName, ObjectNamePart, Query, SetExpr, Statement, TableFactor, TableObject,
+    TableWithJoins, Value, ValueWithSpan, Visit, Visitor,
 };
 use sqlparser::parser::Parser;
 use std::collections::{HashMap, HashSet};
@@ -73,18 +74,12 @@ fn analyze_statement(stmt: &Statement, results: &mut Vec<SqlQueryResult>) -> Res
             let mut counter = 0;
             analyze_query(query, results, &mut counter)?;
         }
-        Statement::Update {
-            table,
-            assignments,
-            from,
-            selection,
-            ..
-        } => {
+        Statement::Update(update) => {
             analyze_update(
-                table,
-                assignments,
-                from.as_ref(),
-                selection.as_ref(),
+                &update.table,
+                &update.assignments,
+                update.from.as_ref(),
+                update.selection.as_ref(),
                 results,
                 &mut 0,
                 &HashSet::new(),
@@ -100,7 +95,6 @@ fn analyze_statement(stmt: &Statement, results: &mut Vec<SqlQueryResult>) -> Res
         | Statement::Rollback { .. }
         | Statement::StartTransaction { .. }
         | Statement::Savepoint { .. }
-        | Statement::SetTransaction { .. }
         | Statement::ReleaseSavepoint { .. }
         | Statement::CreateTable { .. }
         | Statement::AlterTable { .. }
@@ -121,11 +115,7 @@ fn analyze_statement(stmt: &Statement, results: &mut Vec<SqlQueryResult>) -> Res
         | Statement::Truncate { .. }
         | Statement::Grant { .. }
         | Statement::Revoke { .. }
-        | Statement::SetVariable { .. }
-        | Statement::SetNames { .. }
-        | Statement::SetNamesDefault { .. }
-        | Statement::SetTimeZone { .. }
-        | Statement::SetRole { .. }
+        | Statement::Set(_)
         | Statement::ShowVariable { .. }
         | Statement::ShowStatus { .. }
         | Statement::ShowVariables { .. }
@@ -149,15 +139,21 @@ fn analyze_statement(stmt: &Statement, results: &mut Vec<SqlQueryResult>) -> Res
 fn analyze_update(
     table: &TableWithJoins,
     assignments: &[sqlparser::ast::Assignment],
-    from: Option<&TableWithJoins>,
+    from: Option<&sqlparser::ast::UpdateTableFromKind>,
     selection: Option<&Expr>,
     results: &mut Vec<SqlQueryResult>,
     counter: &mut usize,
     cte_names: &HashSet<String>,
 ) -> Result<(), String> {
     let mut tables = extract_tables_from_table_with_joins(table);
-    if let Some(from_clause) = from {
-        tables.extend(extract_tables_from_table_with_joins(from_clause));
+    if let Some(from_kind) = from {
+        let from_tables = match from_kind {
+            sqlparser::ast::UpdateTableFromKind::BeforeSet(twjs)
+            | sqlparser::ast::UpdateTableFromKind::AfterSet(twjs) => twjs,
+        };
+        for twj in from_tables {
+            tables.extend(extract_tables_from_table_with_joins(twj));
+        }
     }
 
     // Filter out common table expression names
@@ -262,8 +258,12 @@ fn analyze_insert(
     counter: &mut usize,
     cte_names: &HashSet<String>,
 ) -> Result<(), String> {
+    let table_name = match &insert.table {
+        TableObject::TableName(name) => object_name_to_string(name),
+        TableObject::TableFunction(func) => format!("{}", func),
+    };
     let table = TableRef {
-        name: object_name_to_string(&insert.table_name),
+        name: table_name,
         alias: insert.table_alias.as_ref().map(|a| a.value.clone()),
     };
     let columns: Vec<&str> = insert.columns.iter().map(|c| c.value.as_str()).collect();
@@ -340,19 +340,12 @@ fn analyze_set_expr(
             analyze_query_with_ctes(query, results, counter, cte_names)?;
         }
         SetExpr::Update(stmt) => {
-            if let Statement::Update {
-                table,
-                assignments,
-                from,
-                selection,
-                ..
-            } = stmt
-            {
+            if let Statement::Update(update) = stmt {
                 analyze_update(
-                    table,
-                    assignments,
-                    from.as_ref(),
-                    selection.as_ref(),
+                    &update.table,
+                    &update.assignments,
+                    update.from.as_ref(),
+                    update.selection.as_ref(),
                     results,
                     counter,
                     cte_names,
@@ -439,7 +432,9 @@ impl Visitor for SelectVisitor {
 
     fn pre_visit_table_factor(&mut self, table_factor: &TableFactor) -> ControlFlow<Self::Break> {
         match table_factor {
-            TableFactor::Table { name, alias, .. } if self.skip_depth == 0 => {
+            TableFactor::Table { name, alias, .. }
+                if self.skip_depth == 0 && !is_table_valued_function(table_factor) =>
+            {
                 let table_name = object_name_to_string(name);
                 // Skip common table expression references (virtual tables, not real ones)
                 if !self.cte_names.contains(&table_name.to_lowercase()) {
@@ -523,11 +518,17 @@ impl Visitor for SelectVisitor {
 }
 
 fn is_mysql_placeholder(expr: &Expr) -> bool {
-    matches!(expr, Expr::Value(Value::Placeholder(p)) if p == "?")
+    matches!(expr, Expr::Value(ValueWithSpan { value: Value::Placeholder(p), .. }) if p == "?")
 }
 
 fn is_placeholder(expr: &Expr) -> bool {
-    matches!(expr, Expr::Value(Value::Placeholder(_)))
+    matches!(
+        expr,
+        Expr::Value(ValueWithSpan {
+            value: Value::Placeholder(_),
+            ..
+        })
+    )
 }
 
 fn extract_subquery(expr: &Expr) -> Option<&Query> {
@@ -758,7 +759,7 @@ fn extract_column_value_pair(
     Some(FilterColumn {
         table,
         column,
-        value: expr_to_value_string(maybe_value),
+        value: expr_to_value_string(maybe_value)?,
         placeholder_number,
         is_placeholder: is_placeholder(maybe_value),
     })
@@ -780,23 +781,43 @@ fn is_column_ref(expr: &Expr) -> bool {
     matches!(expr, Expr::Identifier(_) | Expr::CompoundIdentifier(_))
 }
 
-fn expr_to_value_string(expr: &Expr) -> String {
+fn expr_to_value_string(expr: &Expr) -> Option<String> {
     match expr {
-        Expr::Value(Value::Placeholder(p)) => p.clone(),
-        Expr::Value(Value::SingleQuotedString(s)) => s.clone(),
-        Expr::Value(Value::DoubleQuotedString(s)) => s.clone(),
-        Expr::Value(Value::Number(n, _)) => n.clone(),
-        Expr::Value(Value::EscapedStringLiteral(s)) => s.clone(),
-        Expr::Value(Value::DollarQuotedString(dqs)) => dqs.value.clone(),
-        Expr::Value(Value::NationalStringLiteral(s)) => s.clone(),
-        _ => format!("{}", expr),
+        Expr::Value(vws) => match &vws.value {
+            Value::Placeholder(p) => Some(p.clone()),
+            Value::Number(n, _) => Some(n.clone()),
+            Value::SingleQuotedString(s)
+            | Value::DoubleQuotedString(s)
+            | Value::TripleSingleQuotedString(s)
+            | Value::TripleDoubleQuotedString(s)
+            | Value::EscapedStringLiteral(s)
+            | Value::UnicodeStringLiteral(s)
+            | Value::SingleQuotedByteStringLiteral(s)
+            | Value::DoubleQuotedByteStringLiteral(s)
+            | Value::TripleSingleQuotedByteStringLiteral(s)
+            | Value::TripleDoubleQuotedByteStringLiteral(s)
+            | Value::SingleQuotedRawStringLiteral(s)
+            | Value::DoubleQuotedRawStringLiteral(s)
+            | Value::TripleSingleQuotedRawStringLiteral(s)
+            | Value::TripleDoubleQuotedRawStringLiteral(s)
+            | Value::NationalStringLiteral(s)
+            | Value::HexStringLiteral(s) => Some(s.clone()),
+            Value::DollarQuotedString(dqs) => Some(dqs.value.clone()),
+            Value::QuoteDelimitedStringLiteral(qs)
+            | Value::NationalQuoteDelimitedStringLiteral(qs) => Some(qs.value.clone()),
+            Value::Boolean(_) | Value::Null => None,
+        },
+        _ => None,
     }
 }
 
 fn object_name_to_string(name: &ObjectName) -> String {
     name.0
         .iter()
-        .map(|i| i.value.as_str())
+        .filter_map(|part| match part {
+            ObjectNamePart::Identifier(ident) => Some(ident.value.as_str()),
+            _ => None,
+        })
         .collect::<Vec<_>>()
         .join(".")
 }
@@ -894,6 +915,9 @@ fn count_placeholders(expr: &Expr, count: &mut usize) {
 }
 
 fn table_ref_from_factor(factor: &TableFactor) -> Option<TableRef> {
+    if is_table_valued_function(factor) {
+        return None;
+    }
     if let TableFactor::Table { name, alias, .. } = factor {
         Some(TableRef {
             name: object_name_to_string(name),
@@ -902,6 +926,65 @@ fn table_ref_from_factor(factor: &TableFactor) -> Option<TableRef> {
     } else {
         None
     }
+}
+
+/// Returns true if `factor` is a table-valued function call (e.g.
+/// `jsonb_array_elements(metadata) AS elem`, `generate_series(1, 10)`), rather than a real
+/// table reference. These operate on row data or generate rows, so they are not entities
+/// that need their own IDOR filter.
+///
+/// sqlparser represents both real tables and TVF calls as `TableFactor::Table`; the
+/// distinguishing field is `args`: per sqlparser docs, it is `Some(_)` for a TVF call
+/// (even with zero arguments) and `None` for a plain table reference.
+/// https://github.com/apache/datafusion-sqlparser-rs/blob/b6af2aead6c611a34fed9c24943629753c0a6df0/src/ast/query.rs#L1477
+///
+/// One documented exception: the deprecated MSSQL `FROM foo (NOLOCK)` table-hint
+/// syntax also lands in `args`. Those args are always bare hint keywords (e.g. NOLOCK,
+/// READPAST), so we treat that case as a real table reference, not a TVF call.
+fn is_table_valued_function(table_factor: &TableFactor) -> bool {
+    let TableFactor::Table {
+        args: Some(args), ..
+    } = table_factor
+    else {
+        return false;
+    };
+    // Empty arg list -- treat as TVF (rare, e.g. `current_user()`).
+    if args.args.is_empty() {
+        return true;
+    }
+    // If every arg is a bare MSSQL table-hint keyword, this is the deprecated hint
+    // syntax (`FROM foo (NOLOCK)`), not a function call.
+    !args.args.iter().all(is_mssql_table_hint_arg)
+}
+
+/// Recognizes a bare MSSQL table-hint keyword as it appears inside the deprecated
+/// `FROM foo (NOLOCK, READPAST, ...)` syntax: an unnamed positional arg holding a single
+/// bare identifier whose value matches one of the 15 hints MSSQL allows without the
+/// `WITH` keyword. Other hints (HOLDLOCK, KEEPIDENTITY, FORCESEEK, INDEX = ..., etc.)
+/// require `WITH (...)` and land in `with_hints`, so they never reach `args`.
+/// https://learn.microsoft.com/en-us/sql/t-sql/queries/hints-transact-sql-table
+fn is_mssql_table_hint_arg(arg: &FunctionArg) -> bool {
+    let FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Identifier(ident))) = arg else {
+        return false;
+    };
+    matches!(
+        ident.value.to_uppercase().as_str(),
+        "NOLOCK"
+            | "READUNCOMMITTED"
+            | "UPDLOCK"
+            | "REPEATABLEREAD"
+            | "SERIALIZABLE"
+            | "READCOMMITTED"
+            | "TABLOCK"
+            | "TABLOCKX"
+            | "PAGLOCK"
+            | "ROWLOCK"
+            | "NOWAIT"
+            | "READPAST"
+            | "XLOCK"
+            | "SNAPSHOT"
+            | "NOEXPAND"
+    )
 }
 
 fn extract_tables_from_table_with_joins(twj: &TableWithJoins) -> Vec<TableRef> {
@@ -949,7 +1032,7 @@ fn extract_insert_columns(
 
                     Some(InsertColumn {
                         column: columns[i].to_string(),
-                        value: expr_to_value_string(expr),
+                        value: expr_to_value_string(expr)?,
                         placeholder_number,
                         is_placeholder: is_placeholder(expr),
                     })

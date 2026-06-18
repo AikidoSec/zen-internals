@@ -120,7 +120,8 @@ mod tests {
         // https://pwn-la-chapelle.eu/posts/dhm2024_parsemypostgres/
         is_injection!(
             r#"SELECT * FROM "_User" WHERE "username" ~ 'A''B''';SELECT PG_SLEEP(3);--;' AND ("_rperm" IS NULL OR "_rperm" && ARRAY['*','*'])  LIMIT 100"#,
-            "A''B''';SELECT PG_SLEEP(3);--"
+            "A''B''';SELECT PG_SLEEP(3);--",
+            dialect("postgresql")
         );
     }
 
@@ -325,10 +326,20 @@ mod tests {
             "INSERT INTO books (title, description) VALUES ('${title}', \"Description set by the user: ''), ('exploit',system_user());'\")",
         "'), ('exploit',system_user());");
         // Submission AIKIDO-OCRA7GFG :
-        is_injection!(
-            "INSERT INTO books (title, description) VALUES ('${title}', \"Description set by the user: '\"), (\"exploit\",system_user());--'\")",
-            "\"), (\"exploit\",system_user());--"
-        );
+        // MySQL treats double-quoted strings as string literals (not identifiers),
+        // so the MySQL tokenizer fails on this query.
+        for dia in [
+            dialect("postgresql"),
+            dialect("sqlite"),
+            dialect("clickhouse"),
+            dialect("generic"),
+        ] {
+            is_injection!(
+                "INSERT INTO books (title, description) VALUES ('${title}', \"Description set by the user: '\"), (\"exploit\",system_user());--'\")",
+                "\"), (\"exploit\",system_user());--",
+                dia
+            );
+        }
         is_injection!(
             "INSERT INTO books (title, description) VALUES ('${title}', \"Description set by the user: \"), (\"exploit\",system_user()))",
             "\"), (\"exploit\",system_user())"
@@ -1091,6 +1102,39 @@ mod tests {
         is_injection!(
             "UPDATE a SET b = NOW(), c=ifnull(:languages,c) WHERE (id = :device_id)",
             ":la"
+        );
+    }
+
+    #[test]
+    fn test_trailing_comma() {
+        not_injection!(
+            "SELECT id, username, email FROM users WHERE id IN (1,2,3)",
+            "username,"
+        );
+        not_injection!(
+            "SELECT id, username, email FROM users WHERE id IN (1,2,3)",
+            "id,"
+        );
+        not_injection!(
+            "SELECT id, username, email FROM users WHERE id IN (1,2,3)",
+            "email"
+        );
+        not_injection!(
+            "SELECT id, username, email FROM users WHERE id IN (1,2,3)",
+            "email,"
+        );
+
+        is_injection!(
+            "SELECT id, username, email FROM users WHERE id IN (1,2,3)",
+            "username, email"
+        );
+        is_injection!(
+            "SELECT id, username, email FROM users WHERE id IN (1,2,3)",
+            "id, username"
+        );
+        is_injection!(
+            "SELECT id, username, email FROM users WHERE id IN (1,2,3)",
+            "username, email FROM"
         );
     }
 

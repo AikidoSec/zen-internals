@@ -9,8 +9,12 @@ use std::str;
 #[cfg(target_arch = "wasm32")]
 use std::alloc::{alloc, dealloc, Layout};
 
+/// # Safety
+///
+/// `query` and `userinput` must each be null or point to an initialized buffer
+/// of at least `query_len`/`userinput_len` bytes that stays valid for the call.
 #[no_mangle]
-pub extern "C" fn detect_sql_injection(
+pub unsafe extern "C" fn detect_sql_injection(
     query: *const u8,
     query_len: usize,
     userinput: *const u8,
@@ -53,8 +57,12 @@ pub extern "C" fn detect_sql_injection(
     .unwrap_or(2);
 }
 
+/// # Safety
+///
+/// `code` and `userinput` must each be null or point to an initialized buffer
+/// of at least `code_len`/`userinput_len` bytes that stays valid for the call.
 #[no_mangle]
-pub extern "C" fn detect_js_injection(
+pub unsafe extern "C" fn detect_js_injection(
     code: *const u8,
     code_len: usize,
     userinput: *const u8,
@@ -121,8 +129,12 @@ pub unsafe extern "C" fn wasm_free(ptr: *mut u8, size: usize) {
     dealloc(ptr, layout)
 }
 
+/// # Safety
+///
+/// `query` must be null or point to an initialized buffer of at least
+/// `query_len` bytes that stays valid for the call.
 #[no_mangle]
-pub extern "C" fn idor_analyze_sql_ffi(
+pub unsafe extern "C" fn idor_analyze_sql_ffi(
     query: *const u8,
     query_len: usize,
     dialect: c_int,
