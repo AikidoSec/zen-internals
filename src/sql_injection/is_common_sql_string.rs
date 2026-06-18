@@ -102,31 +102,39 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
     // example: SELECT * FROM users WHERE user_id = '${user id}' AND name = '${user_name}'
 
     // e.g. 'a or '1 or 'product-id-123
-    if user_input.starts_with("'") && user_input.len() <= 200 && !user_input.contains("--") {
-        if regex!(r"^'[a-z0-9-]+$").is_match(user_input) {
-            return true;
-        }
+    if user_input.starts_with("'")
+        && user_input.len() <= 200
+        && !user_input.contains("--")
+        && regex!(r"^'[a-z0-9-]+$").is_match(user_input)
+    {
+        return true;
     }
 
     // e.g. a' or 1' or product-id-123'
-    if user_input.ends_with("'") && user_input.len() <= 200 && !user_input.contains("--") {
-        if regex!(r"^[a-z0-9-]+'$").is_match(user_input) {
-            return true;
-        }
+    if user_input.ends_with("'")
+        && user_input.len() <= 200
+        && !user_input.contains("--")
+        && regex!(r"^[a-z0-9-]+'$").is_match(user_input)
+    {
+        return true;
     }
 
     // e.g. "a or "1 or "product-id-123
-    if user_input.starts_with("\"") && user_input.len() <= 200 && !user_input.contains("--") {
-        if regex!(r#"^"[a-z0-9-]+$"#).is_match(user_input) {
-            return true;
-        }
+    if user_input.starts_with("\"")
+        && user_input.len() <= 200
+        && !user_input.contains("--")
+        && regex!(r#"^"[a-z0-9-]+$"#).is_match(user_input)
+    {
+        return true;
     }
 
     // e.g. a" or 1" or product-id-123"
-    if user_input.ends_with("\"") && user_input.len() <= 200 && !user_input.contains("--") {
-        if regex!(r#"^[a-z0-9-]+"$"#).is_match(user_input) {
-            return true;
-        }
+    if user_input.ends_with("\"")
+        && user_input.len() <= 200
+        && !user_input.contains("--")
+        && regex!(r#"^[a-z0-9-]+"$"#).is_match(user_input)
+    {
+        return true;
     }
 
     if user_input.contains(".") {
@@ -158,10 +166,11 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
     }
 
     // Allow strings with letters, digits and spaces that end with a comma,
-    if user_input.len() <= 40 && user_input.ends_with(',') {
-        if regex!(r"^[a-z0-9 ]+,$").is_match(user_input) {
-            return true;
-        }
+    if user_input.len() <= 40
+        && user_input.ends_with(',')
+        && regex!(r"^[a-z0-9 ]+,$").is_match(user_input)
+    {
+        return true;
     }
 
     return false;
