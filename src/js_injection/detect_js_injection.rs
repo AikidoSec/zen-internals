@@ -30,7 +30,7 @@ pub fn detect_js_injection_str(code: &str, userinput: &str, sourcetype: i32) -> 
         return false;
     }
 
-    let parser_result = Parser::new(&allocator, &code, source_type)
+    let parser_result = Parser::new(&allocator, code, source_type)
         .with_options(ParseOptions {
             allow_return_outside_function: true,
             ..ParseOptions::default()

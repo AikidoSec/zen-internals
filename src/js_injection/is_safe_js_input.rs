@@ -20,7 +20,7 @@ const SAFE_UNARY_OPERATORS: [UnaryOperator; 2] =
     [UnaryOperator::UnaryNegation, UnaryOperator::UnaryPlus];
 
 pub fn is_safe_js_input(user_input: &str, allocator: &Allocator, source_type: SourceType) -> bool {
-    let parser_result = Parser::new(&allocator, &user_input, source_type)
+    let parser_result = Parser::new(allocator, user_input, source_type)
         .with_options(ParseOptions {
             allow_return_outside_function: true,
             ..ParseOptions::default()
