@@ -35,3 +35,7 @@ playground:
 .PHONY: bench
 bench:
 	cd benchmarks && cargo bench
+
+.PHONY: bench-check
+bench-check:
+	cd benchmarks && cargo bench && bash check_thresholds.sh
