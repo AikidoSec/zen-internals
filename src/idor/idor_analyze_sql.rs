@@ -172,9 +172,11 @@ fn analyze_update(
         table,
     )));
     if let Some(from_clause) = from {
-        col_col_pairs.extend(collect_col_col_pairs_from_joins(std::slice::from_ref(
-            from_clause,
-        )));
+        let from_tables = match from_clause {
+            sqlparser::ast::UpdateTableFromKind::BeforeSet(twjs)
+            | sqlparser::ast::UpdateTableFromKind::AfterSet(twjs) => twjs,
+        };
+        col_col_pairs.extend(collect_col_col_pairs_from_joins(from_tables));
     }
 
     let known_tables = tables_to_known_set(&tables);
@@ -634,7 +636,9 @@ fn collect_col_col_pairs_from_joins(tables: &[TableWithJoins]) -> Vec<ColColPair
     let mut pairs = Vec::new();
     for twj in tables {
         for join in &twj.joins {
-            if let JoinOperator::Inner(JoinConstraint::On(on_expr)) = &join.join_operator {
+            if let JoinOperator::Join(JoinConstraint::On(on_expr))
+            | JoinOperator::Inner(JoinConstraint::On(on_expr)) = &join.join_operator
+            {
                 collect_col_col_pairs_only(on_expr, &mut pairs, false);
             }
         }
