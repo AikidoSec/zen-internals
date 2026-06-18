@@ -28,28 +28,28 @@ check() {
     fi
 }
 
-# Thresholds are set at ~2x the measured mean on ubuntu-latest GH Action runner
+# Thresholds are set at ~1.5x the measured mean on ubuntu-latest GH Action runner
 
 # SQL injection
-check "sql" "is injection"      12000
-check "sql" "is not injection"   1750 
-check "sql" "big sql"         3800000
+check "sql" "is injection"       9000
+check "sql" "is not injection"   1300
+check "sql" "big sql"         2850000
 
 # JS injection
-check "js"  "is injection"       2800
-check "js"  "is not injection"   3000
-check "js"  "big code"         650000
+check "js"  "is injection"       2100
+check "js"  "is not injection"   2250
+check "js"  "big code"         488000
 
 # IDOR analysis
-check "idor" "simple_select"                   15000
-check "idor" "select_with_join"                36000 
-check "idor" "insert"                          13000
-check "idor" "update"                          15000
-check "idor" "cte_with_multiple_queries"       53000
-check "idor" "union"                           29000
-check "idor" "large_complex_query"            950000
-check "idor" "col_col_simple"                  41000
-check "idor" "col_col_deep_transitive_chain"  365000
+check "idor" "simple_select"                   11000
+check "idor" "select_with_join"                27000
+check "idor" "insert"                           9750
+check "idor" "update"                          11000
+check "idor" "cte_with_multiple_queries"       40000
+check "idor" "union"                           22000
+check "idor" "large_complex_query"            712500
+check "idor" "col_col_simple"                  31000
+check "idor" "col_col_deep_transitive_chain"  274000
 
 echo ""
 if [ "$FAILED" -ne 0 ]; then
