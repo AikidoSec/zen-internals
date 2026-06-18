@@ -22,4 +22,4 @@ jobs:
       - name: Build
         run: cargo build --release
 
-      - run: make bench-check
+      - run: make bench
