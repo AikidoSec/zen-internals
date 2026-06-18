@@ -103,7 +103,7 @@ pub unsafe extern "C" fn detect_js_injection(
 
 /// Allocates memory in WASM linear memory
 ///
-/// # Satefy
+/// # Safety
 ///
 /// The returned pointer must be deallocated using `wasm_free` with the exact same size.
 /// The allocated memory is uninitialized.
@@ -116,7 +116,7 @@ pub unsafe extern "C" fn wasm_alloc(size: usize) -> *mut u8 {
 
 /// Deallocates memory previously allocated by `wasm_alloc`
 ///
-/// # Satefy
+/// # Safety
 ///
 /// - `ptr` must have been allocated by `wasm_alloc`
 /// - `size` must be the exact size passed to `wasm_alloc`
