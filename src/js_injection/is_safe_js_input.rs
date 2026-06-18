@@ -36,7 +36,7 @@ pub fn is_safe_js_input(user_input: &str, allocator: &Allocator, source_type: So
     };
     ast_pass.visit_program(&parser_result.program);
 
-    return ast_pass.contains_only_safe_tokens;
+    ast_pass.contains_only_safe_tokens
 }
 
 struct ASTPass {

@@ -173,5 +173,5 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         return true;
     }
 
-    return false;
+    false
 }

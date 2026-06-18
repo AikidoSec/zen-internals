@@ -96,8 +96,8 @@ pub fn detect_sql_injection_str(
         };
     }
 
-    return SqlInjectionDetectionResult {
+    SqlInjectionDetectionResult {
         detected: false,
         reason: DetectionReason::NoChangesFound,
-    };
+    }
 }

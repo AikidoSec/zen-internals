@@ -83,5 +83,5 @@ pub fn detect_js_injection_str(code: &str, userinput: &str, sourcetype: i32) -> 
         return true;
     }
 
-    return false;
+    false
 }
