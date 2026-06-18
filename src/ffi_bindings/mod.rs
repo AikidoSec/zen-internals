@@ -38,12 +38,14 @@ pub unsafe extern "C" fn detect_sql_injection(
             return 2;
         }
 
+        // SAFETY: caller guarantees a valid buffer, per the `# Safety` contract.
         let query_bytes = unsafe { std::slice::from_raw_parts(query, query_len) };
         let query_str = match str::from_utf8(query_bytes) {
             Ok(s) => s,
             Err(_) => return 2, // Return error code if invalid UTF-8
         };
 
+        // SAFETY: caller guarantees a valid buffer, per the `# Safety` contract.
         let userinput_bytes = unsafe { std::slice::from_raw_parts(userinput, userinput_len) };
         let userinput_str = match str::from_utf8(userinput_bytes) {
             Ok(s) => s,
@@ -86,12 +88,14 @@ pub unsafe extern "C" fn detect_js_injection(
             return 2;
         }
 
+        // SAFETY: caller guarantees a valid buffer, per the `# Safety` contract.
         let code_bytes = unsafe { std::slice::from_raw_parts(code, code_len) };
         let code_str = match str::from_utf8(code_bytes) {
             Ok(s) => s,
             Err(_) => return 2, // Return error code if invalid UTF-8
         };
 
+        // SAFETY: caller guarantees a valid buffer, per the `# Safety` contract.
         let userinput_bytes = unsafe { std::slice::from_raw_parts(userinput, userinput_len) };
         let userinput_str = match str::from_utf8(userinput_bytes) {
             Ok(s) => s,
@@ -152,6 +156,7 @@ pub unsafe extern "C" fn idor_analyze_sql_ffi(
                 .into_raw();
         }
 
+        // SAFETY: caller guarantees a valid buffer, per the `# Safety` contract.
         let query_bytes = unsafe { std::slice::from_raw_parts(query, query_len) };
         let query_str = match str::from_utf8(query_bytes) {
             Ok(s) => s,
