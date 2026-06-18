@@ -1,3 +1,9 @@
+//! C ABI entry points (FFI boundary).
+//!
+//! Functions taking a raw pointer + length read it via `from_raw_parts`, whose
+//! validity the compiler can't verify. They are therefore `unsafe fn` with a
+//! `# Safety` contract that the caller must uphold.
+
 use crate::idor::idor_analyze_sql::idor_analyze_sql;
 use crate::js_injection::detect_js_injection::detect_js_injection_str;
 use crate::sql_injection::detect_sql_injection::{detect_sql_injection_str, DetectionReason};
@@ -32,12 +38,14 @@ pub unsafe extern "C" fn detect_sql_injection(
             return 2;
         }
 
+        // SAFETY: caller guarantees a valid buffer, per the `# Safety` contract.
         let query_bytes = unsafe { std::slice::from_raw_parts(query, query_len) };
         let query_str = match str::from_utf8(query_bytes) {
             Ok(s) => s,
             Err(_) => return 2, // Return error code if invalid UTF-8
         };
 
+        // SAFETY: caller guarantees a valid buffer, per the `# Safety` contract.
         let userinput_bytes = unsafe { std::slice::from_raw_parts(userinput, userinput_len) };
         let userinput_str = match str::from_utf8(userinput_bytes) {
             Ok(s) => s,
@@ -80,12 +88,14 @@ pub unsafe extern "C" fn detect_js_injection(
             return 2;
         }
 
+        // SAFETY: caller guarantees a valid buffer, per the `# Safety` contract.
         let code_bytes = unsafe { std::slice::from_raw_parts(code, code_len) };
         let code_str = match str::from_utf8(code_bytes) {
             Ok(s) => s,
             Err(_) => return 2, // Return error code if invalid UTF-8
         };
 
+        // SAFETY: caller guarantees a valid buffer, per the `# Safety` contract.
         let userinput_bytes = unsafe { std::slice::from_raw_parts(userinput, userinput_len) };
         let userinput_str = match str::from_utf8(userinput_bytes) {
             Ok(s) => s,
@@ -146,6 +156,7 @@ pub unsafe extern "C" fn idor_analyze_sql_ffi(
                 .into_raw();
         }
 
+        // SAFETY: caller guarantees a valid buffer, per the `# Safety` contract.
         let query_bytes = unsafe { std::slice::from_raw_parts(query, query_len) };
         let query_str = match str::from_utf8(query_bytes) {
             Ok(s) => s,
@@ -174,6 +185,10 @@ pub unsafe extern "C" fn idor_analyze_sql_ffi(
     })
 }
 
+/// # Safety
+///
+/// `ptr` must be null or a pointer previously returned by `idor_analyze_sql_ffi`.
+/// It must not have been freed already, and must not be used after this call.
 #[no_mangle]
 pub unsafe extern "C" fn free_string(ptr: *mut c_char) {
     if !ptr.is_null() {
