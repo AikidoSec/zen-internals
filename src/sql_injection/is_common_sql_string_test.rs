@@ -6,9 +6,8 @@ mod tests {
     #[test]
     fn test_common_sql_strings() {
         COMMON_SQL_STRINGS.iter().for_each(|common_string| {
-            assert_eq!(
+            assert!(
                 is_common_sql_string(&common_string.to_lowercase()),
-                true,
                 "Failed for {}",
                 common_string
             );
@@ -17,426 +16,418 @@ mod tests {
 
     #[test]
     fn test_looks_like_order_by() {
-        assert_eq!(is_common_sql_string("column_name asc"), true);
-        assert_eq!(is_common_sql_string("column_name desc"), true);
-        assert_eq!(is_common_sql_string("name asc"), true);
-        assert_eq!(is_common_sql_string("name desc"), true);
-        assert_eq!(is_common_sql_string("name1 asc"), true);
-        assert_eq!(is_common_sql_string("name1 desc"), true);
-        assert_eq!(is_common_sql_string("name_1 asc"), true);
-        assert_eq!(is_common_sql_string("name_1 desc"), true);
-        assert_eq!(is_common_sql_string("name_1_2 asc"), true);
-        assert_eq!(is_common_sql_string("name_1_2 desc"), true);
-        assert_eq!(is_common_sql_string("name_name_1 asc"), true);
-        assert_eq!(is_common_sql_string("name_name_1 desc"), true);
+        assert!(is_common_sql_string("column_name asc"));
+        assert!(is_common_sql_string("column_name desc"));
+        assert!(is_common_sql_string("name asc"));
+        assert!(is_common_sql_string("name desc"));
+        assert!(is_common_sql_string("name1 asc"));
+        assert!(is_common_sql_string("name1 desc"));
+        assert!(is_common_sql_string("name_1 asc"));
+        assert!(is_common_sql_string("name_1 desc"));
+        assert!(is_common_sql_string("name_1_2 asc"));
+        assert!(is_common_sql_string("name_1_2 desc"));
+        assert!(is_common_sql_string("name_name_1 asc"));
+        assert!(is_common_sql_string("name_name_1 desc"));
     }
 
     #[test]
     fn test_looks_like_order_by_false_positive() {
-        assert_eq!(is_common_sql_string("order by column_name asc"), false);
-        assert_eq!(is_common_sql_string("order by column_name desc"), false);
-        assert_eq!(
-            is_common_sql_string("column_name asc, column_name2 desc"),
-            false
-        );
-        assert_eq!(
-            is_common_sql_string("column_name asc, column_name2 desc;"),
-            false
-        );
-        assert_eq!(is_common_sql_string("column_name asc;"), false);
-        assert_eq!(is_common_sql_string("column_name desc;"), false);
-        assert_eq!(is_common_sql_string(";column_name asc"), false);
-        assert_eq!(is_common_sql_string(";column_name desc"), false);
-        assert_eq!(is_common_sql_string("column_name asc limit 1"), false);
-        assert_eq!(is_common_sql_string("column_name desc limit 1"), false);
-        assert_eq!(
-            is_common_sql_string("column_name asc, column_name2 asc limit 1"),
-            false
-        );
-        assert_eq!(
-            is_common_sql_string("column_name desc, column_name2 desc limit 1"),
-            false
-        );
-        assert_eq!(is_common_sql_string("1 "), true);
-        assert_eq!(is_common_sql_string("asc1"), false);
-        assert_eq!(is_common_sql_string("desc1"), false);
-        assert_eq!(is_common_sql_string("asc 1"), true);
-        assert_eq!(is_common_sql_string("desc 1"), false);
-        assert_eq!(is_common_sql_string("1asc"), false);
-        assert_eq!(is_common_sql_string("1desc"), false);
-        assert_eq!(is_common_sql_string("1;"), false);
-        assert_eq!(is_common_sql_string("1--"), false);
-        assert_eq!(is_common_sql_string("1/*"), false);
-        assert_eq!(is_common_sql_string("1 asc"), true);
-        assert_eq!(is_common_sql_string("1 desc"), false);
-        assert_eq!(is_common_sql_string("1name asc"), false);
-        assert_eq!(is_common_sql_string("1name desc"), false);
-        assert_eq!(is_common_sql_string("1_name asc"), false);
-        assert_eq!(is_common_sql_string("1_name desc"), false);
-        assert_eq!(is_common_sql_string("1_name_2 asc"), false);
-        assert_eq!(is_common_sql_string("1_name_2 desc"), false);
-        assert_eq!(is_common_sql_string("1_name_name asc"), false);
-        assert_eq!(is_common_sql_string("1_name_name desc"), false);
-        assert_eq!(is_common_sql_string("column_name asc "), false);
-        assert_eq!(is_common_sql_string("column_name desc "), false);
-        assert_eq!(is_common_sql_string("column_name asc;"), false);
-        assert_eq!(is_common_sql_string("column_name desc;"), false);
-        assert_eq!(is_common_sql_string("column_name asc--"), false);
-        assert_eq!(is_common_sql_string("column_name desc--"), false);
-        assert_eq!(is_common_sql_string("column_name asc/*"), false);
-        assert_eq!(is_common_sql_string("column_name desc/*"), false);
-        assert_eq!(is_common_sql_string("column_name asc-- "), false);
-        assert_eq!(is_common_sql_string("column_name desc-- "), false);
-        assert_eq!(is_common_sql_string("column_name asc/* "), false);
-        assert_eq!(is_common_sql_string("column_name desc/* "), false);
+        assert!(!is_common_sql_string("order by column_name asc"));
+        assert!(!is_common_sql_string("order by column_name desc"));
+        assert!(!is_common_sql_string("column_name asc, column_name2 desc"));
+        assert!(!is_common_sql_string("column_name asc, column_name2 desc;"));
+        assert!(!is_common_sql_string("column_name asc;"));
+        assert!(!is_common_sql_string("column_name desc;"));
+        assert!(!is_common_sql_string(";column_name asc"));
+        assert!(!is_common_sql_string(";column_name desc"));
+        assert!(!is_common_sql_string("column_name asc limit 1"));
+        assert!(!is_common_sql_string("column_name desc limit 1"));
+        assert!(!is_common_sql_string(
+            "column_name asc, column_name2 asc limit 1"
+        ));
+        assert!(!is_common_sql_string(
+            "column_name desc, column_name2 desc limit 1"
+        ));
+        assert!(is_common_sql_string("1 "));
+        assert!(!is_common_sql_string("asc1"));
+        assert!(!is_common_sql_string("desc1"));
+        assert!(is_common_sql_string("asc 1"));
+        assert!(!is_common_sql_string("desc 1"));
+        assert!(!is_common_sql_string("1asc"));
+        assert!(!is_common_sql_string("1desc"));
+        assert!(!is_common_sql_string("1;"));
+        assert!(!is_common_sql_string("1--"));
+        assert!(!is_common_sql_string("1/*"));
+        assert!(is_common_sql_string("1 asc"));
+        assert!(!is_common_sql_string("1 desc"));
+        assert!(!is_common_sql_string("1name asc"));
+        assert!(!is_common_sql_string("1name desc"));
+        assert!(!is_common_sql_string("1_name asc"));
+        assert!(!is_common_sql_string("1_name desc"));
+        assert!(!is_common_sql_string("1_name_2 asc"));
+        assert!(!is_common_sql_string("1_name_2 desc"));
+        assert!(!is_common_sql_string("1_name_name asc"));
+        assert!(!is_common_sql_string("1_name_name desc"));
+        assert!(!is_common_sql_string("column_name asc "));
+        assert!(!is_common_sql_string("column_name desc "));
+        assert!(!is_common_sql_string("column_name asc;"));
+        assert!(!is_common_sql_string("column_name desc;"));
+        assert!(!is_common_sql_string("column_name asc--"));
+        assert!(!is_common_sql_string("column_name desc--"));
+        assert!(!is_common_sql_string("column_name asc/*"));
+        assert!(!is_common_sql_string("column_name desc/*"));
+        assert!(!is_common_sql_string("column_name asc-- "));
+        assert!(!is_common_sql_string("column_name desc-- "));
+        assert!(!is_common_sql_string("column_name asc/* "));
+        assert!(!is_common_sql_string("column_name desc/* "));
     }
 
     #[test]
     fn test_it_returns_false_for_sql_operators() {
-        assert_eq!(is_common_sql_string("="), false);
-        assert_eq!(is_common_sql_string("!="), false);
-        assert_eq!(is_common_sql_string("<>"), false);
-        assert_eq!(is_common_sql_string(">"), false);
-        assert_eq!(is_common_sql_string("<"), false);
-        assert_eq!(is_common_sql_string(">="), false);
-        assert_eq!(is_common_sql_string("&"), false);
-        assert_eq!(is_common_sql_string("<= asc"), false);
-        assert_eq!(is_common_sql_string("<= desc"), false);
-        assert_eq!(is_common_sql_string("<= "), false);
-        assert_eq!(is_common_sql_string("= asc"), false);
-        assert_eq!(is_common_sql_string("= desc"), false);
-        assert_eq!(is_common_sql_string("= "), false);
+        assert!(!is_common_sql_string("="));
+        assert!(!is_common_sql_string("!="));
+        assert!(!is_common_sql_string("<>"));
+        assert!(!is_common_sql_string(">"));
+        assert!(!is_common_sql_string("<"));
+        assert!(!is_common_sql_string(">="));
+        assert!(!is_common_sql_string("&"));
+        assert!(!is_common_sql_string("<= asc"));
+        assert!(!is_common_sql_string("<= desc"));
+        assert!(!is_common_sql_string("<= "));
+        assert!(!is_common_sql_string("= asc"));
+        assert!(!is_common_sql_string("= desc"));
+        assert!(!is_common_sql_string("= "));
     }
 
     #[test]
     fn test_safe_two_char_payloads() {
-        assert_eq!(is_common_sql_string(":p"), true);
-        assert_eq!(is_common_sql_string(":d"), true);
-        assert_eq!(is_common_sql_string(":l"), true);
-        assert_eq!(is_common_sql_string("(:"), true);
-        assert_eq!(is_common_sql_string("(("), true);
-        assert_eq!(is_common_sql_string("d)"), true);
-        assert_eq!(is_common_sql_string("1)"), true);
-        assert_eq!(is_common_sql_string("(5"), true);
-        assert_eq!(is_common_sql_string("(1"), true);
-        assert_eq!(is_common_sql_string("(s"), true);
-        assert_eq!(is_common_sql_string("+1"), true);
+        assert!(is_common_sql_string(":p"));
+        assert!(is_common_sql_string(":d"));
+        assert!(is_common_sql_string(":l"));
+        assert!(is_common_sql_string("(:"));
+        assert!(is_common_sql_string("(("));
+        assert!(is_common_sql_string("d)"));
+        assert!(is_common_sql_string("1)"));
+        assert!(is_common_sql_string("(5"));
+        assert!(is_common_sql_string("(1"));
+        assert!(is_common_sql_string("(s"));
+        assert!(is_common_sql_string("+1"));
 
-        assert_eq!(is_common_sql_string("--"), false);
-        assert_eq!(is_common_sql_string("/*"), false);
-        assert_eq!(is_common_sql_string("*/"), false);
-        assert_eq!(is_common_sql_string("';"), false);
-        assert_eq!(is_common_sql_string("1;"), false);
-        assert_eq!(is_common_sql_string("#1"), false);
+        assert!(!is_common_sql_string("--"));
+        assert!(!is_common_sql_string("/*"));
+        assert!(!is_common_sql_string("*/"));
+        assert!(!is_common_sql_string("';"));
+        assert!(!is_common_sql_string("1;"));
+        assert!(!is_common_sql_string("#1"));
 
-        assert_eq!(is_common_sql_string("(1)"), false);
-        assert_eq!(is_common_sql_string("(0)"), false);
-        assert_eq!(is_common_sql_string("(a)"), false);
-        assert_eq!(is_common_sql_string("(1)+"), false);
-        assert_eq!(is_common_sql_string("1)+"), false);
-        assert_eq!(is_common_sql_string("+(1"), false);
+        assert!(!is_common_sql_string("(1)"));
+        assert!(!is_common_sql_string("(0)"));
+        assert!(!is_common_sql_string("(a)"));
+        assert!(!is_common_sql_string("(1)+"));
+        assert!(!is_common_sql_string("1)+"));
+        assert!(!is_common_sql_string("+(1"));
     }
 
     #[test]
     fn test_dot_star_common_sql_string() {
-        assert_eq!(is_common_sql_string(".*"), true);
+        assert!(is_common_sql_string(".*"));
     }
 
     #[test]
     fn test_it_returns_false_for_special_chars() {
-        assert_eq!(is_common_sql_string("'"), false);
-        assert_eq!(is_common_sql_string("\""), false);
-        assert_eq!(is_common_sql_string(";"), false);
-        assert_eq!(is_common_sql_string("\""), false);
-        assert_eq!(is_common_sql_string("`"), false);
-        assert_eq!(is_common_sql_string("~"), false);
-        assert_eq!(is_common_sql_string("!"), false);
-        assert_eq!(is_common_sql_string("@"), false);
-        assert_eq!(is_common_sql_string("#"), false);
-        assert_eq!(is_common_sql_string("$"), false);
-        assert_eq!(is_common_sql_string("%"), false);
-        assert_eq!(is_common_sql_string("^"), false);
-        assert_eq!(is_common_sql_string("^ asc"), false);
-        assert_eq!(is_common_sql_string("^ desc"), false);
-        assert_eq!(is_common_sql_string("% asc"), false);
-        assert_eq!(is_common_sql_string("% desc"), false);
-        assert_eq!(is_common_sql_string("asc $"), false);
-        assert_eq!(is_common_sql_string("desc $"), false);
-        assert_eq!(is_common_sql_string("asc$"), false);
-        assert_eq!(is_common_sql_string("desc$"), false);
+        assert!(!is_common_sql_string("'"));
+        assert!(!is_common_sql_string("\""));
+        assert!(!is_common_sql_string(";"));
+        assert!(!is_common_sql_string("\""));
+        assert!(!is_common_sql_string("`"));
+        assert!(!is_common_sql_string("~"));
+        assert!(!is_common_sql_string("!"));
+        assert!(!is_common_sql_string("@"));
+        assert!(!is_common_sql_string("#"));
+        assert!(!is_common_sql_string("$"));
+        assert!(!is_common_sql_string("%"));
+        assert!(!is_common_sql_string("^"));
+        assert!(!is_common_sql_string("^ asc"));
+        assert!(!is_common_sql_string("^ desc"));
+        assert!(!is_common_sql_string("% asc"));
+        assert!(!is_common_sql_string("% desc"));
+        assert!(!is_common_sql_string("asc $"));
+        assert!(!is_common_sql_string("desc $"));
+        assert!(!is_common_sql_string("asc$"));
+        assert!(!is_common_sql_string("desc$"));
     }
 
     #[test]
     fn test_it_sees_table_column_pattern() {
-        assert_eq!(is_common_sql_string("table.column"), true);
-        assert_eq!(is_common_sql_string("views.user_id"), true);
-        assert_eq!(is_common_sql_string("table_name.column_name"), true);
-        assert_eq!(is_common_sql_string("table_name.column_name1"), true);
-        assert_eq!(is_common_sql_string("table_name.column_name_1"), true);
-        assert_eq!(is_common_sql_string("table_name.column_name_1_2"), true);
-        assert_eq!(is_common_sql_string("table_name.column_1_name"), true);
-        assert_eq!(is_common_sql_string("table_name.column_name_name_1"), true);
-        assert_eq!(is_common_sql_string(".r"), true);
-        assert_eq!(is_common_sql_string(".id"), true);
-        assert_eq!(is_common_sql_string(".id_"), true);
-        assert_eq!(is_common_sql_string("r."), true);
-        assert_eq!(is_common_sql_string("r_."), true);
-        assert_eq!(is_common_sql_string("r.r.r"), false);
-        assert_eq!(is_common_sql_string(".test.test"), false);
+        assert!(is_common_sql_string("table.column"));
+        assert!(is_common_sql_string("views.user_id"));
+        assert!(is_common_sql_string("table_name.column_name"));
+        assert!(is_common_sql_string("table_name.column_name1"));
+        assert!(is_common_sql_string("table_name.column_name_1"));
+        assert!(is_common_sql_string("table_name.column_name_1_2"));
+        assert!(is_common_sql_string("table_name.column_1_name"));
+        assert!(is_common_sql_string("table_name.column_name_name_1"));
+        assert!(is_common_sql_string(".r"));
+        assert!(is_common_sql_string(".id"));
+        assert!(is_common_sql_string(".id_"));
+        assert!(is_common_sql_string("r."));
+        assert!(is_common_sql_string("r_."));
+        assert!(!is_common_sql_string("r.r.r"));
+        assert!(!is_common_sql_string(".test.test"));
     }
 
     #[test]
     fn test_it_returns_false_for_table_column_pattern_false_positive() {
-        assert_eq!(is_common_sql_string(";table.column"), false);
-        assert_eq!(is_common_sql_string("table.column;"), false);
-        assert_eq!(is_common_sql_string("table.column "), false);
-        assert_eq!(is_common_sql_string("table .column"), false);
-        assert_eq!(is_common_sql_string("1_table.column"), false);
-        assert_eq!(is_common_sql_string("1table.column"), false);
-        assert_eq!(is_common_sql_string("= table.column"), false);
-        assert_eq!(is_common_sql_string("table.column ="), false);
-        assert_eq!(is_common_sql_string("table.column = "), false);
-        assert_eq!(is_common_sql_string("table.column = 1"), false);
-        assert_eq!(is_common_sql_string("table.column = 1;"), false);
-        assert_eq!(is_common_sql_string("table.column = 1 "), false);
-        assert_eq!(is_common_sql_string("table.column table.column"), false);
-        assert_eq!(is_common_sql_string("table.column,table.column"), false);
+        assert!(!is_common_sql_string(";table.column"));
+        assert!(!is_common_sql_string("table.column;"));
+        assert!(!is_common_sql_string("table.column "));
+        assert!(!is_common_sql_string("table .column"));
+        assert!(!is_common_sql_string("1_table.column"));
+        assert!(!is_common_sql_string("1table.column"));
+        assert!(!is_common_sql_string("= table.column"));
+        assert!(!is_common_sql_string("table.column ="));
+        assert!(!is_common_sql_string("table.column = "));
+        assert!(!is_common_sql_string("table.column = 1"));
+        assert!(!is_common_sql_string("table.column = 1;"));
+        assert!(!is_common_sql_string("table.column = 1 "));
+        assert!(!is_common_sql_string("table.column table.column"));
+        assert!(!is_common_sql_string("table.column,table.column"));
     }
 
     #[test]
     fn test_integers() {
-        assert_eq!(is_common_sql_string("-0"), true);
-        assert_eq!(is_common_sql_string("-1"), true);
-        assert_eq!(is_common_sql_string("-12"), true);
-        assert_eq!(is_common_sql_string("-123"), true);
-        assert_eq!(is_common_sql_string("-1234"), true);
-        assert_eq!(is_common_sql_string("1"), true);
-        assert_eq!(is_common_sql_string("12"), true);
-        assert_eq!(is_common_sql_string("123"), true);
-        assert_eq!(is_common_sql_string("0"), true);
+        assert!(is_common_sql_string("-0"));
+        assert!(is_common_sql_string("-1"));
+        assert!(is_common_sql_string("-12"));
+        assert!(is_common_sql_string("-123"));
+        assert!(is_common_sql_string("-1234"));
+        assert!(is_common_sql_string("1"));
+        assert!(is_common_sql_string("12"));
+        assert!(is_common_sql_string("123"));
+        assert!(is_common_sql_string("0"));
     }
 
     #[test]
     fn test_it_returns_false_if_its_not_an_integer() {
-        assert_eq!(is_common_sql_string("--1"), false);
-        assert_eq!(is_common_sql_string("1--"), false);
-        assert_eq!(is_common_sql_string("-1-"), false);
-        assert_eq!(is_common_sql_string("-1--"), false);
-        assert_eq!(is_common_sql_string("-1 --"), false);
-        assert_eq!(is_common_sql_string("-1 "), false);
-        assert_eq!(is_common_sql_string("-1;"), false);
-        assert_eq!(is_common_sql_string("-1\t"), false);
-        assert_eq!(is_common_sql_string("-1\n"), false);
-        assert_eq!(is_common_sql_string("-1\n;"), false);
-        assert_eq!(is_common_sql_string("--"), false);
-        assert_eq!(is_common_sql_string("-- -1"), false);
-        assert_eq!(is_common_sql_string("-1,"), false);
-        assert_eq!(is_common_sql_string("-1(--)"), false);
-        assert_eq!(is_common_sql_string("-1 /*"), false);
-        assert_eq!(is_common_sql_string("-1 /* abc */"), false);
+        assert!(!is_common_sql_string("--1"));
+        assert!(!is_common_sql_string("1--"));
+        assert!(!is_common_sql_string("-1-"));
+        assert!(!is_common_sql_string("-1--"));
+        assert!(!is_common_sql_string("-1 --"));
+        assert!(!is_common_sql_string("-1 "));
+        assert!(!is_common_sql_string("-1;"));
+        assert!(!is_common_sql_string("-1\t"));
+        assert!(!is_common_sql_string("-1\n"));
+        assert!(!is_common_sql_string("-1\n;"));
+        assert!(!is_common_sql_string("--"));
+        assert!(!is_common_sql_string("-- -1"));
+        assert!(!is_common_sql_string("-1,"));
+        assert!(!is_common_sql_string("-1(--)"));
+        assert!(!is_common_sql_string("-1 /*"));
+        assert!(!is_common_sql_string("-1 /* abc */"));
     }
 
     #[test]
     fn test_stringified_arrays() {
-        assert_eq!(is_common_sql_string("[]"), true);
-        assert_eq!(is_common_sql_string("[ ]"), false);
-        assert_eq!(is_common_sql_string("[1]"), false);
-        assert_eq!(is_common_sql_string("[[]]"), false);
+        assert!(is_common_sql_string("[]"));
+        assert!(!is_common_sql_string("[ ]"));
+        assert!(!is_common_sql_string("[1]"));
+        assert!(!is_common_sql_string("[[]]"));
     }
 
     #[test]
     fn test_decimals() {
-        assert_eq!(is_common_sql_string("1.0"), true);
-        assert_eq!(is_common_sql_string("0.1"), true);
-        assert_eq!(is_common_sql_string("-1.0"), true);
-        assert_eq!(is_common_sql_string("-0.1"), true);
-        assert_eq!(is_common_sql_string("1.5265654651"), true);
+        assert!(is_common_sql_string("1.0"));
+        assert!(is_common_sql_string("0.1"));
+        assert!(is_common_sql_string("-1.0"));
+        assert!(is_common_sql_string("-0.1"));
+        assert!(is_common_sql_string("1.5265654651"));
     }
 
     #[test]
     fn test_digit_space_alpha() {
-        assert_eq!(is_common_sql_string("1 a"), true);
-        assert_eq!(is_common_sql_string("9 z"), true);
-        assert_eq!(is_common_sql_string("0 m"), true);
-        assert_eq!(is_common_sql_string("00 m"), true);
-        assert_eq!(is_common_sql_string("0 mm"), true);
-        assert_eq!(is_common_sql_string("00 mm"), true);
+        assert!(is_common_sql_string("1 a"));
+        assert!(is_common_sql_string("9 z"));
+        assert!(is_common_sql_string("0 m"));
+        assert!(is_common_sql_string("00 m"));
+        assert!(is_common_sql_string("0 mm"));
+        assert!(is_common_sql_string("00 mm"));
 
-        assert_eq!(is_common_sql_string("0  m"), false);
-        assert_eq!(is_common_sql_string("'0 m"), false);
-        assert_eq!(is_common_sql_string("0;m"), false);
+        assert!(!is_common_sql_string("0  m"));
+        assert!(!is_common_sql_string("'0 m"));
+        assert!(!is_common_sql_string("0;m"));
     }
 
     #[test]
     fn test_non_decimals() {
-        assert_eq!(is_common_sql_string("1."), false);
-        assert_eq!(is_common_sql_string(".1"), false);
-        assert_eq!(is_common_sql_string("1.0.0"), false);
-        assert_eq!(is_common_sql_string("."), false);
+        assert!(!is_common_sql_string("1."));
+        assert!(!is_common_sql_string(".1"));
+        assert!(!is_common_sql_string("1.0.0"));
+        assert!(!is_common_sql_string("."));
     }
 
     #[test]
     fn test_single_line_comment_with_single_quote() {
-        assert_eq!(is_common_sql_string("--"), false);
-        assert_eq!(is_common_sql_string("--'"), false);
-        assert_eq!(is_common_sql_string("'--"), false);
+        assert!(!is_common_sql_string("--"));
+        assert!(!is_common_sql_string("--'"));
+        assert!(!is_common_sql_string("'--"));
     }
 
     #[test]
     fn test_short_alphanumeric_with_spaces() {
-        assert_eq!(is_common_sql_string("1 li"), true);
-        assert_eq!(is_common_sql_string("1 ab"), true);
-        assert_eq!(is_common_sql_string("ab 1"), true);
-        assert_eq!(is_common_sql_string("1 abc"), true);
+        assert!(is_common_sql_string("1 li"));
+        assert!(is_common_sql_string("1 ab"));
+        assert!(is_common_sql_string("ab 1"));
+        assert!(is_common_sql_string("1 abc"));
 
-        assert_eq!(is_common_sql_string("1;li"), false);
-        assert_eq!(is_common_sql_string("1'li"), false);
+        assert!(!is_common_sql_string("1;li"));
+        assert!(!is_common_sql_string("1'li"));
     }
 
     #[test]
     fn test_alpha_with_spaces() {
-        assert_eq!(is_common_sql_string("is n"), true);
-        assert_eq!(is_common_sql_string("is nu"), true);
+        assert!(is_common_sql_string("is n"));
+        assert!(is_common_sql_string("is nu"));
 
-        assert_eq!(is_common_sql_string("OR"), false);
-        assert_eq!(is_common_sql_string(" OR "), false);
-        assert_eq!(is_common_sql_string("TRUE OR TRUE IS TRUE"), false);
-        assert_eq!(is_common_sql_string("TRUE OR TRUE"), false);
-        assert_eq!(is_common_sql_string("is  nu"), false);
-        assert_eq!(is_common_sql_string("is nul"), false);
-        assert_eq!(is_common_sql_string("is null abc"), false);
-        assert_eq!(is_common_sql_string("%is n%"), false);
+        assert!(!is_common_sql_string("OR"));
+        assert!(!is_common_sql_string(" OR "));
+        assert!(!is_common_sql_string("TRUE OR TRUE IS TRUE"));
+        assert!(!is_common_sql_string("TRUE OR TRUE"));
+        assert!(!is_common_sql_string("is  nu"));
+        assert!(!is_common_sql_string("is nul"));
+        assert!(!is_common_sql_string("is null abc"));
+        assert!(!is_common_sql_string("%is n%"));
     }
 
     #[test]
     fn test_single_quote_start_end() {
-        assert_eq!(is_common_sql_string("'a"), true);
-        assert_eq!(is_common_sql_string("'0"), true);
-        assert_eq!(is_common_sql_string("a'"), true);
-        assert_eq!(is_common_sql_string("0'"), true);
+        assert!(is_common_sql_string("'a"));
+        assert!(is_common_sql_string("'0"));
+        assert!(is_common_sql_string("a'"));
+        assert!(is_common_sql_string("0'"));
 
-        assert_eq!(is_common_sql_string("00'"), true);
-        assert_eq!(is_common_sql_string("aa'"), true);
-        assert_eq!(is_common_sql_string("'00"), true);
-        assert_eq!(is_common_sql_string("'aa"), true);
+        assert!(is_common_sql_string("00'"));
+        assert!(is_common_sql_string("aa'"));
+        assert!(is_common_sql_string("'00"));
+        assert!(is_common_sql_string("'aa"));
 
-        assert_eq!(is_common_sql_string("'product-123"), true);
-        assert_eq!(is_common_sql_string("product-123'"), true);
-        assert_eq!(is_common_sql_string("'user-id-456"), true);
-        assert_eq!(is_common_sql_string("user-id-456'"), true);
+        assert!(is_common_sql_string("'product-123"));
+        assert!(is_common_sql_string("product-123'"));
+        assert!(is_common_sql_string("'user-id-456"));
+        assert!(is_common_sql_string("user-id-456'"));
 
-        assert_eq!(is_common_sql_string("'payload--drop"), false);
-        assert_eq!(is_common_sql_string("payload--drop'"), false);
+        assert!(!is_common_sql_string("'payload--drop"));
+        assert!(!is_common_sql_string("payload--drop'"));
 
-        assert_eq!(is_common_sql_string("';"), false);
-        assert_eq!(is_common_sql_string(";'"), false);
+        assert!(!is_common_sql_string("';"));
+        assert!(!is_common_sql_string(";'"));
 
         // underscore has special meaning in MySQL LIKE operator, so we don't allow it here
-        assert_eq!(is_common_sql_string("'item_abc-def"), false);
-        assert_eq!(is_common_sql_string("item_abc-def'"), false);
+        assert!(!is_common_sql_string("'item_abc-def"));
+        assert!(!is_common_sql_string("item_abc-def'"));
 
         // spaces are not allowed
-        assert_eq!(is_common_sql_string("'user -id-456"), false);
-        assert_eq!(is_common_sql_string("user -id-456'"), false);
+        assert!(!is_common_sql_string("'user -id-456"));
+        assert!(!is_common_sql_string("user -id-456'"));
 
-        assert_eq!(
-            is_common_sql_string(&format!("{}'{}", "a".repeat(199), "")),
-            true
-        );
-        assert_eq!(
-            is_common_sql_string(&format!("{}'{}", "a".repeat(200), "")),
-            false
-        );
-        assert_eq!(
-            is_common_sql_string(&format!("'{}{}", "a".repeat(199), "")),
-            true
-        );
-        assert_eq!(
-            is_common_sql_string(&format!("'{}{}", "a".repeat(200), "")),
-            false
-        );
+        assert!(is_common_sql_string(&format!("{}'{}", "a".repeat(199), "")));
+        assert!(!is_common_sql_string(&format!(
+            "{}'{}",
+            "a".repeat(200),
+            ""
+        )));
+        assert!(is_common_sql_string(&format!("'{}{}", "a".repeat(199), "")));
+        assert!(!is_common_sql_string(&format!(
+            "'{}{}",
+            "a".repeat(200),
+            ""
+        )));
     }
 
     #[test]
     fn test_digits_ending_with_parenthesis() {
-        assert_eq!(is_common_sql_string("1)"), true);
-        assert_eq!(is_common_sql_string("123)"), true);
+        assert!(is_common_sql_string("1)"));
+        assert!(is_common_sql_string("123)"));
 
-        assert_eq!(is_common_sql_string("(123)"), false);
-        assert_eq!(is_common_sql_string("(123"), false);
-        assert_eq!(is_common_sql_string("1 )"), false);
-        assert_eq!(is_common_sql_string("1) --"), false);
-        assert_eq!(is_common_sql_string("1)--"), false);
+        assert!(!is_common_sql_string("(123)"));
+        assert!(!is_common_sql_string("(123"));
+        assert!(!is_common_sql_string("1 )"));
+        assert!(!is_common_sql_string("1) --"));
+        assert!(!is_common_sql_string("1)--"));
     }
 
     #[test]
     fn test_double_quote_start_end() {
-        assert_eq!(is_common_sql_string(r#""a"#), true);
-        assert_eq!(is_common_sql_string(r#""0"#), true);
-        assert_eq!(is_common_sql_string(r#"a""#), true);
-        assert_eq!(is_common_sql_string(r#"0""#), true);
+        assert!(is_common_sql_string(r#""a"#));
+        assert!(is_common_sql_string(r#""0"#));
+        assert!(is_common_sql_string(r#"a""#));
+        assert!(is_common_sql_string(r#"0""#));
 
-        assert_eq!(is_common_sql_string(r#"00""#), true);
-        assert_eq!(is_common_sql_string(r#"aa""#), true);
-        assert_eq!(is_common_sql_string(r#""00"#), true);
-        assert_eq!(is_common_sql_string(r#""aa"#), true);
+        assert!(is_common_sql_string(r#"00""#));
+        assert!(is_common_sql_string(r#"aa""#));
+        assert!(is_common_sql_string(r#""00"#));
+        assert!(is_common_sql_string(r#""aa"#));
 
-        assert_eq!(is_common_sql_string(r#""product-123"#), true);
-        assert_eq!(is_common_sql_string(r#"product-123""#), true);
-        assert_eq!(is_common_sql_string(r#""user-id-456"#), true);
-        assert_eq!(is_common_sql_string(r#"user-id-456""#), true);
+        assert!(is_common_sql_string(r#""product-123"#));
+        assert!(is_common_sql_string(r#"product-123""#));
+        assert!(is_common_sql_string(r#""user-id-456"#));
+        assert!(is_common_sql_string(r#"user-id-456""#));
 
-        assert_eq!(is_common_sql_string(r#""payload--drop"#), false);
-        assert_eq!(is_common_sql_string(r#"payload--drop""#), false);
+        assert!(!is_common_sql_string(r#""payload--drop"#));
+        assert!(!is_common_sql_string(r#"payload--drop""#));
 
-        assert_eq!(is_common_sql_string(r#"";"#), false);
-        assert_eq!(is_common_sql_string(r#";""#), false);
+        assert!(!is_common_sql_string(r#"";"#));
+        assert!(!is_common_sql_string(r#";""#));
 
         // underscore has special meaning in MySQL LIKE operator, so we don't allow it here
         // (Only when ANSI_QUOTES SQL mode is enabled)
-        assert_eq!(is_common_sql_string(r#""item_abc-def"#), false);
-        assert_eq!(is_common_sql_string(r#"item_abc-def""#), false);
+        assert!(!is_common_sql_string(r#""item_abc-def"#));
+        assert!(!is_common_sql_string(r#"item_abc-def""#));
 
         // spaces are not allowed
-        assert_eq!(is_common_sql_string(r#""user -id-456"#), false);
-        assert_eq!(is_common_sql_string(r#"user -id-456""#), false);
+        assert!(!is_common_sql_string(r#""user -id-456"#));
+        assert!(!is_common_sql_string(r#"user -id-456""#));
 
-        assert_eq!(
-            is_common_sql_string(&format!("{}\"{}", "a".repeat(199), "")),
-            true
-        );
-        assert_eq!(
-            is_common_sql_string(&format!("{}\"{}", "a".repeat(200), "")),
-            false
-        );
-        assert_eq!(
-            is_common_sql_string(&format!("\"{}{}", "a".repeat(199), "")),
-            true
-        );
-        assert_eq!(
-            is_common_sql_string(&format!("\"{}{}", "a".repeat(200), "")),
-            false
-        );
+        assert!(is_common_sql_string(&format!(
+            "{}\"{}",
+            "a".repeat(199),
+            ""
+        )));
+        assert!(!is_common_sql_string(&format!(
+            "{}\"{}",
+            "a".repeat(200),
+            ""
+        )));
+        assert!(is_common_sql_string(&format!(
+            "\"{}{}",
+            "a".repeat(199),
+            ""
+        )));
+        assert!(!is_common_sql_string(&format!(
+            "\"{}{}",
+            "a".repeat(200),
+            ""
+        )));
     }
 
     #[test]
     fn test_trailing_comma() {
-        assert_eq!(is_common_sql_string("username,"), true);
-        assert_eq!(is_common_sql_string("user name,"), true);
+        assert!(is_common_sql_string("username,"));
+        assert!(is_common_sql_string("user name,"));
 
-        assert_eq!(is_common_sql_string(",username,"), false);
-        assert_eq!(is_common_sql_string("user,name,"), false);
-        assert_eq!(is_common_sql_string(",user,name"), false);
-        assert_eq!(is_common_sql_string("user,name"), false);
-        assert_eq!(is_common_sql_string(",user name,"), false);
-        assert_eq!(is_common_sql_string("username,,"), false);
-        assert_eq!(is_common_sql_string(",,username"), false);
-        assert_eq!(is_common_sql_string(",username"), false);
-        assert_eq!(is_common_sql_string(",user name"), false);
+        assert!(!is_common_sql_string(",username,"));
+        assert!(!is_common_sql_string("user,name,"));
+        assert!(!is_common_sql_string(",user,name"));
+        assert!(!is_common_sql_string("user,name"));
+        assert!(!is_common_sql_string(",user name,"));
+        assert!(!is_common_sql_string("username,,"));
+        assert!(!is_common_sql_string(",,username"));
+        assert!(!is_common_sql_string(",username"));
+        assert!(!is_common_sql_string(",user name"));
 
         let at_limit = format!("{},", "a".repeat(39));
-        assert_eq!(is_common_sql_string(&at_limit), true);
+        assert!(is_common_sql_string(&at_limit));
         let over_limit = format!("{}a,", "a".repeat(39));
-        assert_eq!(is_common_sql_string(&over_limit), false);
+        assert!(!is_common_sql_string(&over_limit));
     }
 }
