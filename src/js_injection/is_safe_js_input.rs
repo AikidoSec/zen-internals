@@ -20,6 +20,12 @@ const SAFE_UNARY_OPERATORS: [UnaryOperator; 2] =
     [UnaryOperator::UnaryNegation, UnaryOperator::UnaryPlus];
 
 pub fn is_safe_js_input(user_input: &str, allocator: &Allocator, source_type: SourceType) -> bool {
+    // Right now this function only returns true if the user input contains numbers
+    // This is a early return to avoid parsing the user input if it doesn't contain any numbers
+    if !user_input.bytes().any(|b| b.is_ascii_digit()) {
+        return false;
+    }
+
     let parser_result = Parser::new(allocator, user_input, source_type)
         .with_options(ParseOptions {
             allow_return_outside_function: true,
@@ -45,6 +51,10 @@ struct ASTPass {
 
 impl<'a> Visit<'a> for ASTPass {
     fn enter_node(&mut self, kind: AstKind<'a>) {
+        if !self.contains_only_safe_tokens {
+            // Early return if we already know the input might be unsafe, no need to check further nodes
+            return;
+        }
         match kind {
             // Allow without additional checks, all subnodes of the AST will still be checked, so e.g. a sequence of unsafe tokens will be caught
             AstKind::ExpressionStatement(_) // Allow expressions, this contains the more specific expression type, like BinaryExpression
