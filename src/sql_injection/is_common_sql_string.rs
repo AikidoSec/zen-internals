@@ -41,9 +41,7 @@ macro_rules! regex {
 }
 
 pub fn is_common_sql_string(user_input: &str) -> bool {
-    let is_common_sql_string = COMMON_SQL_STRINGS
-        .iter()
-        .any(|&common_string| user_input == common_string);
+    let is_common_sql_string = COMMON_SQL_STRINGS.contains(&user_input);
 
     if is_common_sql_string {
         return true;
