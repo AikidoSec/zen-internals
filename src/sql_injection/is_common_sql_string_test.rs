@@ -4,6 +4,17 @@ mod tests {
     use crate::sql_injection::is_common_sql_string::COMMON_SQL_STRINGS;
 
     #[test]
+    fn common_sql_strings_are_lowercase() {
+        for s in COMMON_SQL_STRINGS {
+            assert_eq!(
+                s,
+                s.to_lowercase(),
+                "`{s}` is not lowercase; all entries in COMMON_SQL_STRINGS must be lowercase"
+            );
+        }
+    }
+
+    #[test]
     fn test_common_sql_strings() {
         COMMON_SQL_STRINGS.iter().for_each(|common_string| {
             assert!(
