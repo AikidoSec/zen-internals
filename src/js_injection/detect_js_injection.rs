@@ -75,11 +75,7 @@ pub fn detect_js_injection_str(code: &str, userinput: &str, sourcetype: i32) -> 
         return true;
     }
 
-    if have_statements_changed(
-        &parser_result.program,
-        &parser_result_without_input.program,
-        &allocator,
-    ) {
+    if have_statements_changed(&parser_result.program, &parser_result_without_input.program) {
         return true;
     }
 
