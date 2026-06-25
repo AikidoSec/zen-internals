@@ -24,7 +24,6 @@ pub enum DetectionReason {
     CommentStructureAltered,
 }
 
-// `userinput` and `query` provided to this function should already be lowercase.
 pub fn detect_sql_injection_str(
     query_raw: &str,
     userinput_raw: &str,
