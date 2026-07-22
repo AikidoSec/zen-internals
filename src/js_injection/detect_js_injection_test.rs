@@ -302,4 +302,29 @@ mod tests {
             3
         );
     }
+
+    #[test]
+    fn test_bare_function_expression() {
+        // A bare `function() {}` is not valid as a standalone statement (it
+        // needs a name), but it's common as a value, e.g. a MongoDB $where function
+        not_injection!("function() { return 'Hello'; }", "Hello", 2);
+        is_injection!("function() { return 'Hello'; } //';}", "Hello'; } //", 2);
+
+        // Same, but async and generator functions
+        not_injection!("async function() { return 'Hello'; }", "Hello", 2);
+        is_injection!(
+            "async function() { return 'Hello'; } //';}",
+            "Hello'; } //",
+            2
+        );
+        not_injection!("function*() { return 'Hello'; }", "Hello", 2);
+        is_injection!("function*() { return 'Hello'; } //';}", "Hello'; } //", 2);
+
+        // Invalid JS (missing closing brace) still isn't detected
+        not_injection!(
+            "function() { return 'Hello'; console.log('injection'); //'",
+            "Hello'; console.log('injection'); //",
+            2
+        );
+    }
 }
