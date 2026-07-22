@@ -302,4 +302,20 @@ mod tests {
             3
         );
     }
+
+    #[test]
+    fn test_bare_function_expression() {
+        not_injection!("function() { return 'Hello'; }", "Hello", 2);
+        is_injection!(
+            "function() { const test = 'Hello'; console.log('injection'); } //'; }",
+            "Hello'; console.log('injection'); } //",
+            2
+        );
+
+        not_injection!(
+            "function() { const test = 'Hello'; console.log('injection'); } //'; } }",
+            "Hello'; console.log('injection'); } //",
+            2
+        );
+    }
 }
