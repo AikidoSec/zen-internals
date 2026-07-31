@@ -750,7 +750,7 @@ fn collect_col_col_pairs_from_joins(tables: &[TableWithJoins]) -> Vec<ColColPair
             if let JoinOperator::Join(JoinConstraint::On(on_expr))
             | JoinOperator::Inner(JoinConstraint::On(on_expr)) = &join.join_operator
             {
-                collect_col_col_pairs_only(on_expr, &mut pairs, false);
+                collect_col_col_pairs_only(on_expr, &mut pairs, false, 0);
             }
         }
     }
@@ -768,18 +768,28 @@ fn collect_col_col_pairs_for_select(set_expr: &SetExpr) -> Vec<ColColPair> {
     let mut pairs = collect_col_col_pairs_from_joins(&select.from);
 
     if let Some(selection) = &select.selection {
-        collect_col_col_pairs_only(selection, &mut pairs, false);
+        collect_col_col_pairs_only(selection, &mut pairs, false, 0);
     }
 
     if let Some(having) = &select.having {
-        collect_col_col_pairs_only(having, &mut pairs, false);
+        collect_col_col_pairs_only(having, &mut pairs, false, 0);
     }
 
     pairs
 }
 
-fn collect_col_col_pairs_only(expr: &Expr, pairs: &mut Vec<ColColPair>, in_or: bool) {
-    if !in_or {
+/// Recursively collects col=col equality pairs, skipping ones inside OR branches
+/// (not guaranteed to be enforced) or under an odd number of NOTs (the equality means
+/// the opposite of what it says). An even number of NOTs cancels out, e.g.
+/// `NOT NOT (a.tenant_id = b.tenant_id)` is equivalent to `a.tenant_id = b.tenant_id`,
+/// so we still descend through NOT to find pairs nested inside it.
+fn collect_col_col_pairs_only(
+    expr: &Expr,
+    pairs: &mut Vec<ColColPair>,
+    in_or: bool,
+    not_depth: usize,
+) {
+    if !in_or && not_depth.is_multiple_of(2) {
         if let Some(pair) = try_extract_col_col_pair(expr) {
             pairs.push(pair);
         }
@@ -790,10 +800,14 @@ fn collect_col_col_pairs_only(expr: &Expr, pairs: &mut Vec<ColColPair>, in_or: b
     match expr {
         Expr::BinaryOp { left, op, right } => {
             let in_or = in_or || *op == BinaryOperator::Or;
-            collect_col_col_pairs_only(left, pairs, in_or);
-            collect_col_col_pairs_only(right, pairs, in_or);
+            collect_col_col_pairs_only(left, pairs, in_or, not_depth);
+            collect_col_col_pairs_only(right, pairs, in_or, not_depth);
         }
-        Expr::Nested(inner) => collect_col_col_pairs_only(inner, pairs, in_or),
+        Expr::Nested(inner) => collect_col_col_pairs_only(inner, pairs, in_or, not_depth),
+        Expr::UnaryOp {
+            op: UnaryOperator::Not,
+            expr: inner,
+        } => collect_col_col_pairs_only(inner, pairs, in_or, not_depth + 1),
         _ => {}
     }
 }

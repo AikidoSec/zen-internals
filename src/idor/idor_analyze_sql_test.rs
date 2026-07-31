@@ -7491,4 +7491,79 @@ mod tests {
             }]
         );
     }
+
+    #[test]
+    fn test_double_negated_col_col_resolved_from_where() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT r.* FROM requests r, tenants t \
+                 WHERE t.sys_group_id = $1 AND NOT NOT (r.sys_group_id = t.sys_group_id)",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "requests".into(),
+                        alias: Some("r".into()),
+                    },
+                    TableRef {
+                        name: "tenants".into(),
+                        alias: Some("t".into()),
+                    },
+                ],
+                filters: vec![
+                    FilterColumn {
+                        table: Some("t".into()),
+                        column: "sys_group_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                    FilterColumn {
+                        table: Some("r".into()),
+                        column: "sys_group_id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    },
+                ],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_single_negated_col_col_not_resolved_from_where() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT r.* FROM requests r, tenants t \
+                 WHERE t.sys_group_id = $1 AND NOT (r.sys_group_id = t.sys_group_id)",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![
+                    TableRef {
+                        name: "requests".into(),
+                        alias: Some("r".into()),
+                    },
+                    TableRef {
+                        name: "tenants".into(),
+                        alias: Some("t".into()),
+                    },
+                ],
+                filters: vec![FilterColumn {
+                    table: Some("t".into()),
+                    column: "sys_group_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
 }
