@@ -7453,4 +7453,42 @@ mod tests {
             }]
         );
     }
+
+    #[test]
+    fn test_select_double_negated_filter_is_trusted() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM orders WHERE NOT NOT (tenant_id = $1)", 9).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "orders".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_select_triple_negated_filter_not_trusted() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM orders WHERE NOT NOT NOT (tenant_id = $1)", 9).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "orders".into(),
+                    alias: None,
+                }],
+                filters: vec![],
+                insert_columns: None,
+            }]
+        );
+    }
 }

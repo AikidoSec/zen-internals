@@ -465,9 +465,11 @@ struct SelectVisitor {
     /// because filters inside OR branches may not be applied (e.g. `WHERE tenant_id = 1 OR admin = true`
     /// does not guarantee that `tenant_id = 1` is enforced).
     or_depth: usize,
-    /// Tracks nesting depth inside NOT expressions. When > 0, we skip collecting filters
+    /// Tracks nesting depth inside NOT expressions. When odd, we skip collecting filters
     /// because a negated equality means the opposite of what it says (e.g.
-    /// `WHERE NOT (tenant_id = 1)` matches every tenant except 1, not tenant 1).
+    /// `WHERE NOT (tenant_id = 1)` matches every tenant except 1, not tenant 1). An even
+    /// depth means the NOTs cancel out (e.g. `WHERE NOT NOT (tenant_id = 1)` is equivalent
+    /// to `WHERE tenant_id = 1`), so the filter is still trusted.
     not_depth: usize,
     /// Pointers to the top-level `Expr` of clauses that never restrict which rows are
     /// returned (projection, GROUP BY, etc., see `compute_non_restricting_roots`).
@@ -579,10 +581,11 @@ impl Visitor for SelectVisitor {
             self.non_restricting_depth += 1;
         }
 
-        // Skip filters inside OR branches (not guaranteed to be enforced), inside NOT
-        // (the equality means the opposite of what it says), and inside clauses that
-        // don't restrict which rows are returned (projection, GROUP BY, ...)
-        if self.or_depth > 0 || self.not_depth > 0 || self.non_restricting_depth > 0 {
+        // Skip filters inside OR branches (not guaranteed to be enforced), inside an odd
+        // number of NOTs (the equality means the opposite of what it says, while an even
+        // number cancels out, e.g. `NOT NOT (tenant_id = 1)`), and inside clauses that don't
+        // restrict which rows are returned (projection, GROUP BY, ...)
+        if self.or_depth > 0 || self.not_depth % 2 == 1 || self.non_restricting_depth > 0 {
             return ControlFlow::Continue(());
         }
 
