@@ -7323,4 +7323,134 @@ mod tests {
             }]
         );
     }
+
+    #[test]
+    fn test_select_negated_filter_not_trusted() {
+        assert_eq!(
+            idor_analyze_sql("SELECT * FROM orders WHERE NOT (tenant_id = $1)", 9).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "orders".into(),
+                    alias: None,
+                }],
+                filters: vec![],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_select_negated_filter_with_other_condition_not_trusted() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM orders WHERE id = $1 AND NOT (tenant_id = $2)",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "orders".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "id".into(),
+                    value: "$1".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_select_cosmetic_projection_equality_not_a_filter() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT *, (tenant_id = $1) AS is_mine FROM orders WHERE id = $2",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "orders".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "id".into(),
+                    value: "$2".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_select_cosmetic_projection_equality_whole_table_not_a_filter() {
+        assert_eq!(
+            idor_analyze_sql("SELECT *, (tenant_id = $1) AS is_mine FROM orders", 9,).unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "orders".into(),
+                    alias: None,
+                }],
+                filters: vec![],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_select_case_in_projection_not_a_filter() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT id, tenant_id, CASE WHEN tenant_id = $1 THEN total END AS t FROM orders",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "orders".into(),
+                    alias: None,
+                }],
+                filters: vec![],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_select_group_by_equality_not_a_filter() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT id, (tenant_id = $1) AS grp FROM orders WHERE id = $2 GROUP BY id, (tenant_id = $1)",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "select".into(),
+                tables: vec![TableRef {
+                    name: "orders".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "id".into(),
+                    value: "$2".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
 }

@@ -2,9 +2,10 @@ use crate::idor::sql_query_result::{FilterColumn, InsertColumn, SqlQueryResult, 
 use crate::sql_injection::helpers::select_dialect_based_on_enum::select_dialect_based_on_enum;
 use core::ops::ControlFlow;
 use sqlparser::ast::{
-    BinaryOperator, Expr, FromTable, FunctionArg, FunctionArgExpr, JoinConstraint, JoinOperator,
-    ObjectName, ObjectNamePart, Query, SetExpr, Statement, TableFactor, TableObject,
-    TableWithJoins, Value, ValueWithSpan, Visit, Visitor,
+    BinaryOperator, Expr, FromTable, FunctionArg, FunctionArgExpr, GroupByExpr, JoinConstraint,
+    JoinOperator, ObjectName, ObjectNamePart, Query, SelectItem, SelectItemQualifiedWildcardKind,
+    SetExpr, Statement, TableFactor, TableObject, TableWithJoins, UnaryOperator, Value,
+    ValueWithSpan, Visit, Visitor,
 };
 use sqlparser::parser::Parser;
 use std::collections::HashSet;
@@ -20,7 +21,8 @@ use std::collections::HashSet;
 /// # Filter Extraction
 ///
 /// Equality comparisons (`=`) where one side is a column and the other is a concrete
-/// value (literal or placeholder) are extracted directly.
+/// value (literal or placeholder) are extracted directly. For SELECT, only equalities
+/// that can actually restrict which rows are returned count.
 ///
 /// Column-to-column comparisons in JOIN ON or WHERE clauses (e.g.
 /// `r.sys_group_id = t.sys_group_id`) are also collected. After extraction, we
@@ -374,7 +376,8 @@ fn visit_select(
     counter: &mut usize,
     cte_names: &HashSet<String>,
 ) -> Result<(), String> {
-    let mut visitor = SelectVisitor::new(*counter, cte_names.clone());
+    let non_restricting_roots = compute_non_restricting_roots(set_expr);
+    let mut visitor = SelectVisitor::new(*counter, cte_names.clone(), non_restricting_roots);
     let _ = set_expr.visit(&mut visitor);
     *counter = visitor.placeholder_counter;
 
@@ -400,6 +403,54 @@ fn visit_select(
     Ok(())
 }
 
+/// Collects raw pointers to the top-level `Expr` of every clause in `select` that can
+/// never restrict which rows are returned, regardless of join structure.
+/// For example these filters do not protect against IDOR:
+/// - SELECT * FROM orders WHERE NOT (tenant_id = $1)
+/// - SELECT *, (tenant_id = $1) AS is_mine FROM orders WHERE id = $2
+fn compute_non_restricting_roots(set_expr: &SetExpr) -> HashSet<*const Expr> {
+    let mut roots = HashSet::new();
+    let SetExpr::Select(select) = set_expr else {
+        return roots;
+    };
+
+    for item in &select.projection {
+        match item {
+            SelectItem::UnnamedExpr(expr) => {
+                roots.insert(expr as *const Expr);
+            }
+            SelectItem::ExprWithAlias { expr, .. } => {
+                roots.insert(expr as *const Expr);
+            }
+            SelectItem::QualifiedWildcard(SelectItemQualifiedWildcardKind::Expr(expr), _) => {
+                roots.insert(expr as *const Expr);
+            }
+            _ => {}
+        }
+    }
+
+    if let GroupByExpr::Expressions(exprs, _) = &select.group_by {
+        for expr in exprs {
+            roots.insert(expr as *const Expr);
+        }
+    }
+
+    for expr in &select.cluster_by {
+        roots.insert(expr as *const Expr);
+    }
+    for expr in &select.distribute_by {
+        roots.insert(expr as *const Expr);
+    }
+    for order_by_expr in &select.sort_by {
+        roots.insert(&order_by_expr.expr as *const Expr);
+    }
+    if let Some(qualify) = &select.qualify {
+        roots.insert(qualify as *const Expr);
+    }
+
+    roots
+}
+
 struct SelectVisitor {
     tables: Vec<TableRef>,
     filters: Vec<FilterColumn>,
@@ -414,6 +465,16 @@ struct SelectVisitor {
     /// because filters inside OR branches may not be applied (e.g. `WHERE tenant_id = 1 OR admin = true`
     /// does not guarantee that `tenant_id = 1` is enforced).
     or_depth: usize,
+    /// Tracks nesting depth inside NOT expressions. When > 0, we skip collecting filters
+    /// because a negated equality means the opposite of what it says (e.g.
+    /// `WHERE NOT (tenant_id = 1)` matches every tenant except 1, not tenant 1).
+    not_depth: usize,
+    /// Pointers to the top-level `Expr` of clauses that never restrict which rows are
+    /// returned (projection, GROUP BY, etc., see `compute_non_restricting_roots`).
+    /// `non_restricting_depth` tracks nesting inside one of these roots; while > 0, we
+    /// skip collecting filters since these clauses don't guarantee anything is enforced.
+    non_restricting_roots: HashSet<*const Expr>,
+    non_restricting_depth: usize,
     /// Common table expression names to skip when collecting tables (virtual tables, not real ones)
     cte_names: HashSet<String>,
     /// Set to true when a col=col equality expression is encountered (e.g. `a.id = b.id`).
@@ -422,7 +483,11 @@ struct SelectVisitor {
 }
 
 impl SelectVisitor {
-    fn new(initial_placeholder_count: usize, cte_names: HashSet<String>) -> Self {
+    fn new(
+        initial_placeholder_count: usize,
+        cte_names: HashSet<String>,
+        non_restricting_roots: HashSet<*const Expr>,
+    ) -> Self {
         Self {
             tables: Vec::new(),
             filters: Vec::new(),
@@ -430,6 +495,9 @@ impl SelectVisitor {
             subqueries: Vec::new(),
             skip_depth: 0,
             or_depth: 0,
+            not_depth: 0,
+            non_restricting_roots,
+            non_restricting_depth: 0,
             cte_names,
             potential_col_col: false,
         }
@@ -497,8 +565,24 @@ impl Visitor for SelectVisitor {
             self.or_depth += 1;
         }
 
-        // Skip filters inside OR branches: OR does not guarantee the filter is enforced
-        if self.or_depth > 0 {
+        if matches!(
+            expr,
+            Expr::UnaryOp {
+                op: UnaryOperator::Not,
+                ..
+            }
+        ) {
+            self.not_depth += 1;
+        }
+
+        if self.non_restricting_roots.contains(&(expr as *const Expr)) {
+            self.non_restricting_depth += 1;
+        }
+
+        // Skip filters inside OR branches (not guaranteed to be enforced), inside NOT
+        // (the equality means the opposite of what it says), and inside clauses that
+        // don't restrict which rows are returned (projection, GROUP BY, ...)
+        if self.or_depth > 0 || self.not_depth > 0 || self.non_restricting_depth > 0 {
             return ControlFlow::Continue(());
         }
 
@@ -532,6 +616,18 @@ impl Visitor for SelectVisitor {
             }
         ) {
             self.or_depth = self.or_depth.saturating_sub(1);
+        }
+        if matches!(
+            expr,
+            Expr::UnaryOp {
+                op: UnaryOperator::Not,
+                ..
+            }
+        ) {
+            self.not_depth = self.not_depth.saturating_sub(1);
+        }
+        if self.non_restricting_roots.contains(&(expr as *const Expr)) {
+            self.non_restricting_depth = self.non_restricting_depth.saturating_sub(1);
         }
         ControlFlow::Continue(())
     }
