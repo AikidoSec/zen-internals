@@ -91,16 +91,13 @@ pub fn detect_sql_injection_str(
 
             if escaped_userinput_occurrences == 1 && userinput_occurrences == 1 {
                 for token in tokens.iter() {
-                    match token {
-                        SingleQuotedString(s) => {
-                            if *s == escaped_userinput {
-                                return SqlInjectionDetectionResult {
-                                    detected: false,
-                                    reason: DetectionReason::SafelyEscapedUserInput,
-                                };
-                            }
-                        }
-                        _ => {}
+                    if let SingleQuotedString(s) = token
+                        && *s == escaped_userinput
+                    {
+                        return SqlInjectionDetectionResult {
+                            detected: false,
+                            reason: DetectionReason::SafelyEscapedUserInput,
+                        };
                     }
                 }
             }
