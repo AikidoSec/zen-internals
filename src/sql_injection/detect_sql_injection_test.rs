@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use crate::sql_injection::detect_sql_injection::detect_sql_injection_str;
+    use crate::sql_injection::detect_sql_injection::{
+        detect_sql_injection_str, DetectionReason,
+    };
 
     fn dialect(s: &str) -> i32 {
         match s {
@@ -1228,5 +1230,56 @@ mod tests {
             "#,
             "'_'"
         );
+    }
+
+    #[test]
+    fn test_single_quote_is_safely_escaped_for_all_dialects() {
+        for dia in get_supported_dialects() {
+            let result = detect_sql_injection_str("SELECT '_'''", "_'", dia);
+
+            assert!(
+                !result.detected
+                    && matches!(
+                        &result.reason,
+                        DetectionReason::SafelyEscapedUserInput
+                    )
+            );
+        }
+    }
+
+    #[test]
+    fn test_input_must_match_the_entire_string() {
+        for dia in get_supported_dialects() {
+            let result = detect_sql_injection_str("SELECT 'prefix_'''", "_'", dia);
+
+            assert!(!matches!(
+                &result.reason,
+                DetectionReason::SafelyEscapedUserInput
+            ));
+        }
+    }
+
+    #[test]
+    fn test_single_quotes_in_comments_are_not_escaped_strings() {
+        for dia in get_supported_dialects() {
+            let result = detect_sql_injection_str("SELECT 1 -- _''\n", "_'", dia);
+
+            assert!(!matches!(
+                &result.reason,
+                DetectionReason::SafelyEscapedUserInput
+            ));
+        }
+    }
+
+    #[test]
+    fn test_input_with_quotes_in_the_middle_is_not_safely_escaped() {
+        for dia in get_supported_dialects() {
+            let result = detect_sql_injection_str("SELECT 'it''s'''", "it's'", dia);
+
+            assert!(!matches!(
+                &result.reason,
+                DetectionReason::SafelyEscapedUserInput
+            ));
+        }
     }
 }
