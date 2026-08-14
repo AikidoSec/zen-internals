@@ -90,15 +90,15 @@ pub fn detect_sql_injection_str(
             let userinput_occurrences = query.matches(&userinput).count();
 
             if escaped_userinput_occurrences == 1 && userinput_occurrences == 1 {
-                for token in tokens.iter() {
-                    if let SingleQuotedString(s) = token
-                        && *s == escaped_userinput
-                    {
-                        return SqlInjectionDetectionResult {
-                            detected: false,
-                            reason: DetectionReason::SafelyEscapedUserInput,
-                        };
-                    }
+                let is_safely_escaped = tokens
+                    .iter()
+                    .any(|token| matches!(token, SingleQuotedString(s) if *s == escaped_userinput));
+
+                if is_safely_escaped {
+                    return SqlInjectionDetectionResult {
+                        detected: false,
+                        reason: DetectionReason::SafelyEscapedUserInput,
+                    };
                 }
             }
         }
