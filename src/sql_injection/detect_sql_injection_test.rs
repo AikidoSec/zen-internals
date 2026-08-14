@@ -1,8 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::sql_injection::detect_sql_injection::{
-        detect_sql_injection_str, DetectionReason,
-    };
+    use crate::sql_injection::detect_sql_injection::{detect_sql_injection_str, DetectionReason};
 
     fn dialect(s: &str) -> i32 {
         match s {
@@ -1239,10 +1237,7 @@ mod tests {
 
             assert!(
                 !result.detected
-                    && matches!(
-                        &result.reason,
-                        DetectionReason::SafelyEscapedUserInput
-                    )
+                    && matches!(&result.reason, DetectionReason::SafelyEscapedUserInput)
             );
         }
     }
