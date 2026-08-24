@@ -1,7 +1,39 @@
 #[cfg(test)]
 mod tests {
     use crate::idor::idor_analyze_sql::idor_analyze_sql;
-    use crate::idor::sql_query_result::{FilterColumn, InsertColumn, SqlQueryResult, TableRef};
+    use crate::idor::sql_query_result::{
+        FilterColumn, InsertColumn, SetColumn, SqlQueryResult, TableRef, ValueType,
+    };
+
+    fn literal_set(table: &str, column: &str, value: &str) -> SetColumn {
+        SetColumn {
+            table: Some(table.into()),
+            column: column.into(),
+            value: value.into(),
+            placeholder_number: None,
+            value_type: ValueType::Literal,
+        }
+    }
+
+    fn placeholder_set(table: &str, column: &str, value: &str, number: Option<usize>) -> SetColumn {
+        SetColumn {
+            table: Some(table.into()),
+            column: column.into(),
+            value: value.into(),
+            placeholder_number: number,
+            value_type: ValueType::Placeholder,
+        }
+    }
+
+    fn unsupported_set(table: &str, column: &str, value: &str) -> SetColumn {
+        SetColumn {
+            table: Some(table.into()),
+            column: column.into(),
+            value: value.into(),
+            placeholder_number: None,
+            value_type: ValueType::Unsupported,
+        }
+    }
 
     #[test]
     fn test_simple_select() {
@@ -20,6 +52,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -52,6 +85,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -75,6 +109,7 @@ mod tests {
                     placeholder_number: Some(0),
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -120,6 +155,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -148,6 +184,36 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: Some(vec![SetColumn {
+                    table: Some("users".into()),
+                    column: "name".into(),
+                    value: "x".into(),
+                    placeholder_number: None,
+                    value_type: ValueType::Literal,
+                }]),
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_update_set_columns_with_quoted_identifiers_postgres() {
+        assert_eq!(
+            idor_analyze_sql("UPDATE \"users\" SET \"status\" = $1 WHERE \"id\" = $2", 9,).unwrap(),
+            vec![SqlQueryResult {
+                kind: "update".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "id".into(),
+                    value: "$2".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                set_columns: Some(vec![placeholder_set("users", "status", "$1", None)]),
                 insert_columns: None,
             }]
         );
@@ -176,6 +242,330 @@ mod tests {
                     placeholder_number: Some(2),
                     is_placeholder: true,
                 }],
+                set_columns: Some(vec![
+                    SetColumn {
+                        table: Some("users".into()),
+                        column: "name".into(),
+                        value: "?".into(),
+                        placeholder_number: Some(0),
+                        value_type: ValueType::Placeholder,
+                    },
+                    SetColumn {
+                        table: Some("users".into()),
+                        column: "tenant_id".into(),
+                        value: "?".into(),
+                        placeholder_number: Some(1),
+                        value_type: ValueType::Placeholder,
+                    },
+                ]),
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_update_set_columns_preserve_tenant_assignment_and_placeholder_offsets() {
+        assert_eq!(
+            idor_analyze_sql(
+                "UPDATE tickets t SET t.sys_group_id = ?, status = ? WHERE t.sys_group_id = ?",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "update".into(),
+                tables: vec![TableRef {
+                    name: "tickets".into(),
+                    alias: Some("t".into()),
+                }],
+                filters: vec![FilterColumn {
+                    table: Some("t".into()),
+                    column: "sys_group_id".into(),
+                    value: "?".into(),
+                    placeholder_number: Some(2),
+                    is_placeholder: true,
+                }],
+                set_columns: Some(vec![
+                    placeholder_set("t", "sys_group_id", "?", Some(0)),
+                    placeholder_set("t", "status", "?", Some(1)),
+                ]),
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_update_set_columns_serialize_value_type() {
+        let analysis = idor_analyze_sql(
+            "UPDATE tickets SET sys_group_id = 999 WHERE sys_group_id = ?",
+            8,
+        )
+        .unwrap();
+        let value = serde_json::to_value(analysis).unwrap();
+
+        assert_eq!(value[0]["set_columns"][0]["value_type"], "literal");
+    }
+
+    #[test]
+    fn test_update_set_columns_with_expressions_and_default_postgres() {
+        assert_eq!(
+            idor_analyze_sql(
+                "UPDATE weather SET temp_lo = temp_lo + 1, temp_hi = temp_lo + 15, prcp = DEFAULT WHERE city = 'San Francisco' AND date = '2003-07-03' RETURNING temp_lo AS lo, temp_hi AS hi, prcp",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "update".into(),
+                tables: vec![TableRef {
+                    name: "weather".into(),
+                    alias: None,
+                }],
+                filters: vec![
+                    FilterColumn {
+                        table: None,
+                        column: "city".into(),
+                        value: "San Francisco".into(),
+                        placeholder_number: None,
+                        is_placeholder: false,
+                    },
+                    FilterColumn {
+                        table: None,
+                        column: "date".into(),
+                        value: "2003-07-03".into(),
+                        placeholder_number: None,
+                        is_placeholder: false,
+                    },
+                ],
+                set_columns: Some(vec![
+                    unsupported_set("weather", "temp_lo", "temp_lo + 1"),
+                    unsupported_set("weather", "temp_hi", "temp_lo + 15"),
+                    unsupported_set("weather", "prcp", "DEFAULT"),
+                ]),
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_update_join_on_placeholder_counted_before_set_mysql() {
+        assert_eq!(
+            idor_analyze_sql(
+                "UPDATE tickets t JOIN accounts a ON t.account_id = a.id AND a.active = ? SET t.status = ? WHERE t.sys_group_id = ?",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "update".into(),
+                tables: vec![
+                    TableRef {
+                        name: "tickets".into(),
+                        alias: Some("t".into()),
+                    },
+                    TableRef {
+                        name: "accounts".into(),
+                        alias: Some("a".into()),
+                    },
+                ],
+                filters: vec![FilterColumn {
+                    table: Some("t".into()),
+                    column: "sys_group_id".into(),
+                    value: "?".into(),
+                    placeholder_number: Some(2),
+                    is_placeholder: true,
+                }],
+                set_columns: Some(vec![placeholder_set("t", "status", "?", Some(1))]),
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_update_tuple_assignment_pairs_values_with_columns_mysql() {
+        assert_eq!(
+            idor_analyze_sql(
+                "UPDATE users SET (tenant_id, status) = (?, ?) WHERE id = ?",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "update".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "id".into(),
+                    value: "?".into(),
+                    placeholder_number: Some(2),
+                    is_placeholder: true,
+                }],
+                set_columns: Some(vec![
+                    placeholder_set("users", "tenant_id", "?", Some(0)),
+                    placeholder_set("users", "status", "?", Some(1)),
+                ]),
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_update_tuple_assignment_from_subquery_postgres() {
+        assert_eq!(
+            idor_analyze_sql(
+                "UPDATE users SET (tenant_id, status) = (SELECT 42, 'active') WHERE id = $1",
+                9,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "update".into(),
+                    tables: vec![TableRef {
+                        name: "users".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "id".into(),
+                        value: "$1".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    }],
+                    set_columns: Some(vec![
+                        unsupported_set("users", "tenant_id", "(SELECT 42, 'active')"),
+                        unsupported_set("users", "status", "(SELECT 42, 'active')"),
+                    ]),
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![],
+                    filters: vec![],
+                    set_columns: None,
+                    insert_columns: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_update_schema_qualified_set_target_mysql() {
+        assert_eq!(
+            idor_analyze_sql(
+                "UPDATE public.users SET public.users.tenant_id = ? WHERE id = ?",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "update".into(),
+                tables: vec![TableRef {
+                    name: "public.users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "id".into(),
+                    value: "?".into(),
+                    placeholder_number: Some(1),
+                    is_placeholder: true,
+                }],
+                set_columns: Some(vec![placeholder_set(
+                    "public.users",
+                    "tenant_id",
+                    "?",
+                    Some(0),
+                )]),
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_update_parenthesized_set_values_mysql() {
+        assert_eq!(
+            idor_analyze_sql(
+                "UPDATE users SET tenant_id = (?), status = (3) WHERE id = ?",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "update".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "id".into(),
+                    value: "?".into(),
+                    placeholder_number: Some(1),
+                    is_placeholder: true,
+                }],
+                set_columns: Some(vec![
+                    placeholder_set("users", "tenant_id", "?", Some(0)),
+                    literal_set("users", "status", "3"),
+                ]),
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_update_one_column_tuple_assignment_mysql() {
+        assert_eq!(
+            idor_analyze_sql("UPDATE users SET (tenant_id) = ? WHERE id = ?", 8).unwrap(),
+            vec![SqlQueryResult {
+                kind: "update".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "id".into(),
+                    value: "?".into(),
+                    placeholder_number: Some(1),
+                    is_placeholder: true,
+                }],
+                set_columns: Some(vec![placeholder_set("users", "tenant_id", "?", Some(0),)]),
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_update_join_unqualified_set_column_not_attributed_to_wrong_table_mysql() {
+        assert_eq!(
+            idor_analyze_sql(
+                "UPDATE users u JOIN accounts a ON u.account_id = a.id SET tenant_id = ? WHERE a.status = ?",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "update".into(),
+                tables: vec![
+                    TableRef {
+                        name: "users".into(),
+                        alias: Some("u".into()),
+                    },
+                    TableRef {
+                        name: "accounts".into(),
+                        alias: Some("a".into()),
+                    },
+                ],
+                filters: vec![FilterColumn {
+                    table: Some("a".into()),
+                    column: "status".into(),
+                    value: "?".into(),
+                    placeholder_number: Some(1),
+                    is_placeholder: true,
+                }],
+                set_columns: Some(vec![SetColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "?".into(),
+                    placeholder_number: Some(0),
+                    value_type: ValueType::Placeholder,
+                }]),
                 insert_columns: None,
             }]
         );
@@ -192,6 +582,13 @@ mod tests {
                     alias: None,
                 }],
                 filters: vec![],
+                set_columns: Some(vec![SetColumn {
+                    table: Some("users".into()),
+                    column: "name".into(),
+                    value: "x".into(),
+                    placeholder_number: None,
+                    value_type: ValueType::Literal,
+                }]),
                 insert_columns: None,
             }]
         );
@@ -215,6 +612,13 @@ mod tests {
                     placeholder_number: Some(1),
                     is_placeholder: true,
                 }],
+                set_columns: Some(vec![SetColumn {
+                    table: Some("users".into()),
+                    column: "name".into(),
+                    value: "?".into(),
+                    placeholder_number: Some(0),
+                    value_type: ValueType::Placeholder,
+                }]),
                 insert_columns: None,
             }]
         );
@@ -238,6 +642,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -261,6 +666,7 @@ mod tests {
                     placeholder_number: Some(0),
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -277,6 +683,7 @@ mod tests {
                     alias: None,
                 }],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -293,6 +700,7 @@ mod tests {
                     alias: None,
                 }],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: Some(vec![vec![
                     InsertColumn {
                         column: "name".into(),
@@ -322,6 +730,7 @@ mod tests {
                     alias: None,
                 }],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: Some(vec![vec![
                     InsertColumn {
                         column: "name".into(),
@@ -351,6 +760,7 @@ mod tests {
                     alias: None,
                 }],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: Some(vec![vec![InsertColumn {
                     column: "name".into(),
                     value: "x".into(),
@@ -376,6 +786,7 @@ mod tests {
                     alias: None,
                 }],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: Some(vec![
                     vec![
                         InsertColumn {
@@ -425,6 +836,7 @@ mod tests {
                     alias: None,
                 }],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: Some(vec![vec![
                     InsertColumn {
                         column: "name".into(),
@@ -458,6 +870,7 @@ mod tests {
                     alias: None,
                 }],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: Some(vec![vec![
                     InsertColumn {
                         column: "name".into(),
@@ -498,6 +911,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -513,6 +927,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -541,6 +956,7 @@ mod tests {
                         placeholder_number: Some(0),
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -556,6 +972,7 @@ mod tests {
                         placeholder_number: Some(1),
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -584,6 +1001,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -599,6 +1017,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -614,6 +1033,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -642,6 +1062,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -651,6 +1072,7 @@ mod tests {
                         alias: None,
                     }],
                     filters: vec![],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -679,6 +1101,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -688,6 +1111,7 @@ mod tests {
                         alias: None,
                     }],
                     filters: vec![],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -722,6 +1146,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -743,6 +1168,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -771,6 +1197,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -786,6 +1213,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -814,6 +1242,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -829,6 +1258,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -862,6 +1292,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -889,6 +1320,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -898,6 +1330,7 @@ mod tests {
                         alias: None,
                     }],
                     filters: vec![],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -926,6 +1359,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -935,6 +1369,7 @@ mod tests {
                         alias: None,
                     }],
                     filters: vec![],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -963,6 +1398,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -978,6 +1414,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -1005,6 +1442,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -1032,6 +1470,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -1047,6 +1486,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -1056,6 +1496,7 @@ mod tests {
                         alias: None,
                     }],
                     filters: vec![],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -1084,6 +1525,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -1099,6 +1541,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -1146,6 +1589,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -1158,6 +1602,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: false,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -1186,6 +1631,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -1201,12 +1647,14 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
                     kind: "select".into(),
                     tables: vec![],
                     filters: vec![],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -1235,6 +1683,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -1250,6 +1699,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -1278,6 +1728,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -1290,12 +1741,14 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: false,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
                     kind: "select".into(),
                     tables: vec![],
                     filters: vec![],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -1324,6 +1777,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -1339,12 +1793,14 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
                     kind: "select".into(),
                     tables: vec![],
                     filters: vec![],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -1373,12 +1829,14 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
                     kind: "select".into(),
                     tables: vec![],
                     filters: vec![],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -1402,6 +1860,7 @@ mod tests {
                         alias: None,
                     }],
                     filters: vec![],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -1411,6 +1870,7 @@ mod tests {
                         alias: None,
                     }],
                     filters: vec![],
+                    set_columns: None,
                     insert_columns: Some(vec![vec![
                         InsertColumn {
                             column: "name".into(),
@@ -1470,6 +1930,7 @@ mod tests {
                             is_placeholder: true,
                         },
                     ],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -1485,6 +1946,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: Some(vec![literal_set("i", "status", "active")]),
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -1509,18 +1971,25 @@ mod tests {
                             is_placeholder: true,
                         },
                     ],
+                    set_columns: Some(vec![unsupported_set(
+                        "w",
+                        "item_id",
+                        "(SELECT id FROM selected)",
+                    )]),
                     insert_columns: None,
                 },
                 SqlQueryResult {
                     kind: "select".into(),
                     tables: vec![],
                     filters: vec![],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
                     kind: "select".into(),
                     tables: vec![],
                     filters: vec![],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -1543,6 +2012,7 @@ mod tests {
                         alias: None,
                     }],
                     filters: vec![],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -1555,6 +2025,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: false,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -1583,6 +2054,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -1592,6 +2064,7 @@ mod tests {
                         alias: Some("o".into()),
                     }],
                     filters: vec![],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -1620,12 +2093,14 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
                     kind: "select".into(),
                     tables: vec![],
                     filters: vec![],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -1648,6 +2123,7 @@ mod tests {
                         alias: None,
                     }],
                     filters: vec![],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -1663,6 +2139,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -1685,6 +2162,7 @@ mod tests {
                         alias: None,
                     }],
                     filters: vec![],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -1700,6 +2178,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -1717,6 +2196,7 @@ mod tests {
                     alias: None,
                 }],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -1733,6 +2213,7 @@ mod tests {
                     alias: None,
                 }],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -1759,6 +2240,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -1785,6 +2267,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -1801,6 +2284,7 @@ mod tests {
                     alias: None,
                 }],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -1817,6 +2301,7 @@ mod tests {
                     alias: None,
                 }],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -1837,6 +2322,7 @@ mod tests {
                     alias: None,
                 }],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -1863,6 +2349,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -1883,6 +2370,7 @@ mod tests {
                     alias: None,
                 }],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -1903,6 +2391,7 @@ mod tests {
                     alias: None,
                 }],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -1938,6 +2427,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -1958,6 +2448,7 @@ mod tests {
                     alias: None,
                 }],
                 filters: vec![],
+                set_columns: Some(vec![placeholder_set("users", "name", "$1", None)]),
                 insert_columns: None,
             }]
         );
@@ -1974,6 +2465,7 @@ mod tests {
                     alias: None,
                 }],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -2000,6 +2492,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: Some(vec![placeholder_set("users", "name", "$1", None)]),
                 insert_columns: None,
             }]
         );
@@ -2026,6 +2519,7 @@ mod tests {
                     placeholder_number: Some(2),
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -2073,6 +2567,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -2114,6 +2609,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -2175,6 +2671,7 @@ mod tests {
                             is_placeholder: false,
                         },
                     ],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -2212,6 +2709,7 @@ mod tests {
                             is_placeholder: false,
                         },
                     ],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -2252,6 +2750,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -2273,6 +2772,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -2296,6 +2796,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -2318,6 +2819,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -2354,6 +2856,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -2386,6 +2889,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: Some(vec![literal_set("orders", "status", "cancelled")]),
                 insert_columns: None,
             }]
         );
@@ -2413,6 +2917,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -2422,6 +2927,7 @@ mod tests {
                         alias: None,
                     }],
                     filters: vec![],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -2455,6 +2961,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -2487,6 +2994,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -2513,6 +3021,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -2539,6 +3048,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -2565,6 +3075,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -2591,6 +3102,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -2622,6 +3134,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -2654,6 +3167,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -2680,6 +3194,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -2700,6 +3215,7 @@ mod tests {
                     alias: None,
                 }],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: Some(vec![vec![
                     InsertColumn {
                         column: "name".into(),
@@ -2736,6 +3252,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: Some(vec![literal_set("public.users", "name", "x")]),
                 insert_columns: None,
             }]
         );
@@ -2758,6 +3275,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -2780,6 +3298,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -2802,6 +3321,7 @@ mod tests {
                     placeholder_number: Some(0),
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -2824,6 +3344,7 @@ mod tests {
                     placeholder_number: Some(0),
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -2846,6 +3367,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -2881,6 +3403,7 @@ mod tests {
                         is_placeholder: false,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -2916,6 +3439,7 @@ mod tests {
                         is_placeholder: false,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -2929,6 +3453,7 @@ mod tests {
                 kind: "select".into(),
                 tables: vec![],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -2942,6 +3467,7 @@ mod tests {
                 kind: "select".into(),
                 tables: vec![],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -2968,6 +3494,7 @@ mod tests {
                         alias: None,
                     }],
                     filters: vec![],
+                    set_columns: Some(vec![literal_set("orders", "status", "cancelled")]),
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -2983,6 +3510,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -3005,6 +3533,7 @@ mod tests {
                         alias: None,
                     }],
                     filters: vec![],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -3020,6 +3549,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -3041,6 +3571,7 @@ mod tests {
                     alias: None,
                 }],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: Some(vec![vec![
                     InsertColumn {
                         column: "name".into(),
@@ -3074,6 +3605,7 @@ mod tests {
                     alias: None,
                 }],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: Some(vec![
                     vec![
                         InsertColumn {
@@ -3129,6 +3661,11 @@ mod tests {
                     placeholder_number: Some(3),
                     is_placeholder: true,
                 }],
+                set_columns: Some(vec![
+                    placeholder_set("users", "name", "?", Some(0)),
+                    placeholder_set("users", "email", "?", Some(1)),
+                    placeholder_set("users", "status", "?", Some(2)),
+                ]),
                 insert_columns: None,
             }]
         );
@@ -3164,6 +3701,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: Some(vec![placeholder_set("users", "name", "?", Some(0))]),
                 insert_columns: None,
             }]
         );
@@ -3186,6 +3724,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -3208,6 +3747,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -3240,6 +3780,7 @@ mod tests {
                     placeholder_number: Some(0),
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -3262,6 +3803,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: false,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -3304,6 +3846,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -3326,6 +3869,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -3353,6 +3897,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -3368,6 +3913,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -3396,6 +3942,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -3411,6 +3958,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -3434,6 +3982,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: false,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -3469,6 +4018,7 @@ mod tests {
                         is_placeholder: false,
                     },
                 ],
+                set_columns: Some(vec![literal_set("users", "status", "inactive")]),
                 insert_columns: None,
             }]
         );
@@ -3504,6 +4054,7 @@ mod tests {
                         is_placeholder: false,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -3539,6 +4090,7 @@ mod tests {
                         is_placeholder: false,
                     },
                 ],
+                set_columns: Some(vec![literal_set("users", "status", "inactive")]),
                 insert_columns: None,
             }]
         );
@@ -3559,6 +4111,7 @@ mod tests {
                     alias: None,
                 }],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: Some(vec![vec![InsertColumn {
                     column: "name".into(),
                     value: "alice".into(),
@@ -3584,6 +4137,7 @@ mod tests {
                     alias: None,
                 }],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: Some(vec![
                     vec![
                         InsertColumn {
@@ -3645,6 +4199,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: false,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -3667,6 +4222,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: false,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -3689,6 +4245,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: false,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -3715,6 +4272,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -3741,6 +4299,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -3768,6 +4327,11 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: Some(vec![unsupported_set(
+                        "users",
+                        "score",
+                        "(SELECT AVG(score) FROM scores WHERE tenant_id = $1)",
+                    )]),
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -3783,6 +4347,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -3815,6 +4380,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -3847,6 +4413,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: false,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -3874,6 +4441,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -3889,6 +4457,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -3904,6 +4473,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -4110,6 +4680,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -4152,6 +4723,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -4178,6 +4750,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: Some(vec![placeholder_set("users", "name", ":name", None)]),
                 insert_columns: None,
             }]
         );
@@ -4200,6 +4773,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -4220,6 +4794,7 @@ mod tests {
                     alias: None,
                 }],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: Some(vec![vec![
                     InsertColumn {
                         column: "name".into(),
@@ -4255,6 +4830,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -4287,6 +4863,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -4309,6 +4886,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: false,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -4331,6 +4909,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -4353,6 +4932,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: false,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -4375,6 +4955,7 @@ mod tests {
                     placeholder_number: Some(0),
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -4397,6 +4978,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -4419,6 +5001,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: false,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -4435,6 +5018,7 @@ mod tests {
                     alias: None,
                 }],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: Some(vec![vec![
                     InsertColumn {
                         column: "name".into(),
@@ -4464,6 +5048,7 @@ mod tests {
                     alias: None,
                 }],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: Some(vec![vec![
                     InsertColumn {
                         column: "name".into(),
@@ -4497,6 +5082,7 @@ mod tests {
                     alias: None,
                 }],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: Some(vec![vec![
                     InsertColumn {
                         column: "name".into(),
@@ -4532,6 +5118,7 @@ mod tests {
                     placeholder_number: Some(0),
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -4567,6 +5154,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -4589,6 +5177,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -4611,6 +5200,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -4633,6 +5223,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -4653,6 +5244,7 @@ mod tests {
                     alias: None,
                 }],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: Some(vec![vec![
                     InsertColumn {
                         column: "name".into(),
@@ -4701,6 +5293,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -4727,6 +5320,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -4753,6 +5347,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -4775,6 +5370,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: false,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -4797,6 +5393,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: false,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -4819,6 +5416,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: false,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -4841,6 +5439,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: false,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -4863,6 +5462,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: false,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -4885,6 +5485,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: false,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -4907,6 +5508,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: false,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -4929,6 +5531,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: false,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -4951,6 +5554,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: false,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -4978,12 +5582,14 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
                     kind: "select".into(),
                     tables: vec![],
                     filters: vec![],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -5011,6 +5617,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -5037,6 +5644,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -5078,6 +5686,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 }],
                 "hint `{}` was not recognized as a table reference",
@@ -5106,6 +5715,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 }],
                 "hint `{}` was not recognized as a table reference",
@@ -5135,6 +5745,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -5162,12 +5773,14 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
                     kind: "select".into(),
                     tables: vec![],
                     filters: vec![],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -5204,12 +5817,14 @@ mod tests {
                             placeholder_number: None,
                             is_placeholder: false,
                         }],
+                        set_columns: None,
                         insert_columns: None,
                     },
                     SqlQueryResult {
                         kind: "select".into(),
                         tables: vec![],
                         filters: vec![],
+                        set_columns: None,
                         insert_columns: None,
                     },
                 ],
@@ -5245,6 +5860,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: false,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 }],
                 "deprecated hint syntax was not preserved as a real table in dialect {}",
@@ -5261,6 +5877,7 @@ mod tests {
                 kind: "select".into(),
                 tables: vec![],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -5287,6 +5904,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: Some(vec![unsupported_set("users", "name", "elem")]),
                 insert_columns: None,
             }]
         );
@@ -5313,6 +5931,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -5335,6 +5954,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: false,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -5378,6 +5998,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -5421,6 +6042,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -5463,6 +6085,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -5506,6 +6129,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -5539,6 +6163,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -5561,6 +6186,7 @@ mod tests {
                         alias: None,
                     }],
                     filters: vec![],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -5576,6 +6202,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -5620,6 +6247,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -5648,6 +6276,7 @@ mod tests {
                     },
                 ],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -5675,6 +6304,7 @@ mod tests {
                     },
                 ],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -5703,6 +6333,7 @@ mod tests {
                     },
                 ],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -5766,6 +6397,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -5822,6 +6454,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -5878,6 +6511,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -5921,6 +6555,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -5950,6 +6585,7 @@ mod tests {
                         },
                     ],
                     filters: vec![],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -5965,6 +6601,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -5990,6 +6627,7 @@ mod tests {
                         alias: Some("o".into()),
                     }],
                     filters: vec![],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -6005,6 +6643,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -6049,6 +6688,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: Some(vec![literal_set("requests", "status", "active")]),
                 insert_columns: None,
             }]
         );
@@ -6093,6 +6733,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -6161,6 +6802,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -6217,6 +6859,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -6273,6 +6916,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -6301,6 +6945,7 @@ mod tests {
                     },
                 ],
                 filters: vec![],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -6344,6 +6989,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -6373,6 +7019,7 @@ mod tests {
                         },
                     ],
                     filters: vec![],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -6388,6 +7035,7 @@ mod tests {
                         placeholder_number: None,
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -6432,6 +7080,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -6475,6 +7124,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -6509,6 +7159,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -6542,6 +7193,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -6585,6 +7237,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -6619,6 +7272,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -6653,6 +7307,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -6697,6 +7352,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -6742,6 +7398,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -6766,6 +7423,7 @@ mod tests {
                         alias: Some("u".into()),
                     }],
                     filters: vec![],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -6796,6 +7454,7 @@ mod tests {
                             is_placeholder: true,
                         },
                     ],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -6863,6 +7522,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -6906,6 +7566,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -6949,6 +7610,7 @@ mod tests {
                         is_placeholder: false,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -6992,6 +7654,7 @@ mod tests {
                         is_placeholder: false,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -7035,6 +7698,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -7079,6 +7743,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: Some(vec![literal_set("t1", "status", "active")]),
                 insert_columns: None,
             }]
         );
@@ -7126,6 +7791,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: Some(vec![literal_set("r", "status", "active")]),
                 insert_columns: None,
             }]
         );
@@ -7160,6 +7826,7 @@ mod tests {
                     placeholder_number: Some(0),
                     is_placeholder: true,
                 }],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -7195,6 +7862,7 @@ mod tests {
                     placeholder_number: Some(0),
                     is_placeholder: true,
                 }],
+                set_columns: Some(vec![literal_set("t1", "status", "active")]),
                 insert_columns: None,
             }]
         );
@@ -7238,6 +7906,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -7281,6 +7950,7 @@ mod tests {
                         is_placeholder: true,
                     },
                 ],
+                set_columns: None,
                 insert_columns: None,
             }]
         );
@@ -7319,6 +7989,7 @@ mod tests {
                     placeholder_number: None,
                     is_placeholder: true,
                 }],
+                set_columns: Some(vec![literal_set("r", "status", "active")]),
                 insert_columns: None,
             }]
         );
@@ -7345,6 +8016,7 @@ mod tests {
                     placeholder_number: Some(3),
                     is_placeholder: true,
                 }],
+                set_columns: Some(vec![placeholder_set("users", "name", "?", Some(0))]),
                 insert_columns: None,
             }]
         );
@@ -7372,6 +8044,7 @@ mod tests {
                         placeholder_number: Some(1),
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -7387,6 +8060,7 @@ mod tests {
                         placeholder_number: Some(0),
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
             ]
@@ -7415,6 +8089,7 @@ mod tests {
                         placeholder_number: Some(0),
                         is_placeholder: true,
                     }],
+                    set_columns: None,
                     insert_columns: None,
                 },
                 SqlQueryResult {
@@ -7424,6 +8099,7 @@ mod tests {
                         alias: None,
                     }],
                     filters: vec![],
+                    set_columns: None,
                     insert_columns: Some(vec![vec![
                         InsertColumn {
                             column: "a".into(),
@@ -7470,6 +8146,7 @@ mod tests {
                     placeholder_number: Some(2),
                     is_placeholder: true,
                 }],
+                set_columns: Some(vec![placeholder_set("u", "name", "?", Some(1))]),
                 insert_columns: None,
             }]
         );
