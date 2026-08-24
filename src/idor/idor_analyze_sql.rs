@@ -1,10 +1,12 @@
-use crate::idor::sql_query_result::{FilterColumn, InsertColumn, SqlQueryResult, TableRef};
+use crate::idor::sql_query_result::{
+    FilterColumn, InsertColumn, SetColumn, SqlQueryResult, TableRef, ValueType,
+};
 use crate::sql_injection::helpers::select_dialect_based_on_enum::select_dialect_based_on_enum;
 use core::ops::ControlFlow;
 use sqlparser::ast::{
-    BinaryOperator, Expr, FromTable, FunctionArg, FunctionArgExpr, JoinConstraint, JoinOperator,
-    ObjectName, ObjectNamePart, Query, SetExpr, Spanned, Statement, TableFactor, TableObject,
-    TableWithJoins, Value, ValueWithSpan, Visit, Visitor,
+    AssignmentTarget, BinaryOperator, Expr, FromTable, FunctionArg, FunctionArgExpr,
+    JoinConstraint, JoinOperator, ObjectName, ObjectNamePart, Query, SetExpr, Spanned, Statement,
+    TableFactor, TableObject, TableWithJoins, Value, ValueWithSpan, Visit, Visitor,
 };
 use sqlparser::parser::Parser;
 use sqlparser::tokenizer::{Location, Span, Token, Tokenizer};
@@ -17,6 +19,7 @@ use std::collections::HashSet;
 /// - `tables`: All tables referenced (with optional aliases)
 /// - `filters`: Equality filters extracted from WHERE clauses
 /// - `insert_columns`: For INSERT statements, the column-value pairs per row
+/// - `set_columns`: For UPDATE statements, the assigned column-value pairs
 ///
 /// # Filter Extraction
 ///
@@ -223,6 +226,7 @@ fn analyze_update(
     cte_names: &HashSet<String>,
 ) -> Result<(), String> {
     let mut tables = extract_tables_from_table_with_joins(table);
+    let update_clause_table_count = tables.len();
     if let Some(from_kind) = from {
         let from_tables = match from_kind {
             sqlparser::ast::UpdateTableFromKind::BeforeSet(twjs)
@@ -238,6 +242,15 @@ fn analyze_update(
 
     let assignment_exprs: Vec<&Expr> = assignments.iter().map(|a| &a.value).collect();
     let assignment_subqueries = extract_subqueries_from_exprs(&assignment_exprs);
+
+    let update_table = table_ref_from_factor(&table.relation);
+    // Do not infer a table for `SET status = ?` in `UPDATE orders JOIN users ...`.
+    let unqualified_target_table = if update_clause_table_count == 1 {
+        update_table.as_ref()
+    } else {
+        None
+    };
+    let set_columns = extract_set_columns(assignments, placeholders, unqualified_target_table);
 
     let (mut filters, mut col_col_pairs, subqueries) = match selection {
         Some(expr) => extract_filters_from_where(expr, placeholders),
@@ -265,6 +278,7 @@ fn analyze_update(
         tables,
         filters,
         insert_columns: None,
+        set_columns: Some(set_columns),
     });
 
     for subquery in assignment_subqueries {
@@ -323,6 +337,7 @@ fn analyze_delete(
         tables,
         filters,
         insert_columns: None,
+        set_columns: None,
     });
 
     for subquery in subqueries {
@@ -361,6 +376,7 @@ fn analyze_insert(
         tables: vec![table],
         filters: Vec::new(),
         insert_columns,
+        set_columns: None,
     });
 
     Ok(())
@@ -467,6 +483,7 @@ fn visit_select(
         tables: visitor.tables,
         filters,
         insert_columns: None,
+        set_columns: None,
     });
 
     for subquery in visitor.subqueries {
@@ -980,6 +997,146 @@ fn extract_subqueries_from_exprs(exprs: &[&Expr]) -> Vec<Query> {
         }
     }
     subqueries
+}
+
+/// `SET (name, email) = (?, ?)` is one assignment but produces two `SetColumn`s.
+fn extract_set_columns(
+    assignments: &[sqlparser::ast::Assignment],
+    placeholders: &PlaceholderPositions,
+    update_table: Option<&TableRef>,
+) -> Vec<SetColumn> {
+    assignments
+        .iter()
+        .flat_map(|assignment| set_columns_for_assignment(assignment, update_table, placeholders))
+        .collect()
+}
+
+fn set_columns_for_assignment(
+    assignment: &sqlparser::ast::Assignment,
+    update_table: Option<&TableRef>,
+    placeholders: &PlaceholderPositions,
+) -> Vec<SetColumn> {
+    match &assignment.target {
+        AssignmentTarget::ColumnName(name) => {
+            extract_assignment_target_from_name(name, update_table)
+                .map(|(table, column)| {
+                    set_column_from_assignment(table, column, &assignment.value, placeholders)
+                })
+                .into_iter()
+                .collect()
+        }
+        AssignmentTarget::Tuple(names) => {
+            set_columns_for_tuple(names, &assignment.value, update_table, placeholders)
+        }
+    }
+}
+
+fn set_columns_for_tuple(
+    names: &[ObjectName],
+    value: &Expr,
+    update_table: Option<&TableRef>,
+    placeholders: &PlaceholderPositions,
+) -> Vec<SetColumn> {
+    if let [name] = names {
+        return extract_assignment_target_from_name(name, update_table)
+            .map(|(table, column)| set_column_from_assignment(table, column, value, placeholders))
+            .into_iter()
+            .collect();
+    }
+
+    match value {
+        Expr::Tuple(values) if values.len() == names.len() => names
+            .iter()
+            .zip(values.iter())
+            .filter_map(|(name, value)| {
+                extract_assignment_target_from_name(name, update_table).map(|(table, column)| {
+                    set_column_from_assignment(table, column, value, placeholders)
+                })
+            })
+            .collect(),
+        _ => set_columns_for_unpaired_tuple(names, value, update_table),
+    }
+}
+
+/// `SET (name, email) = (SELECT ...)` cannot be split without running the SELECT.
+fn set_columns_for_unpaired_tuple(
+    names: &[ObjectName],
+    value: &Expr,
+    update_table: Option<&TableRef>,
+) -> Vec<SetColumn> {
+    let raw_value = value.to_string();
+    names
+        .iter()
+        .filter_map(|name| {
+            extract_assignment_target_from_name(name, update_table).map(|(table, column)| {
+                SetColumn {
+                    table,
+                    column,
+                    value: raw_value.clone(),
+                    placeholder_number: None,
+                    value_type: ValueType::Unsupported,
+                }
+            })
+        })
+        .collect()
+}
+
+/// `$1` and `:tenant_id` identify themselves; only `?` needs a numeric index.
+fn set_column_from_assignment(
+    table: Option<String>,
+    column: String,
+    assignment_value: &Expr,
+    placeholders: &PlaceholderPositions,
+) -> SetColumn {
+    let assignment_value = unwrap_nested_expr(assignment_value);
+    let value =
+        expr_to_value_string(assignment_value).unwrap_or_else(|| assignment_value.to_string());
+    let value_type = match assignment_value {
+        Expr::Value(ValueWithSpan {
+            value: Value::Placeholder(_),
+            ..
+        }) => ValueType::Placeholder,
+        Expr::Value(_) => ValueType::Literal,
+        _ => ValueType::Unsupported,
+    };
+
+    SetColumn {
+        table,
+        column,
+        value,
+        placeholder_number: placeholders.number_of(assignment_value),
+        value_type,
+    }
+}
+
+fn unwrap_nested_expr(mut expr: &Expr) -> &Expr {
+    while let Expr::Nested(inner) = expr {
+        expr = inner.as_ref();
+    }
+    expr
+}
+
+fn extract_assignment_target_from_name(
+    name: &ObjectName,
+    update_table: Option<&TableRef>,
+) -> Option<(Option<String>, String)> {
+    let identifiers = name
+        .0
+        .iter()
+        .filter_map(|part| match part {
+            ObjectNamePart::Identifier(ident) => Some(ident.value.as_str()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+
+    match identifiers.as_slice() {
+        [] => None,
+        [column] => Some((
+            update_table.map(|table| table.alias.clone().unwrap_or_else(|| table.name.clone())),
+            (*column).to_string(),
+        )),
+        [table_parts @ .., column] => Some((Some(table_parts.join(".")), (*column).to_string())),
+    }
 }
 
 fn table_ref_from_factor(factor: &TableFactor) -> Option<TableRef> {
