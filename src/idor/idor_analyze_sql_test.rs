@@ -7323,4 +7323,123 @@ mod tests {
             }]
         );
     }
+
+    #[test]
+    fn test_update_placeholder_in_where_in_list_not_skipped_mysql() {
+        assert_eq!(
+            idor_analyze_sql(
+                "UPDATE users SET name = ? WHERE id IN (?, ?) AND tenant_id = ?",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "update".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "?".into(),
+                    placeholder_number: Some(3),
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_subquery_placeholder_numbered_before_outer_placeholder_mysql() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM a WHERE id IN (SELECT id FROM b WHERE t = ?) AND x = ?",
+                8,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "a".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "x".into(),
+                        value: "?".into(),
+                        placeholder_number: Some(1),
+                        is_placeholder: true,
+                    }],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "b".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "t".into(),
+                        value: "?".into(),
+                        placeholder_number: Some(0),
+                        is_placeholder: true,
+                    }],
+                    insert_columns: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_insert_columns_numbered_after_earlier_cte_placeholder_mysql() {
+        assert_eq!(
+            idor_analyze_sql(
+                "WITH c AS (SELECT id FROM x WHERE q = ?) INSERT INTO t (a, b) VALUES (?, ?)",
+                8,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "x".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "q".into(),
+                        value: "?".into(),
+                        placeholder_number: Some(0),
+                        is_placeholder: true,
+                    }],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "insert".into(),
+                    tables: vec![TableRef {
+                        name: "t".into(),
+                        alias: None,
+                    }],
+                    filters: vec![],
+                    insert_columns: Some(vec![vec![
+                        InsertColumn {
+                            column: "a".into(),
+                            value: "?".into(),
+                            placeholder_number: Some(1),
+                            is_placeholder: true,
+                        },
+                        InsertColumn {
+                            column: "b".into(),
+                            value: "?".into(),
+                            placeholder_number: Some(2),
+                            is_placeholder: true,
+                        },
+                    ]]),
+                },
+            ]
+        );
+    }
 }
