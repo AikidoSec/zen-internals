@@ -5,8 +5,9 @@ use crate::sql_injection::helpers::select_dialect_based_on_enum::select_dialect_
 use core::ops::ControlFlow;
 use sqlparser::ast::{
     AssignmentTarget, BinaryOperator, Expr, FromTable, FunctionArg, FunctionArgExpr,
-    JoinConstraint, JoinOperator, ObjectName, ObjectNamePart, Query, SetExpr, Spanned, Statement,
-    TableFactor, TableObject, TableWithJoins, Value, ValueWithSpan, Visit, Visitor,
+    FunctionArguments, Ident, Insert, JoinConstraint, JoinOperator, ObjectName, ObjectNamePart,
+    OnConflictAction, OnInsert, Query, SetExpr, Spanned, Statement, TableFactor, TableObject,
+    TableWithJoins, Value, ValueWithSpan, Visit, Visitor,
 };
 use sqlparser::parser::Parser;
 use sqlparser::tokenizer::{Location, Span, Token, Tokenizer};
@@ -19,7 +20,8 @@ use std::collections::HashSet;
 /// - `tables`: All tables referenced (with optional aliases)
 /// - `filters`: Equality filters extracted from WHERE clauses
 /// - `insert_columns`: For INSERT statements, the column-value pairs per row
-/// - `set_columns`: For UPDATE statements, the assigned column-value pairs
+/// - `set_columns`: For UPDATE statements and INSERT conflict updates, the assigned
+///   column-value pairs
 ///
 /// # Filter Extraction
 ///
@@ -250,7 +252,8 @@ fn analyze_update(
     } else {
         None
     };
-    let set_columns = extract_set_columns(assignments, placeholders, unqualified_target_table);
+    let set_columns =
+        extract_set_columns(assignments, placeholders, unqualified_target_table, None);
 
     let (mut filters, mut col_col_pairs, subqueries) = match selection {
         Some(expr) => extract_filters_from_where(expr, placeholders),
@@ -363,6 +366,16 @@ fn analyze_insert(
     };
     let columns: Vec<&str> = insert.columns.iter().map(|c| c.value.as_str()).collect();
     let insert_columns = extract_insert_columns(&insert.source, &columns, placeholders);
+    let set_columns = extract_insert_set_columns(insert, placeholders, &table);
+    let assignment_subqueries = insert_update_assignments(insert)
+        .map(|assignments| {
+            let assignment_exprs: Vec<&Expr> = assignments
+                .iter()
+                .map(|assignment| &assignment.value)
+                .collect();
+            extract_subqueries_from_exprs(&assignment_exprs)
+        })
+        .unwrap_or_default();
 
     // For INSERT ... SELECT, analyze the SELECT source
     if insert_columns.is_none() {
@@ -376,8 +389,12 @@ fn analyze_insert(
         tables: vec![table],
         filters: Vec::new(),
         insert_columns,
-        set_columns: None,
+        set_columns,
     });
+
+    for subquery in assignment_subqueries {
+        analyze_query_with_ctes(&subquery, results, placeholders, cte_names)?;
+    }
 
     Ok(())
 }
@@ -989,44 +1006,109 @@ fn walk_expr(
     }
 }
 
-fn extract_subqueries_from_exprs(exprs: &[&Expr]) -> Vec<Query> {
-    let mut subqueries = Vec::new();
-    for expr in exprs {
-        if let Some(subquery) = extract_subquery(expr) {
-            subqueries.push(subquery.clone());
-        }
+struct AssignmentSubqueryVisitor {
+    subqueries: Vec<Query>,
+    query_depth: usize,
+}
+
+impl Visitor for AssignmentSubqueryVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, _query: &Query) -> ControlFlow<Self::Break> {
+        self.query_depth += 1;
+        ControlFlow::Continue(())
     }
-    subqueries
+
+    fn post_visit_query(&mut self, _query: &Query) -> ControlFlow<Self::Break> {
+        self.query_depth = self.query_depth.saturating_sub(1);
+        ControlFlow::Continue(())
+    }
+
+    fn pre_visit_expr(&mut self, expr: &Expr) -> ControlFlow<Self::Break> {
+        if self.query_depth == 0 {
+            if let Some(subquery) = extract_subquery(expr) {
+                self.subqueries.push(subquery.clone());
+            }
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+fn extract_subqueries_from_exprs(exprs: &[&Expr]) -> Vec<Query> {
+    let mut visitor = AssignmentSubqueryVisitor {
+        subqueries: Vec::new(),
+        query_depth: 0,
+    };
+    for expr in exprs {
+        let _ = expr.visit(&mut visitor);
+    }
+    visitor.subqueries
+}
+
+fn insert_update_assignments(insert: &Insert) -> Option<&[sqlparser::ast::Assignment]> {
+    match &insert.on {
+        Some(OnInsert::DuplicateKeyUpdate(assignments)) => Some(assignments),
+        Some(OnInsert::OnConflict(on_conflict)) => match &on_conflict.action {
+            OnConflictAction::DoUpdate(do_update) => Some(&do_update.assignments),
+            OnConflictAction::DoNothing => None,
+        },
+        _ => None,
+    }
+}
+
+fn extract_insert_set_columns(
+    insert: &Insert,
+    placeholders: &PlaceholderPositions,
+    target_table: &TableRef,
+) -> Option<Vec<SetColumn>> {
+    let assignments = insert_update_assignments(insert)?;
+
+    Some(extract_set_columns(
+        assignments,
+        placeholders,
+        Some(target_table),
+        Some(insert),
+    ))
 }
 
 /// `SET (name, email) = (?, ?)` is one assignment but produces two `SetColumn`s.
 fn extract_set_columns(
     assignments: &[sqlparser::ast::Assignment],
     placeholders: &PlaceholderPositions,
-    update_table: Option<&TableRef>,
+    target_table: Option<&TableRef>,
+    insert: Option<&Insert>,
 ) -> Vec<SetColumn> {
     assignments
         .iter()
-        .flat_map(|assignment| set_columns_for_assignment(assignment, update_table, placeholders))
+        .flat_map(|assignment| {
+            set_columns_for_assignment(assignment, target_table, placeholders, insert)
+        })
         .collect()
 }
 
 fn set_columns_for_assignment(
     assignment: &sqlparser::ast::Assignment,
-    update_table: Option<&TableRef>,
+    target_table: Option<&TableRef>,
     placeholders: &PlaceholderPositions,
+    insert: Option<&Insert>,
 ) -> Vec<SetColumn> {
     match &assignment.target {
         AssignmentTarget::ColumnName(name) => {
-            extract_assignment_target_from_name(name, update_table)
+            extract_assignment_target_from_name(name, target_table)
                 .map(|(table, column)| {
-                    set_column_from_assignment(table, column, &assignment.value, placeholders)
+                    set_column_from_assignment(
+                        table,
+                        column,
+                        &assignment.value,
+                        placeholders,
+                        insert,
+                    )
                 })
                 .into_iter()
                 .collect()
         }
         AssignmentTarget::Tuple(names) => {
-            set_columns_for_tuple(names, &assignment.value, update_table, placeholders)
+            set_columns_for_tuple(names, &assignment.value, target_table, placeholders, insert)
         }
     }
 }
@@ -1034,12 +1116,15 @@ fn set_columns_for_assignment(
 fn set_columns_for_tuple(
     names: &[ObjectName],
     value: &Expr,
-    update_table: Option<&TableRef>,
+    target_table: Option<&TableRef>,
     placeholders: &PlaceholderPositions,
+    insert: Option<&Insert>,
 ) -> Vec<SetColumn> {
     if let [name] = names {
-        return extract_assignment_target_from_name(name, update_table)
-            .map(|(table, column)| set_column_from_assignment(table, column, value, placeholders))
+        return extract_assignment_target_from_name(name, target_table)
+            .map(|(table, column)| {
+                set_column_from_assignment(table, column, value, placeholders, insert)
+            })
             .into_iter()
             .collect();
     }
@@ -1049,12 +1134,12 @@ fn set_columns_for_tuple(
             .iter()
             .zip(values.iter())
             .filter_map(|(name, value)| {
-                extract_assignment_target_from_name(name, update_table).map(|(table, column)| {
-                    set_column_from_assignment(table, column, value, placeholders)
+                extract_assignment_target_from_name(name, target_table).map(|(table, column)| {
+                    set_column_from_assignment(table, column, value, placeholders, insert)
                 })
             })
             .collect(),
-        _ => set_columns_for_unpaired_tuple(names, value, update_table),
+        _ => set_columns_for_unpaired_tuple(names, value, target_table),
     }
 }
 
@@ -1062,13 +1147,13 @@ fn set_columns_for_tuple(
 fn set_columns_for_unpaired_tuple(
     names: &[ObjectName],
     value: &Expr,
-    update_table: Option<&TableRef>,
+    target_table: Option<&TableRef>,
 ) -> Vec<SetColumn> {
     let raw_value = value.to_string();
     names
         .iter()
         .filter_map(|name| {
-            extract_assignment_target_from_name(name, update_table).map(|(table, column)| {
+            extract_assignment_target_from_name(name, target_table).map(|(table, column)| {
                 SetColumn {
                     table,
                     column,
@@ -1087,8 +1172,21 @@ fn set_column_from_assignment(
     column: String,
     assignment_value: &Expr,
     placeholders: &PlaceholderPositions,
+    insert: Option<&Insert>,
 ) -> SetColumn {
     let assignment_value = unwrap_nested_expr(assignment_value);
+    if let Some(insert_column) =
+        insert.and_then(|insert| insert_column_reference(assignment_value, insert))
+    {
+        return SetColumn {
+            table,
+            column,
+            value: insert_column,
+            placeholder_number: None,
+            value_type: ValueType::InsertColumnReference,
+        };
+    }
+
     let value =
         expr_to_value_string(assignment_value).unwrap_or_else(|| assignment_value.to_string());
     let value_type = match assignment_value {
@@ -1107,6 +1205,136 @@ fn set_column_from_assignment(
         placeholder_number: placeholders.number_of(assignment_value),
         value_type,
     }
+}
+
+fn insert_column_reference(expr: &Expr, insert: &Insert) -> Option<String> {
+    let source = insert.source.as_ref()?;
+    if !matches!(source.body.as_ref(), SetExpr::Values(_)) {
+        return None;
+    }
+
+    match &insert.on {
+        Some(OnInsert::OnConflict(_)) => excluded_column_reference(expr)
+            .and_then(|column| declared_insert_column(column, insert)),
+        Some(OnInsert::DuplicateKeyUpdate(_)) => values_column_reference(expr)
+            .and_then(|column| declared_insert_column(column, insert))
+            .or_else(|| insert_alias_column_reference(expr, insert)),
+        _ => None,
+    }
+}
+
+fn excluded_column_reference(expr: &Expr) -> Option<&Ident> {
+    qualified_column_reference(expr, "excluded")
+}
+
+fn values_column_reference(expr: &Expr) -> Option<&Ident> {
+    let Expr::Function(function) = expr else {
+        return None;
+    };
+    if !object_name_matches_unquoted(&function.name, "VALUES") {
+        return None;
+    }
+    let FunctionArguments::List(arguments) = &function.args else {
+        return None;
+    };
+    let [FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Identifier(column)))] =
+        arguments.args.as_slice()
+    else {
+        return None;
+    };
+
+    Some(column)
+}
+
+fn insert_alias_column_reference(expr: &Expr, insert: &Insert) -> Option<String> {
+    let insert_alias = insert.insert_alias.as_ref()?;
+    let column = match expr {
+        Expr::CompoundIdentifier(identifiers) => {
+            let [alias, column] = identifiers.as_slice() else {
+                return None;
+            };
+            if !object_name_matches_identifier(&insert_alias.row_alias, alias) {
+                return None;
+            }
+            column
+        }
+        Expr::Identifier(column)
+            if insert_alias
+                .col_aliases
+                .as_ref()
+                .is_some_and(|aliases| !aliases.is_empty()) =>
+        {
+            column
+        }
+        _ => return None,
+    };
+
+    match insert_alias.col_aliases.as_deref() {
+        Some(column_aliases) if !column_aliases.is_empty() => column_aliases
+            .iter()
+            .position(|column_alias| identifiers_match(column_alias, column))
+            .and_then(|index| insert.columns.get(index))
+            .map(|column| column.value.clone()),
+        _ => declared_insert_column(column, insert),
+    }
+}
+
+fn declared_insert_column(reference: &Ident, insert: &Insert) -> Option<String> {
+    insert
+        .columns
+        .iter()
+        .find(|column| identifiers_match(column, reference))
+        .map(|column| column.value.clone())
+}
+
+fn qualified_column_reference<'a>(expr: &'a Expr, qualifier: &str) -> Option<&'a Ident> {
+    let Expr::CompoundIdentifier(identifiers) = expr else {
+        return None;
+    };
+    let [prefix, column] = identifiers.as_slice() else {
+        return None;
+    };
+    identifier_matches_keyword(prefix, qualifier).then_some(column)
+}
+
+fn object_name_matches_unquoted(name: &ObjectName, expected: &str) -> bool {
+    matches!(
+        name.0.as_slice(),
+        [ObjectNamePart::Identifier(identifier)]
+            if identifier.quote_style.is_none() && identifier.value.eq_ignore_ascii_case(expected)
+    )
+}
+
+fn object_name_matches_identifier(name: &ObjectName, expected: &Ident) -> bool {
+    matches!(name.0.as_slice(), [ObjectNamePart::Identifier(identifier)] if identifiers_match(identifier, expected))
+}
+
+fn identifier_matches_keyword(identifier: &Ident, keyword: &str) -> bool {
+    match identifier.quote_style {
+        None => identifier.value.eq_ignore_ascii_case(keyword),
+        Some(_) => identifier.value == keyword,
+    }
+}
+
+fn identifiers_match(left: &Ident, right: &Ident) -> bool {
+    if left.quote_style == Some('`') || right.quote_style == Some('`') {
+        return left.value.eq_ignore_ascii_case(&right.value);
+    }
+
+    match (left.quote_style, right.quote_style) {
+        (None, None) => left.value.eq_ignore_ascii_case(&right.value),
+        (None, Some(_)) => unquoted_identifier_matches_quoted(&left.value, &right.value),
+        (Some(_), None) => unquoted_identifier_matches_quoted(&right.value, &left.value),
+        (Some(_), Some(_)) => left.value == right.value,
+    }
+}
+
+fn unquoted_identifier_matches_quoted(unquoted: &str, quoted: &str) -> bool {
+    unquoted.len() == quoted.len()
+        && unquoted
+            .bytes()
+            .zip(quoted.bytes())
+            .all(|(unquoted, quoted)| unquoted.to_ascii_lowercase() == quoted)
 }
 
 fn unwrap_nested_expr(mut expr: &Expr) -> &Expr {
