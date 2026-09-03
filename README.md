@@ -55,6 +55,8 @@ zen_internals.ip_matcher_create.argtypes = [ctypes.POINTER(IpMatcherByteSlice), 
 zen_internals.ip_matcher_create.restype = ctypes.c_void_p
 zen_internals.ip_matcher_has.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t]
 zen_internals.ip_matcher_has.restype = ctypes.c_int
+zen_internals.ip_matcher_memory_size.argtypes = [ctypes.c_void_p]
+zen_internals.ip_matcher_memory_size.restype = ctypes.c_size_t
 zen_internals.ip_matcher_free.argtypes = [ctypes.c_void_p]
 zen_internals.ip_matcher_free.restype = None
 
@@ -73,6 +75,7 @@ try:
     lookup_buffer = (ctypes.c_uint8 * len(lookup_bytes)).from_buffer_copy(lookup_bytes)
     result = zen_internals.ip_matcher_has(matcher, lookup_buffer, len(lookup_buffer))
     print(result)  # 1 = match, 0 = no match, 2 = error
+    print("Native memory:", zen_internals.ip_matcher_memory_size(matcher))
 finally:
     zen_internals.ip_matcher_free(matcher)
 ```
