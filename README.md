@@ -77,9 +77,12 @@ finally:
     zen_internals.ip_matcher_free(matcher)
 ```
 
-Invalid network strings are ignored. `ip_matcher_create` returns `NULL` if the input is malformed or exceeds 1,000,000 entries or 64 MiB.
+### Notes
 
-Call `ip_matcher_free` exactly once for each matcher. Lookups may run concurrently, but do not free the matcher until all lookups have finished.
+- Invalid network strings are ignored.
+- `ip_matcher_create` returns `NULL` for malformed input, more than 1,000,000 entries, or more than 64 MiB of input.
+- `ip_matcher_has` returns `1` for a match, `0` for no match, and `2` for invalid FFI input, including lookups longer than 128 bytes.
+- Call `ip_matcher_free` exactly once for each matcher. Lookups may run concurrently, but the matcher must remain alive until all lookups finish.
 
 ## Node.js bindings (using WASM)
 
