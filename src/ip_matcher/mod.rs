@@ -149,6 +149,10 @@ impl IpMatcher {
         }
     }
 
+    pub fn memory_size(&self) -> usize {
+        std::mem::size_of::<Self>() + self.sorted.capacity() * std::mem::size_of::<Network>()
+    }
+
     pub fn has(&self, network: &str) -> bool {
         if let Some(bytes) = parse_strict_ipv4_address(network) {
             return self.has_ipv4(&bytes);

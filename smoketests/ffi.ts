@@ -28,6 +28,10 @@ const lib = Deno.dlopen(fullTargetDir, {
         parameters: ["pointer", "buffer", "usize"],
         result: "i32",
     },
+    ip_matcher_memory_size: {
+        parameters: ["pointer"],
+        result: "usize",
+    },
     ip_matcher_free: {
         parameters: ["pointer"],
         result: "void",
@@ -360,6 +364,10 @@ if (ipMatcher === null) {
 }
 
 try {
+    if (lib.symbols.ip_matcher_memory_size(ipMatcher) <= 0n) {
+        throw new Error("IP matcher did not report its memory size");
+    }
+
     const ipv4Match = new TextEncoder().encode("10.2.3.4");
     assertEquals(
         lib.symbols.ip_matcher_has(ipMatcher, ipv4Match, BigInt(ipv4Match.length)),

@@ -12,6 +12,14 @@ fn assert_cases(networks: &[&str], cases: &[(&str, bool)]) {
 }
 
 #[test]
+fn memory_size_includes_network_storage() {
+    let empty = IpMatcher::new([] as [&str; 0]);
+    let matcher = IpMatcher::new(["192.0.2.1"]);
+
+    assert!(matcher.memory_size() > empty.memory_size());
+}
+
+#[test]
 fn check_with_single_ipv4s() {
     assert_cases(
         &[
