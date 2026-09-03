@@ -84,6 +84,23 @@ unsafe fn create_matcher(
     Ok(IpMatcher::new(network_strings))
 }
 
+/// Returns the number of bytes allocated by a matcher, or zero for an invalid handle or panic.
+///
+/// # Safety
+///
+/// `handle` must be null or a live pointer returned by `ip_matcher_create`.
+#[no_mangle]
+pub unsafe extern "C" fn ip_matcher_memory_size(handle: *const IpMatcherHandle) -> usize {
+    panic::catch_unwind(|| {
+        if handle.is_null() {
+            0
+        } else {
+            unsafe { &*handle }.matcher.memory_size()
+        }
+    })
+    .unwrap_or(0)
+}
+
 /// Returns `1` for a match, `0` for no match, and `2` for invalid FFI input or a caught panic.
 ///
 /// # Safety
@@ -163,6 +180,7 @@ mod tests {
 
         let handle = unsafe { ip_matcher_create(descriptors.as_ptr(), descriptors.len()) };
         assert!(!handle.is_null());
+        assert!(unsafe { ip_matcher_memory_size(handle) } > 0);
         assert_eq!(unsafe { has(handle, b"10.255.255.255") }, MATCH);
         assert_eq!(unsafe { has(handle, b"[2001:db8::1]") }, MATCH);
         assert_eq!(unsafe { has(handle, b"192.0.2.1") }, NO_MATCH);
@@ -172,6 +190,7 @@ mod tests {
 
     #[test]
     fn creation_rejects_structural_errors_and_limits() {
+        assert_eq!(unsafe { ip_matcher_memory_size(ptr::null()) }, 0);
         assert!(unsafe { ip_matcher_create(ptr::null(), 1) }.is_null());
         assert!(unsafe { ip_matcher_create(ptr::null(), MAX_NETWORKS + 1) }.is_null());
 
