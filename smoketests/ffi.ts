@@ -20,6 +20,18 @@ const lib = Deno.dlopen(fullTargetDir, {
         parameters: ["pointer"],
         result: "void",
     },
+    ip_matcher_create: {
+        parameters: ["buffer", "usize"],
+        result: "pointer",
+    },
+    ip_matcher_has: {
+        parameters: ["pointer", "buffer", "usize"],
+        result: "i32",
+    },
+    ip_matcher_free: {
+        parameters: ["pointer"],
+        result: "void",
+    },
 });
 
 function getBufferAndLength(str: string): [Deno.PointerValue, number] {
@@ -302,5 +314,71 @@ assertEquals(
     callIdorAnalyzeSql("COMMIT", 9),
     []
 );
+
+function encodeIpMatcherInput(networks: string[]): Uint8Array {
+    const encodedNetworks = networks.map((network) =>
+        new TextEncoder().encode(network)
+    );
+    const descriptorBytes = networks.length * 2 * BigUint64Array.BYTES_PER_ELEMENT;
+    const input = new Uint8Array(
+        descriptorBytes +
+            encodedNetworks.reduce((size, network) => size + network.length, 0)
+    );
+    const descriptors = new BigUint64Array(
+        input.buffer,
+        input.byteOffset,
+        networks.length * 2
+    );
+    const inputPointer = Deno.UnsafePointer.of(input);
+    if (inputPointer === null) {
+        throw new Error("Failed to allocate IP matcher input");
+    }
+
+    let networkOffset = descriptorBytes;
+    for (const [index, network] of encodedNetworks.entries()) {
+        input.set(network, networkOffset);
+        const networkPointer = Deno.UnsafePointer.offset(
+            inputPointer,
+            networkOffset
+        );
+        descriptors[index * 2] = Deno.UnsafePointer.value(networkPointer);
+        descriptors[index * 2 + 1] = BigInt(network.length);
+        networkOffset += network.length;
+    }
+
+    return input;
+}
+
+const ipMatcherNetworks = ["10.0.0.0/8", "2001:db8::/32"];
+const ipMatcherInput = encodeIpMatcherInput(ipMatcherNetworks);
+const ipMatcher = lib.symbols.ip_matcher_create(
+    ipMatcherInput,
+    BigInt(ipMatcherNetworks.length)
+);
+if (ipMatcher === null) {
+    throw new Error("Failed to create IP matcher");
+}
+
+try {
+    const ipv4Match = new TextEncoder().encode("10.2.3.4");
+    assertEquals(
+        lib.symbols.ip_matcher_has(ipMatcher, ipv4Match, BigInt(ipv4Match.length)),
+        1
+    );
+
+    const ipv6Match = new TextEncoder().encode("2001:db8::1");
+    assertEquals(
+        lib.symbols.ip_matcher_has(ipMatcher, ipv6Match, BigInt(ipv6Match.length)),
+        1
+    );
+
+    const noMatch = new TextEncoder().encode("192.0.2.1");
+    assertEquals(
+        lib.symbols.ip_matcher_has(ipMatcher, noMatch, BigInt(noMatch.length)),
+        0
+    );
+} finally {
+    lib.symbols.ip_matcher_free(ipMatcher);
+}
 
 lib.close();
