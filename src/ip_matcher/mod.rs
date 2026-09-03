@@ -1,3 +1,6 @@
+// Exact port of firewall-node's core matcher, including its parsing behavior.
+// Based on https://github.com/demskie/netparser (MIT, Copyright (c) 2019 alex).
+
 use std::cmp::Ordering;
 
 const IPV4_BYTES: u8 = 4;

@@ -6,6 +6,7 @@ use std::str;
 
 const MAX_NETWORKS: usize = 1_000_000;
 const MAX_INPUT_BYTES: usize = 64 * 1024 * 1024;
+const MAX_LOOKUP_BYTES: usize = 128;
 const NO_MATCH: c_int = 0;
 const MATCH: c_int = 1;
 const ERROR: c_int = 2;
@@ -21,20 +22,16 @@ pub struct IpMatcherHandle {
     matcher: IpMatcher,
 }
 
-/// Builds an immutable IP matcher and transfers ownership of its opaque handle to the caller.
+/// Creates an immutable matcher. Invalid network strings are ignored.
 ///
-/// Returns null when the descriptor array is malformed, an input is not UTF-8, a limit is
-/// exceeded, or construction panics. Syntactically invalid individual IP networks are ignored.
+/// Returns null for invalid FFI input, exceeded limits, or a caught panic.
 ///
 /// # Safety
 ///
-/// When `network_count` is nonzero and no greater than 1,000,000, `networks` must point to
-/// `network_count` contiguous, initialized, properly aligned `IpMatcherByteSlice` values that
-/// remain unchanged for this call. For inputs whose declared total is no greater than 64 MiB,
-/// every non-null slice pointer must point to `len` contiguous, initialized bytes that remain
-/// unchanged for this call. Each pointed-to range must fit in a Rust slice and may be null only
-/// when `len` is zero. The descriptor array and each byte range must each lie within one allocated
-/// object. The returned handle must eventually be passed exactly once to `ip_matcher_free`.
+/// For `network_count` in `1..=1_000_000`, `networks` must reference that many aligned,
+/// initialized descriptors. Each nonempty descriptor must reference `len` contiguous,
+/// initialized bytes. All referenced memory must remain valid and unchanged for this call.
+/// Free a non-null result exactly once with `ip_matcher_free`.
 #[no_mangle]
 pub unsafe extern "C" fn ip_matcher_create(
     networks: *const IpMatcherByteSlice,
@@ -87,18 +84,13 @@ unsafe fn create_matcher(
     Ok(IpMatcher::new(network_strings))
 }
 
-/// Tests one UTF-8 IP address or network against an opaque matcher.
-///
-/// Returns `1` for a match, `0` for no match or invalid IP syntax, and `2` for an invalid handle,
-/// malformed byte slice, invalid UTF-8, or a caught panic.
+/// Returns `1` for a match, `0` for no match, and `2` for invalid FFI input or a caught panic.
 ///
 /// # Safety
 ///
-/// `handle` must be a live pointer returned by `ip_matcher_create` and must remain live for this
-/// call. Concurrent lookups are allowed, but `ip_matcher_free` must not run concurrently. When
-/// `network_len` is nonzero, `network` must point to `network_len` contiguous, initialized bytes
-/// in one allocated object, the range must fit in a Rust slice, and the bytes must remain unchanged
-/// for this call. `network` may be null only when `network_len` is zero.
+/// `handle` must remain live for this call. Concurrent lookups are allowed, but freeing the handle
+/// concurrently is not. For `network_len` in `1..=128`, `network` must reference that many
+/// contiguous, initialized bytes that remain valid and unchanged for this call.
 #[no_mangle]
 pub unsafe extern "C" fn ip_matcher_has(
     handle: *const IpMatcherHandle,
@@ -106,7 +98,10 @@ pub unsafe extern "C" fn ip_matcher_has(
     network_len: usize,
 ) -> c_int {
     panic::catch_unwind(|| {
-        if handle.is_null() || (network_len > 0 && network.is_null()) {
+        if handle.is_null()
+            || network_len > MAX_LOOKUP_BYTES
+            || (network_len > 0 && network.is_null())
+        {
             return ERROR;
         }
 
@@ -209,6 +204,9 @@ mod tests {
         assert_eq!(unsafe { ip_matcher_has(handle, ptr::null(), 1) }, ERROR);
         assert_eq!(unsafe { has(handle, &[0xc3, 0x28]) }, ERROR);
         assert_eq!(unsafe { has(handle, b"not-an-address") }, NO_MATCH);
+
+        let oversized = vec![b'0'; MAX_LOOKUP_BYTES + 1];
+        assert_eq!(unsafe { has(handle, &oversized) }, ERROR);
         unsafe { ip_matcher_free(handle) };
     }
 }
