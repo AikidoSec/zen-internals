@@ -1,0 +1,60 @@
+name: ☕ JVM WASM Compilation
+
+on:
+  workflow_call: {}
+  push: {}
+
+permissions:
+  contents: read
+
+env:
+  CHICORY_VERSION: 1.7.5
+  CHICORY_COMPILER_SHA256: ff2c00c6b9d5bb451b0d34e224c7d54985b8271b84cf0b8c52dd994ad0dcf86d
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Set up Rust
+        run: |
+          rustup toolchain install stable
+          rustup default stable
+          rustup target add wasm32-unknown-unknown
+
+      - name: Set up Java
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - name: Install Binaryen
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y binaryen
+
+      - name: Build WASM
+        run: ./scripts/build-wasm.sh
+
+      - name: Install Chicory compiler
+        run: |
+          curl --fail --location --silent --show-error \
+            --output /tmp/chicory-compiler \
+            "https://maven-central.storage-download.googleapis.com/maven2/com/dylibso/chicory/build-time-compiler-cli-experimental/${CHICORY_VERSION}/build-time-compiler-cli-experimental-${CHICORY_VERSION}.sh"
+          echo "${CHICORY_COMPILER_SHA256}  /tmp/chicory-compiler" | sha256sum --check
+          chmod +x /tmp/chicory-compiler
+
+      - name: Compile WASM to JVM bytecode
+        run: |
+          mkdir -p target/chicory/{sources,classes,wasm}
+          /tmp/chicory-compiler target/wasm32-unknown-unknown/release/zen_internals.wasm \
+            --prefix dev.aikido.zeninternals.ZenInternals \
+            --source-dir target/chicory/sources \
+            --class-dir target/chicory/classes \
+            --wasm-dir target/chicory/wasm \
+            --interpreter-fallback FAIL
