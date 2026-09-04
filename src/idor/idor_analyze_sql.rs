@@ -3,10 +3,11 @@ use crate::sql_injection::helpers::select_dialect_based_on_enum::select_dialect_
 use core::ops::ControlFlow;
 use sqlparser::ast::{
     BinaryOperator, Expr, FromTable, FunctionArg, FunctionArgExpr, JoinConstraint, JoinOperator,
-    ObjectName, ObjectNamePart, Query, SetExpr, Statement, TableFactor, TableObject,
+    ObjectName, ObjectNamePart, Query, SetExpr, Spanned, Statement, TableFactor, TableObject,
     TableWithJoins, Value, ValueWithSpan, Visit, Visitor,
 };
 use sqlparser::parser::Parser;
+use sqlparser::tokenizer::{Location, Span, Token, Tokenizer};
 use std::collections::HashSet;
 
 /// Analyzes a SQL query for IDOR (Insecure Direct Object Reference) protection.
@@ -43,36 +44,91 @@ use std::collections::HashSet;
 /// statements, placeholders in SET assignments are counted first, so WHERE placeholders
 /// have correct offsets.
 pub fn idor_analyze_sql(query: &str, dialect: i32) -> Result<Vec<SqlQueryResult>, String> {
-    let statements = parse_sql(query, dialect)?;
+    let (statements, placeholder_starts) = parse_sql(query, dialect)?;
     let mut results = Vec::new();
 
     for stmt in &statements {
-        analyze_statement(stmt, &mut results)?;
+        let placeholders = PlaceholderPositions::of_statement(stmt, &placeholder_starts);
+        analyze_statement(stmt, &mut results, &placeholders)?;
     }
 
     Ok(results)
 }
 
-fn parse_sql(query: &str, dialect: i32) -> Result<Vec<Statement>, String> {
+/// Uses tokenizer locations instead of AST traversal. In `MATCH (...) AGAINST (?)`, sqlparser
+/// stores the `?` in the `match_value` field of `Expr::MatchAgainst`. That field is a `Value`
+/// without a source span, while the corresponding token retains its source location.
+///
+/// For queries containing multiple statements, placeholder numbering starts at zero for each
+/// statement.
+struct PlaceholderPositions {
+    starts: Vec<Location>,
+}
+
+impl PlaceholderPositions {
+    fn of_statement(stmt: &Statement, placeholder_starts: &[Location]) -> Self {
+        let span = stmt.span();
+        let starts = placeholder_starts
+            .iter()
+            .copied()
+            .filter(|start| span.start <= *start && *start <= span.end)
+            .collect();
+
+        Self { starts }
+    }
+
+    fn number_of(&self, expr: &Expr) -> Option<usize> {
+        let span = mysql_placeholder_span(expr)?;
+        self.starts.binary_search(&span.start).ok()
+    }
+}
+
+fn mysql_placeholder_span(expr: &Expr) -> Option<Span> {
+    match expr {
+        Expr::Value(ValueWithSpan {
+            value: Value::Placeholder(p),
+            span,
+        }) if p == "?" => Some(*span),
+        _ => None,
+    }
+}
+
+fn parse_sql(query: &str, dialect: i32) -> Result<(Vec<Statement>, Vec<Location>), String> {
     if query.trim().is_empty() {
         return Err("Empty query".to_string());
     }
 
     let dialect = select_dialect_based_on_enum(dialect);
-    let statements = Parser::parse_sql(&*dialect, query).map_err(|e| e.to_string())?;
+    let tokens = Tokenizer::new(&*dialect, query)
+        .tokenize_with_location()
+        .map_err(|e| e.to_string())?;
+    let placeholder_starts = tokens
+        .iter()
+        .filter_map(|token| match &token.token {
+            Token::Placeholder(placeholder) if placeholder == "?" => Some(token.span.start),
+            _ => None,
+        })
+        .collect();
+    let statements = Parser::new(&*dialect)
+        .with_tokens_with_locations(tokens)
+        .parse_statements()
+        .map_err(|e| e.to_string())?;
 
     if statements.is_empty() {
         return Err("No SQL statements found".to_string());
     }
 
-    Ok(statements)
+    Ok((statements, placeholder_starts))
 }
 
-fn analyze_statement(stmt: &Statement, results: &mut Vec<SqlQueryResult>) -> Result<(), String> {
+fn analyze_statement(
+    stmt: &Statement,
+    results: &mut Vec<SqlQueryResult>,
+    placeholders: &PlaceholderPositions,
+) -> Result<(), String> {
     match stmt {
         Statement::Query(query) => {
-            let mut counter = 0;
-            analyze_query(query, results, &mut counter)?;
+            analyze_query(query, results, placeholders)?;
         }
         Statement::Update(update) => {
             analyze_update(
@@ -81,15 +137,15 @@ fn analyze_statement(stmt: &Statement, results: &mut Vec<SqlQueryResult>) -> Res
                 update.from.as_ref(),
                 update.selection.as_ref(),
                 results,
-                &mut 0,
+                placeholders,
                 &HashSet::new(),
             )?;
         }
         Statement::Delete(delete) => {
-            analyze_delete(delete, results, &mut 0, &HashSet::new())?;
+            analyze_delete(delete, results, placeholders, &HashSet::new())?;
         }
         Statement::Insert(insert) => {
-            analyze_insert(insert, results, &mut 0, &HashSet::new())?;
+            analyze_insert(insert, results, placeholders, &HashSet::new())?;
         }
         Statement::Commit { .. }
         | Statement::Rollback { .. }
@@ -142,7 +198,7 @@ fn analyze_update(
     from: Option<&sqlparser::ast::UpdateTableFromKind>,
     selection: Option<&Expr>,
     results: &mut Vec<SqlQueryResult>,
-    counter: &mut usize,
+    placeholders: &PlaceholderPositions,
     cte_names: &HashSet<String>,
 ) -> Result<(), String> {
     let mut tables = extract_tables_from_table_with_joins(table);
@@ -161,10 +217,9 @@ fn analyze_update(
 
     let assignment_exprs: Vec<&Expr> = assignments.iter().map(|a| &a.value).collect();
     let assignment_subqueries = extract_subqueries_from_exprs(&assignment_exprs);
-    *counter += count_placeholders_in_exprs(&assignment_exprs);
 
     let (mut filters, mut col_col_pairs, subqueries) = match selection {
-        Some(expr) => extract_filters_from_where(expr, counter),
+        Some(expr) => extract_filters_from_where(expr, placeholders),
         None => (Vec::new(), Vec::new(), Vec::new()),
     };
 
@@ -192,11 +247,11 @@ fn analyze_update(
     });
 
     for subquery in assignment_subqueries {
-        analyze_query_with_ctes(&subquery, results, counter, cte_names)?;
+        analyze_query_with_ctes(&subquery, results, placeholders, cte_names)?;
     }
 
     for subquery in subqueries {
-        analyze_query_with_ctes(&subquery, results, counter, cte_names)?;
+        analyze_query_with_ctes(&subquery, results, placeholders, cte_names)?;
     }
 
     Ok(())
@@ -205,7 +260,7 @@ fn analyze_update(
 fn analyze_delete(
     delete: &sqlparser::ast::Delete,
     results: &mut Vec<SqlQueryResult>,
-    counter: &mut usize,
+    placeholders: &PlaceholderPositions,
     cte_names: &HashSet<String>,
 ) -> Result<(), String> {
     let mut tables: Vec<TableRef> = match &delete.from {
@@ -225,7 +280,7 @@ fn analyze_delete(
     tables.retain(|t| !cte_names.contains(&t.name.to_lowercase()));
 
     let (mut filters, mut col_col_pairs, subqueries) = match &delete.selection {
-        Some(expr) => extract_filters_from_where(expr, counter),
+        Some(expr) => extract_filters_from_where(expr, placeholders),
         None => (Vec::new(), Vec::new(), Vec::new()),
     };
 
@@ -250,7 +305,7 @@ fn analyze_delete(
     });
 
     for subquery in subqueries {
-        analyze_query_with_ctes(&subquery, results, counter, cte_names)?;
+        analyze_query_with_ctes(&subquery, results, placeholders, cte_names)?;
     }
 
     Ok(())
@@ -259,7 +314,7 @@ fn analyze_delete(
 fn analyze_insert(
     insert: &sqlparser::ast::Insert,
     results: &mut Vec<SqlQueryResult>,
-    counter: &mut usize,
+    placeholders: &PlaceholderPositions,
     cte_names: &HashSet<String>,
 ) -> Result<(), String> {
     let table_name = match &insert.table {
@@ -271,12 +326,12 @@ fn analyze_insert(
         alias: insert.table_alias.as_ref().map(|a| a.value.clone()),
     };
     let columns: Vec<&str> = insert.columns.iter().map(|c| c.value.as_str()).collect();
-    let insert_columns = extract_insert_columns(&insert.source, &columns);
+    let insert_columns = extract_insert_columns(&insert.source, &columns, placeholders);
 
     // For INSERT ... SELECT, analyze the SELECT source
     if insert_columns.is_none() {
         if let Some(source) = &insert.source {
-            analyze_query_with_ctes(source, results, counter, cte_names)?;
+            analyze_query_with_ctes(source, results, placeholders, cte_names)?;
         }
     }
 
@@ -300,15 +355,15 @@ fn analyze_insert(
 fn analyze_query(
     query: &Query,
     results: &mut Vec<SqlQueryResult>,
-    counter: &mut usize,
+    placeholders: &PlaceholderPositions,
 ) -> Result<(), String> {
-    analyze_query_with_ctes(query, results, counter, &HashSet::new())
+    analyze_query_with_ctes(query, results, placeholders, &HashSet::new())
 }
 
 fn analyze_query_with_ctes(
     query: &Query,
     results: &mut Vec<SqlQueryResult>,
-    counter: &mut usize,
+    placeholders: &PlaceholderPositions,
     parent_cte_names: &HashSet<String>,
 ) -> Result<(), String> {
     let mut cte_names = parent_cte_names.clone();
@@ -321,27 +376,27 @@ fn analyze_query_with_ctes(
 
         // Second pass: analyze each common table expression's body
         for cte in &with.cte_tables {
-            analyze_query_with_ctes(&cte.query, results, counter, &cte_names)?;
+            analyze_query_with_ctes(&cte.query, results, placeholders, &cte_names)?;
         }
     }
 
-    analyze_set_expr(&query.body, results, counter, &cte_names)
+    analyze_set_expr(&query.body, results, placeholders, &cte_names)
 }
 
 fn analyze_set_expr(
     set_expr: &SetExpr,
     results: &mut Vec<SqlQueryResult>,
-    counter: &mut usize,
+    placeholders: &PlaceholderPositions,
     cte_names: &HashSet<String>,
 ) -> Result<(), String> {
     match set_expr {
         SetExpr::SetOperation { left, right, .. } => {
-            analyze_set_expr(left, results, counter, cte_names)?;
-            analyze_set_expr(right, results, counter, cte_names)?;
+            analyze_set_expr(left, results, placeholders, cte_names)?;
+            analyze_set_expr(right, results, placeholders, cte_names)?;
         }
         SetExpr::Query(query) => {
             // Nested query may have its own common table expressions
-            analyze_query_with_ctes(query, results, counter, cte_names)?;
+            analyze_query_with_ctes(query, results, placeholders, cte_names)?;
         }
         SetExpr::Update(stmt) => {
             if let Statement::Update(update) = stmt {
@@ -351,18 +406,18 @@ fn analyze_set_expr(
                     update.from.as_ref(),
                     update.selection.as_ref(),
                     results,
-                    counter,
+                    placeholders,
                     cte_names,
                 )?;
             }
         }
         SetExpr::Insert(stmt) => {
             if let Statement::Insert(insert) = stmt {
-                analyze_insert(insert, results, counter, cte_names)?;
+                analyze_insert(insert, results, placeholders, cte_names)?;
             }
         }
         _ => {
-            visit_select(set_expr, results, counter, cte_names)?;
+            visit_select(set_expr, results, placeholders, cte_names)?;
         }
     }
     Ok(())
@@ -371,12 +426,11 @@ fn analyze_set_expr(
 fn visit_select(
     set_expr: &SetExpr,
     results: &mut Vec<SqlQueryResult>,
-    counter: &mut usize,
+    placeholders: &PlaceholderPositions,
     cte_names: &HashSet<String>,
 ) -> Result<(), String> {
-    let mut visitor = SelectVisitor::new(*counter, cte_names.clone());
+    let mut visitor = SelectVisitor::new(placeholders, cte_names.clone());
     let _ = set_expr.visit(&mut visitor);
-    *counter = visitor.placeholder_counter;
 
     let mut filters = visitor.filters;
     if visitor.potential_col_col {
@@ -395,15 +449,15 @@ fn visit_select(
     });
 
     for subquery in visitor.subqueries {
-        analyze_query_with_ctes(&subquery, results, counter, cte_names)?;
+        analyze_query_with_ctes(&subquery, results, placeholders, cte_names)?;
     }
     Ok(())
 }
 
-struct SelectVisitor {
+struct SelectVisitor<'a> {
     tables: Vec<TableRef>,
     filters: Vec<FilterColumn>,
-    placeholder_counter: usize,
+    placeholders: &'a PlaceholderPositions,
     subqueries: Vec<Query>,
     /// Tracks nesting depth inside subqueries. When > 0, we skip collecting tables/filters
     /// because the Visitor walks into subquery children automatically, but we want to
@@ -421,12 +475,12 @@ struct SelectVisitor {
     potential_col_col: bool,
 }
 
-impl SelectVisitor {
-    fn new(initial_placeholder_count: usize, cte_names: HashSet<String>) -> Self {
+impl<'a> SelectVisitor<'a> {
+    fn new(placeholders: &'a PlaceholderPositions, cte_names: HashSet<String>) -> Self {
         Self {
             tables: Vec::new(),
             filters: Vec::new(),
-            placeholder_counter: initial_placeholder_count,
+            placeholders,
             subqueries: Vec::new(),
             skip_depth: 0,
             or_depth: 0,
@@ -436,7 +490,7 @@ impl SelectVisitor {
     }
 }
 
-impl Visitor for SelectVisitor {
+impl Visitor for SelectVisitor<'_> {
     type Break = ();
 
     fn pre_visit_table_factor(&mut self, table_factor: &TableFactor) -> ControlFlow<Self::Break> {
@@ -478,10 +532,6 @@ impl Visitor for SelectVisitor {
             return ControlFlow::Continue(());
         }
 
-        if is_mysql_placeholder(expr) {
-            self.placeholder_counter += 1;
-        }
-
         if let Some(subquery) = extract_subquery(expr) {
             self.subqueries.push(subquery.clone());
             self.skip_depth += 1;
@@ -502,7 +552,7 @@ impl Visitor for SelectVisitor {
             return ControlFlow::Continue(());
         }
 
-        if let Some(filter) = try_extract_filter(expr, self.placeholder_counter) {
+        if let Some(filter) = try_extract_filter(expr, self.placeholders) {
             self.filters.push(filter);
         } else if !self.potential_col_col {
             if let Expr::BinaryOp {
@@ -537,10 +587,6 @@ impl Visitor for SelectVisitor {
     }
 }
 
-fn is_mysql_placeholder(expr: &Expr) -> bool {
-    matches!(expr, Expr::Value(ValueWithSpan { value: Value::Placeholder(p), .. }) if p == "?")
-}
-
 fn is_placeholder(expr: &Expr) -> bool {
     matches!(
         expr,
@@ -560,7 +606,7 @@ fn extract_subquery(expr: &Expr) -> Option<&Query> {
     }
 }
 
-fn try_extract_filter(expr: &Expr, placeholder_counter: usize) -> Option<FilterColumn> {
+fn try_extract_filter(expr: &Expr, placeholders: &PlaceholderPositions) -> Option<FilterColumn> {
     let Expr::BinaryOp { left, op, right } = expr else {
         return None;
     };
@@ -569,8 +615,8 @@ fn try_extract_filter(expr: &Expr, placeholder_counter: usize) -> Option<FilterC
         return None;
     }
 
-    extract_column_value_pair(left, right, placeholder_counter)
-        .or_else(|| extract_column_value_pair(right, left, placeholder_counter))
+    extract_column_value_pair(left, right, placeholders)
+        .or_else(|| extract_column_value_pair(right, left, placeholders))
 }
 
 struct ColColPair {
@@ -756,7 +802,7 @@ fn resolve_col_col_filters(
 fn extract_column_value_pair(
     maybe_column: &Expr,
     maybe_value: &Expr,
-    placeholder_counter: usize,
+    placeholders: &PlaceholderPositions,
 ) -> Option<FilterColumn> {
     let (table, column) = extract_column_ref(maybe_column)?;
 
@@ -764,17 +810,11 @@ fn extract_column_value_pair(
         return None;
     }
 
-    let placeholder_number = if is_mysql_placeholder(maybe_value) {
-        Some(placeholder_counter)
-    } else {
-        None
-    };
-
     Some(FilterColumn {
         table,
         column,
         value: expr_to_value_string(maybe_value)?,
-        placeholder_number,
+        placeholder_number: placeholders.number_of(maybe_value),
         is_placeholder: is_placeholder(maybe_value),
     })
 }
@@ -838,7 +878,7 @@ fn object_name_to_string(name: &ObjectName) -> String {
 
 fn extract_filters_from_where(
     expr: &Expr,
-    counter: &mut usize,
+    placeholders: &PlaceholderPositions,
 ) -> (Vec<FilterColumn>, Vec<ColColPair>, Vec<Query>) {
     let mut filters = Vec::new();
     let mut col_col_pairs = Vec::new();
@@ -846,7 +886,7 @@ fn extract_filters_from_where(
     // Start with in_or=false: the top-level WHERE clause is not inside an OR branch
     walk_expr(
         expr,
-        counter,
+        placeholders,
         &mut filters,
         &mut col_col_pairs,
         &mut subqueries,
@@ -857,19 +897,15 @@ fn extract_filters_from_where(
 
 fn walk_expr(
     expr: &Expr,
-    counter: &mut usize,
+    placeholders: &PlaceholderPositions,
     filters: &mut Vec<FilterColumn>,
     col_col_pairs: &mut Vec<ColColPair>,
     subqueries: &mut Vec<Query>,
     in_or: bool,
 ) {
-    if is_mysql_placeholder(expr) {
-        *counter += 1;
-    }
-
     // Skip filters inside OR branches: OR does not guarantee the filter is enforced
     if !in_or {
-        if let Some(filter) = try_extract_filter(expr, *counter) {
+        if let Some(filter) = try_extract_filter(expr, placeholders) {
             filters.push(filter);
         } else if let Some(pair) = try_extract_col_col_pair(expr) {
             col_col_pairs.push(pair);
@@ -884,11 +920,32 @@ fn walk_expr(
     match expr {
         Expr::BinaryOp { left, op, right } => {
             let in_or = in_or || *op == BinaryOperator::Or;
-            walk_expr(left, counter, filters, col_col_pairs, subqueries, in_or);
-            walk_expr(right, counter, filters, col_col_pairs, subqueries, in_or);
+            walk_expr(
+                left,
+                placeholders,
+                filters,
+                col_col_pairs,
+                subqueries,
+                in_or,
+            );
+            walk_expr(
+                right,
+                placeholders,
+                filters,
+                col_col_pairs,
+                subqueries,
+                in_or,
+            );
         }
         Expr::Nested(inner) => {
-            walk_expr(inner, counter, filters, col_col_pairs, subqueries, in_or);
+            walk_expr(
+                inner,
+                placeholders,
+                filters,
+                col_col_pairs,
+                subqueries,
+                in_or,
+            );
         }
         _ => {}
     }
@@ -902,30 +959,6 @@ fn extract_subqueries_from_exprs(exprs: &[&Expr]) -> Vec<Query> {
         }
     }
     subqueries
-}
-
-fn count_placeholders_in_exprs(exprs: &[&Expr]) -> usize {
-    let mut count = 0;
-    for expr in exprs {
-        count_placeholders(expr, &mut count);
-    }
-    count
-}
-
-fn count_placeholders(expr: &Expr, count: &mut usize) {
-    struct Counter<'a> {
-        count: &'a mut usize,
-    }
-    impl Visitor for Counter<'_> {
-        type Break = ();
-        fn pre_visit_expr(&mut self, expr: &Expr) -> ControlFlow<Self::Break> {
-            if is_mysql_placeholder(expr) {
-                *self.count += 1;
-            }
-            ControlFlow::Continue(())
-        }
-    }
-    let _ = expr.visit(&mut Counter { count });
 }
 
 fn table_ref_from_factor(factor: &TableFactor) -> Option<TableRef> {
@@ -1017,6 +1050,7 @@ fn extract_tables_from_table_with_joins(twj: &TableWithJoins) -> Vec<TableRef> {
 fn extract_insert_columns(
     source: &Option<Box<Query>>,
     columns: &[&str],
+    placeholders: &PlaceholderPositions,
 ) -> Option<Vec<Vec<InsertColumn>>> {
     let source = source.as_ref()?;
     let values = match source.body.as_ref() {
@@ -1024,7 +1058,6 @@ fn extract_insert_columns(
         _ => return None,
     };
 
-    let mut placeholder_counter = 0;
     let rows = values
         .rows
         .iter()
@@ -1036,18 +1069,10 @@ fn extract_insert_columns(
                         return None;
                     }
 
-                    let placeholder_number = if is_mysql_placeholder(expr) {
-                        let num = placeholder_counter;
-                        placeholder_counter += 1;
-                        Some(num)
-                    } else {
-                        None
-                    };
-
                     Some(InsertColumn {
                         column: columns[i].to_string(),
                         value: expr_to_value_string(expr)?,
-                        placeholder_number,
+                        placeholder_number: placeholders.number_of(expr),
                         is_placeholder: is_placeholder(expr),
                     })
                 })

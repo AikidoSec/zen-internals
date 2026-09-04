@@ -7323,4 +7323,209 @@ mod tests {
             }]
         );
     }
+
+    #[test]
+    fn test_update_placeholder_in_where_in_list_not_skipped_mysql() {
+        assert_eq!(
+            idor_analyze_sql(
+                "UPDATE users SET name = ? WHERE id IN (?, ?) AND tenant_id = ?",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "update".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "?".into(),
+                    placeholder_number: Some(3),
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_subquery_placeholder_numbered_before_outer_placeholder_mysql() {
+        assert_eq!(
+            idor_analyze_sql(
+                "SELECT * FROM a WHERE id IN (SELECT id FROM b WHERE t = ?) AND x = ?",
+                8,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "a".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "x".into(),
+                        value: "?".into(),
+                        placeholder_number: Some(1),
+                        is_placeholder: true,
+                    }],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "b".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "t".into(),
+                        value: "?".into(),
+                        placeholder_number: Some(0),
+                        is_placeholder: true,
+                    }],
+                    insert_columns: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_insert_columns_numbered_after_earlier_cte_placeholder_mysql() {
+        assert_eq!(
+            idor_analyze_sql(
+                "WITH c AS (SELECT id FROM x WHERE q = ?) INSERT INTO t (a, b) VALUES (?, ?)",
+                8,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "x".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "q".into(),
+                        value: "?".into(),
+                        placeholder_number: Some(0),
+                        is_placeholder: true,
+                    }],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "insert".into(),
+                    tables: vec![TableRef {
+                        name: "t".into(),
+                        alias: None,
+                    }],
+                    filters: vec![],
+                    insert_columns: Some(vec![vec![
+                        InsertColumn {
+                            column: "a".into(),
+                            value: "?".into(),
+                            placeholder_number: Some(1),
+                            is_placeholder: true,
+                        },
+                        InsertColumn {
+                            column: "b".into(),
+                            value: "?".into(),
+                            placeholder_number: Some(2),
+                            is_placeholder: true,
+                        },
+                    ]]),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_update_placeholder_in_where_numbered_after_join_and_assignment_mysql() {
+        assert_eq!(
+            idor_analyze_sql(
+                "UPDATE users u JOIN tenants t ON t.region_id = ? SET u.name = ? WHERE u.tenant_id = ?",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "update".into(),
+                tables: vec![
+                    TableRef {
+                        name: "users".into(),
+                        alias: Some("u".into()),
+                    },
+                    TableRef {
+                        name: "tenants".into(),
+                        alias: Some("t".into()),
+                    },
+                ],
+                filters: vec![FilterColumn {
+                    table: Some("u".into()),
+                    column: "tenant_id".into(),
+                    value: "?".into(),
+                    placeholder_number: Some(2),
+                    is_placeholder: true,
+                }],
+                insert_columns: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_mysql_placeholder_positions_across_expression_forms() {
+        for (query, expected_placeholder_numbers) in [
+            (
+                "UPDATE users SET name = ? WHERE id BETWEEN ? AND ? AND tenant_id = ?",
+                vec![Some(3)],
+            ),
+            (
+                "UPDATE users SET name = ? WHERE status REGEXP ? AND tenant_id = ?",
+                vec![Some(2)],
+            ),
+            (
+                "UPDATE users SET name = ? WHERE updated_at > NOW() - INTERVAL ? DAY AND tenant_id = ?",
+                vec![Some(2)],
+            ),
+            (
+                "UPDATE users SET name = ? WHERE EXISTS (SELECT 1 FROM memberships WHERE user_id = users.id AND role_id = ?) AND tenant_id = ?",
+                vec![Some(2), Some(1)],
+            ),
+            (
+                "UPDATE users SET name = ? WHERE CASE ? WHEN 1 THEN active = 1 ELSE TRUE END AND tenant_id = ?",
+                vec![Some(2)],
+            ),
+            (
+                "UPDATE users SET name = ? WHERE MATCH(bio) AGAINST (? IN BOOLEAN MODE) AND tenant_id = ?",
+                vec![Some(2)],
+            ),
+            (
+                "UPDATE users u JOIN JSON_TABLE(?, '$[*]' COLUMNS(user_id BIGINT PATH '$.user_id')) AS jt ON jt.user_id = u.id SET u.name = ? WHERE u.tenant_id = ?",
+                vec![Some(2)],
+            ),
+            (
+                "DELETE u FROM users AS u JOIN tenants AS t ON t.region_id = ? WHERE u.tenant_id = ?",
+                vec![Some(1)],
+            ),
+            (
+                "DELETE FROM users WHERE name LIKE ? AND tenant_id = ?",
+                vec![Some(1)],
+            ),
+            (
+                "UPDATE users SET name = ? WHERE tenant_id = ?; UPDATE users SET name = ? WHERE tenant_id = ?",
+                vec![Some(1), Some(1)],
+            ),
+        ] {
+            let placeholder_numbers = idor_analyze_sql(query, 8)
+                .unwrap()
+                .iter()
+                .flat_map(|result| result.filters.iter().map(|filter| filter.placeholder_number))
+                .collect::<Vec<_>>();
+
+            assert_eq!(placeholder_numbers, expected_placeholder_numbers, "{query}");
+        }
+    }
 }
