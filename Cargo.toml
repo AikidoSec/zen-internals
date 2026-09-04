@@ -23,7 +23,7 @@ wasm-bindgen = { version = "0.2", optional = true }
 
 [profile.release]
 strip = true
-opt-level = "s"
+opt-level = 2
 lto = true
 # To speed up compile times, Rust tries to split crates into small chunks and compile as many in parallel as possible.
 # The downside is that there's less opportunities for the compiler to optimize code across these chunks.
