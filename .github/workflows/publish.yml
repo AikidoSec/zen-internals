@@ -94,6 +94,7 @@ jobs:
 
           - target: wasm32-unknown-unknown
             runner: ubuntu-latest
+            profile: wasm
             add_target: wasm32-unknown-unknown
             artifact_name: wasm-binaries
             lib_name: zen_internals.wasm
@@ -130,20 +131,21 @@ jobs:
 
       - name: Build
         run: |
+          PROFILE="${{ matrix.profile || 'release' }}"
           ${{ matrix.rustflags && format('RUSTFLAGS="{0}"', matrix.rustflags) || '' }} \
           ${{ matrix.use_zig && 'cargo zigbuild' || 'cargo build' }} \
-          --target ${{ matrix.target }} --release
+          --target ${{ matrix.target }} --profile "$PROFILE"
         shell: bash
 
       - name: Optimize WASM
         if: matrix.target == 'wasm32-unknown-unknown'
         run: |
-          wasm-opt -O --enable-bulk-memory --enable-sign-ext --enable-nontrapping-float-to-int target/wasm32-unknown-unknown/release/zen_internals.wasm -o target/wasm32-unknown-unknown/release/zen_internals.wasm
+          wasm-opt -O --enable-bulk-memory --enable-sign-ext --enable-nontrapping-float-to-int target/wasm32-unknown-unknown/${{ matrix.profile }}/zen_internals.wasm -o target/wasm32-unknown-unknown/${{ matrix.profile }}/zen_internals.wasm
 
       - name: Prepare release (Unix)
         if: "!matrix.use_powershell"
         run: |
-          cd target/${{ matrix.add_target || matrix.target }}/release
+          cd target/${{ matrix.add_target || matrix.target }}/${{ matrix.profile || 'release' }}
           FILE=${{ matrix.output_name }}
           sudo mv ${{ matrix.lib_name }} ${FILE}
           sudo touch ${FILE}.sha256sum && sudo chmod 777 ${FILE}.sha256sum
@@ -153,7 +155,7 @@ jobs:
         if: matrix.use_powershell
         shell: pwsh
         run: |
-          Set-Location target/${{ matrix.target }}/release
+          Set-Location target/${{ matrix.target }}/${{ matrix.profile || 'release' }}
           $FILE = "${{ matrix.output_name }}"
           Move-Item "${{ matrix.lib_name }}" $FILE
           New-Item -ItemType File -Path "$FILE.sha256sum" | Out-Null
@@ -166,8 +168,8 @@ jobs:
         with:
           name: ${{ matrix.artifact_name }}
           path: |
-            target/${{ matrix.add_target || matrix.target }}/release/${{ matrix.output_name }}
-            target/${{ matrix.add_target || matrix.target }}/release/${{ matrix.output_name }}.sha256sum
+            target/${{ matrix.add_target || matrix.target }}/${{ matrix.profile || 'release' }}/${{ matrix.output_name }}
+            target/${{ matrix.add_target || matrix.target }}/${{ matrix.profile || 'release' }}/${{ matrix.output_name }}.sha256sum
 
   build-wasm-node:
     needs: [tests, lint]
@@ -184,7 +186,7 @@ jobs:
       - name: Install wasm-pack
         run: cargo install wasm-pack
       - name: Build with wasm-pack
-        run: wasm-pack build --target nodejs --features wasm-js
+        run: wasm-pack build --profile wasm --target nodejs --features wasm-js
       - name: Package and checksum
         run: |
           cd pkg

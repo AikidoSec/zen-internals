@@ -1,0 +1,71 @@
+name: ⚡ WASM Opt-Level Benchmarks
+
+on:
+  push: {}
+
+permissions:
+  contents: read
+
+jobs:
+  build-wasm-opt-levels:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        opt-level: ["s", "2", "3"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Set up Rust
+        run: |
+          rustup toolchain install stable
+          rustup default stable
+
+      - name: Install WASM build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y binaryen
+          cargo install wasm-pack
+
+      - name: Build WASM
+        env:
+          CARGO_PROFILE_WASM_OPT_LEVEL: ${{ matrix.opt-level }}
+          CARGO_TARGET_DIR: target/wasm-opt-level-${{ matrix.opt-level }}
+        run: wasm-pack build --profile wasm --target nodejs --out-dir pkg-opt-level-${{ matrix.opt-level }} --features wasm-js
+
+      - name: Upload WASM
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-opt-level-${{ matrix.opt-level }}
+          path: pkg-opt-level-${{ matrix.opt-level }}
+          retention-days: 1
+
+  compare-wasm-opt-levels:
+    needs: build-wasm-opt-levels
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.x"
+
+      - name: Download WASM builds
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wasm-opt-level-*
+          path: wasm-opt-levels
+
+      - name: Compare WASM performance
+        run: |
+          SELECTED_OPT_LEVEL=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["profile"]["wasm"]["opt-level"])')
+          node --expose-gc benchmarks/compare_wasm_opt_levels.mjs \
+            "$SELECTED_OPT_LEVEL" \
+            s=wasm-opt-levels/wasm-opt-level-s/zen_internals.js \
+            2=wasm-opt-levels/wasm-opt-level-2/zen_internals.js \
+            3=wasm-opt-levels/wasm-opt-level-3/zen_internals.js | tee wasm-opt-levels.md
+          cat wasm-opt-levels.md >> "$GITHUB_STEP_SUMMARY"
