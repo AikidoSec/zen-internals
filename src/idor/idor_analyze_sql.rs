@@ -7,7 +7,7 @@ use sqlparser::ast::{
     TableWithJoins, Value, ValueWithSpan, Visit, Visitor,
 };
 use sqlparser::parser::Parser;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 /// Analyzes a SQL query for IDOR (Insecure Direct Object Reference) protection.
 ///
@@ -179,9 +179,10 @@ fn analyze_update(
         col_col_pairs.extend(collect_col_col_pairs_from_joins(from_tables));
     }
 
-    let known_tables = tables_to_known_set(&tables);
-    let resolved = resolve_col_col_filters(&filters, &col_col_pairs, &known_tables);
-    filters.extend(resolved);
+    if !col_col_pairs.is_empty() {
+        let resolved = resolve_col_col_filters(&filters, &col_col_pairs, &tables);
+        filters.extend(resolved);
+    }
 
     results.push(SqlQueryResult {
         kind: "update".into(),
@@ -236,9 +237,10 @@ fn analyze_delete(
         col_col_pairs.extend(collect_col_col_pairs_from_joins(using_clauses));
     }
 
-    let known_tables = tables_to_known_set(&tables);
-    let resolved = resolve_col_col_filters(&filters, &col_col_pairs, &known_tables);
-    filters.extend(resolved);
+    if !col_col_pairs.is_empty() {
+        let resolved = resolve_col_col_filters(&filters, &col_col_pairs, &tables);
+        filters.extend(resolved);
+    }
 
     results.push(SqlQueryResult {
         kind: "delete".into(),
@@ -376,13 +378,14 @@ fn visit_select(
     let _ = set_expr.visit(&mut visitor);
     *counter = visitor.placeholder_counter;
 
-    // Collect col-col pairs from INNER JOINs
-    let col_col_pairs = collect_col_col_pairs_for_select(set_expr);
-
-    let known_tables = tables_to_known_set(&visitor.tables);
     let mut filters = visitor.filters;
-    let resolved = resolve_col_col_filters(&filters, &col_col_pairs, &known_tables);
-    filters.extend(resolved);
+    if visitor.potential_col_col {
+        let col_col_pairs = collect_col_col_pairs_for_select(set_expr);
+        if !col_col_pairs.is_empty() {
+            let resolved = resolve_col_col_filters(&filters, &col_col_pairs, &visitor.tables);
+            filters.extend(resolved);
+        }
+    }
 
     results.push(SqlQueryResult {
         kind: "select".into(),
@@ -413,6 +416,9 @@ struct SelectVisitor {
     or_depth: usize,
     /// Common table expression names to skip when collecting tables (virtual tables, not real ones)
     cte_names: HashSet<String>,
+    /// Set to true when a col=col equality expression is encountered (e.g. `a.id = b.id`).
+    /// Used to skip the col-col resolution pass entirely for queries that cannot have any.
+    potential_col_col: bool,
 }
 
 impl SelectVisitor {
@@ -425,6 +431,7 @@ impl SelectVisitor {
             skip_depth: 0,
             or_depth: 0,
             cte_names,
+            potential_col_col: false,
         }
     }
 }
@@ -497,6 +504,17 @@ impl Visitor for SelectVisitor {
 
         if let Some(filter) = try_extract_filter(expr, self.placeholder_counter) {
             self.filters.push(filter);
+        } else if !self.potential_col_col {
+            if let Expr::BinaryOp {
+                op: BinaryOperator::Eq,
+                left,
+                right,
+            } = expr
+            {
+                if is_column_ref(left) && is_column_ref(right) {
+                    self.potential_col_col = true;
+                }
+            }
         }
 
         ControlFlow::Continue(())
@@ -584,25 +602,14 @@ fn try_extract_col_col_pair(expr: &Expr) -> Option<ColColPair> {
 
 /// Returns true if the column's table qualifier belongs to the current query.
 /// Unqualified columns (no table prefix) are always considered in scope.
-fn is_table_in_scope(table: &Option<String>, known_tables: &HashSet<String>) -> bool {
+fn is_table_in_scope(table: &Option<String>, tables: &[TableRef]) -> bool {
     match table {
         None => true,
-        Some(t) => known_tables.contains(&t.to_lowercase()),
+        Some(t) => tables.iter().any(|tr| {
+            tr.name.eq_ignore_ascii_case(t)
+                || tr.alias.as_ref().is_some_and(|a| a.eq_ignore_ascii_case(t))
+        }),
     }
-}
-
-/// Builds a set of lowercase table names and aliases from a table list.
-fn tables_to_known_set(tables: &[TableRef]) -> HashSet<String> {
-    tables
-        .iter()
-        .flat_map(|t| {
-            let mut names = vec![t.name.to_lowercase()];
-            if let Some(alias) = &t.alias {
-                names.push(alias.to_lowercase());
-            }
-            names
-        })
-        .collect()
 }
 
 /// If `source_key` has a known value and `target_key` doesn't yet, creates a new
@@ -611,22 +618,27 @@ fn tables_to_known_set(tables: &[TableRef]) -> HashSet<String> {
 fn try_derive_filter(
     target_key: &(Option<String>, String),
     source_key: &(Option<String>, String),
-    col_values: &HashMap<(Option<String>, String), FilterColumn>,
-    known_tables: &HashSet<String>,
+    col_values: &[FilterColumn],
+    tables: &[TableRef],
 ) -> Option<FilterColumn> {
-    if col_values.contains_key(target_key) {
+    if col_values
+        .iter()
+        .any(|f| f.table == target_key.0 && f.column == target_key.1)
+    {
         return None;
     }
-    let resolved = col_values.get(source_key)?.clone();
-    if !is_table_in_scope(&target_key.0, known_tables) {
+    let source = col_values
+        .iter()
+        .find(|f| f.table == source_key.0 && f.column == source_key.1)?;
+    if !is_table_in_scope(&target_key.0, tables) {
         return None;
     }
     Some(FilterColumn {
         table: target_key.0.clone(),
         column: target_key.1.clone(),
-        value: resolved.value,
-        placeholder_number: resolved.placeholder_number,
-        is_placeholder: resolved.is_placeholder,
+        value: source.value.clone(),
+        placeholder_number: source.placeholder_number,
+        is_placeholder: source.is_placeholder,
     })
 }
 
@@ -694,43 +706,41 @@ fn collect_col_col_pairs_only(expr: &Expr, pairs: &mut Vec<ColColPair>, in_or: b
 fn resolve_col_col_filters(
     filters: &[FilterColumn],
     col_col_pairs: &[ColColPair],
-    known_tables: &HashSet<String>,
+    tables: &[TableRef],
 ) -> Vec<FilterColumn> {
     if col_col_pairs.is_empty() {
         return Vec::new();
     }
 
-    // Map from (table, column) to the filter we already know about.
-    // We grow this map as we discover new filters during the loop below.
-    let mut col_values: HashMap<(Option<String>, String), FilterColumn> = HashMap::new();
-    for filter in filters {
-        col_values
-            .entry((filter.table.clone(), filter.column.clone()))
-            .or_insert_with(|| filter.clone());
-    }
+    // Pre-compute (table, column) key tuples from pairs once.
+    // This avoids cloning them on every iteration of the resolution loop
+    let pair_keys: Vec<_> = col_col_pairs
+        .iter()
+        .map(|p| {
+            (
+                (p.left_table.clone(), p.left_col.clone()),
+                (p.right_table.clone(), p.right_col.clone()),
+            )
+        })
+        .collect();
 
-    let mut additional = Vec::new();
+    // Uses a Vec rather than HashMap because filter counts are small,
+    // so linear scan avoids hash computation and allocator overhead.
+    let mut col_values = filters.to_vec();
+    col_values.reserve(col_col_pairs.len());
+    let initial_len = col_values.len();
 
     loop {
         let mut added_in_pass = false;
 
-        for pair in col_col_pairs {
-            let left_key = (pair.left_table.clone(), pair.left_col.clone());
-            let right_key = (pair.right_table.clone(), pair.right_col.clone());
-
-            if let Some(new_filter) =
-                try_derive_filter(&left_key, &right_key, &col_values, known_tables)
-            {
-                col_values.insert(left_key.clone(), new_filter.clone());
-                additional.push(new_filter);
+        for (left_key, right_key) in &pair_keys {
+            if let Some(new_filter) = try_derive_filter(left_key, right_key, &col_values, tables) {
+                col_values.push(new_filter);
                 added_in_pass = true;
             }
 
-            if let Some(new_filter) =
-                try_derive_filter(&right_key, &left_key, &col_values, known_tables)
-            {
-                col_values.insert(right_key.clone(), new_filter.clone());
-                additional.push(new_filter);
+            if let Some(new_filter) = try_derive_filter(right_key, left_key, &col_values, tables) {
+                col_values.push(new_filter);
                 added_in_pass = true;
             }
         }
@@ -740,7 +750,7 @@ fn resolve_col_col_filters(
         }
     }
 
-    additional
+    col_values.drain(initial_len..).collect()
 }
 
 fn extract_column_value_pair(

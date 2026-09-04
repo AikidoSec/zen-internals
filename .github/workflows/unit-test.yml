@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   build:
@@ -36,3 +37,8 @@ jobs:
           fail_ci_if_error: true
           files: ./target/lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
+      
+      - name: Upload coverage to Aikido
+        uses: AikidoSec/code-coverage-github-action@18138c9866f45cb159779a167d6e1330c967fe28 #v0.1.1
+        with:
+          lcov-file-paths: target/lcov.info

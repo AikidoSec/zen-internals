@@ -24,7 +24,6 @@ pub enum DetectionReason {
     CommentStructureAltered,
 }
 
-// `userinput` and `query` provided to this function should already be lowercase.
 pub fn detect_sql_injection_str(
     query_raw: &str,
     userinput_raw: &str,
@@ -50,16 +49,6 @@ pub fn detect_sql_injection_str(
         };
     }
 
-    // Tokenize query :
-    let tokens = tokenize_query(&query, dialect);
-    if tokens.len() <= 0 {
-        // Tokens are empty, probably a parsing issue with original query, return false.
-        return SqlInjectionDetectionResult {
-            detected: false,
-            reason: DetectionReason::FailedToTokenizeQuery,
-        };
-    }
-
     // Remove leading and trailing spaces from userinput :
     let trimmed_userinput = userinput.trim_matches(SPACE_CHAR);
 
@@ -69,6 +58,16 @@ pub fn detect_sql_injection_str(
         return SqlInjectionDetectionResult {
             detected: false,
             reason: DetectionReason::UserInputTooSmall,
+        };
+    }
+
+    // Tokenize query :
+    let tokens = tokenize_query(&query, dialect);
+    if tokens.is_empty() {
+        // Tokens are empty, probably a parsing issue with original query, return false.
+        return SqlInjectionDetectionResult {
+            detected: false,
+            reason: DetectionReason::FailedToTokenizeQuery,
         };
     }
 
@@ -96,8 +95,8 @@ pub fn detect_sql_injection_str(
         };
     }
 
-    return SqlInjectionDetectionResult {
+    SqlInjectionDetectionResult {
         detected: false,
         reason: DetectionReason::NoChangesFound,
-    };
+    }
 }

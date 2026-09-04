@@ -161,9 +161,6 @@ mod tests {
 
     #[test]
     fn invalid_js_without_userinput() {
-        // Previously the double-fail fallback (both replacement and removal cause parse errors)
-        // returned false unconditionally. The fix detects structural JS elements instead.
-        // This input contains ";" and IS a real injection — correctly flagged now.
         is_injection!(
             "const test = 'Hello World!'; console.log('Injected!');",
             "Hello World!'; console.log('Injected!');",

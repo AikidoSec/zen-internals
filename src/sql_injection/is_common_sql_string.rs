@@ -2,33 +2,33 @@ use regex::Regex;
 use std::sync::LazyLock;
 
 pub const COMMON_SQL_STRINGS: [&str; 28] = [
-    "SELECT *",
-    "SELECT COUNT(*)",
-    "INSERT INTO",
-    "INNER JOIN",
-    "LEFT JOIN",
-    "RIGHT JOIN",
-    "LEFT OUTER JOIN",
-    "RIGHT OUTER JOIN",
-    "DELETE FROM",
-    "ORDER BY",
-    "GROUP BY",
-    "ON CONFLICT",
-    "ON CONFLICT DO UPDATE",
-    "ON CONFLICT DO NOTHING",
-    "ON DUPLICATE KEY",
-    "ON DUPLICATE KEY UPDATE",
-    "DO UPDATE",
-    "DO NOTHING",
-    "COUNT(*)",
-    "IS NULL",
-    "IS NOT NULL",
-    "IS NOT",
-    "NOT EXISTS",
-    "DISTINCT ON",
+    "select *",
+    "select count(*)",
+    "insert into",
+    "inner join",
+    "left join",
+    "right join",
+    "left outer join",
+    "right outer join",
+    "delete from",
+    "order by",
+    "group by",
+    "on conflict",
+    "on conflict do update",
+    "on conflict do nothing",
+    "on duplicate key",
+    "on duplicate key update",
+    "do update",
+    "do nothing",
+    "count(*)",
+    "is null",
+    "is not null",
+    "is not",
+    "not exists",
+    "distinct on",
     "[]",
-    "NOT IN",
-    "TIME ZONE",
+    "not in",
+    "time zone",
     ".*",
 ];
 
@@ -41,10 +41,7 @@ macro_rules! regex {
 }
 
 pub fn is_common_sql_string(user_input: &str) -> bool {
-    let is_common_sql_string = COMMON_SQL_STRINGS
-        .iter()
-        .map(|s| s.to_lowercase())
-        .any(|common_string| user_input == common_string);
+    let is_common_sql_string = COMMON_SQL_STRINGS.contains(&user_input);
 
     if is_common_sql_string {
         return true;
@@ -59,6 +56,11 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
     // e.g. `select * from "table" where "id" = $1 limit $2`
     //                                           ^^^ `1 l`
     if user_input.len() <= 3 && regex!(r"^[ 0-9a-z]+$").is_match(user_input) {
+        return true;
+    }
+
+    if user_input.ends_with(")") && regex!(r"^[0-9]+\)+$").is_match(user_input) {
+        // e.g. `2)` or `12345)`
         return true;
     }
 
@@ -97,31 +99,39 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
     // example: SELECT * FROM users WHERE user_id = '${user id}' AND name = '${user_name}'
 
     // e.g. 'a or '1 or 'product-id-123
-    if user_input.starts_with("'") && user_input.len() <= 200 && !user_input.contains("--") {
-        if regex!(r"^'[a-z0-9-]+$").is_match(user_input) {
-            return true;
-        }
+    if user_input.starts_with("'")
+        && user_input.len() <= 200
+        && !user_input.contains("--")
+        && regex!(r"^'[a-z0-9-]+$").is_match(user_input)
+    {
+        return true;
     }
 
     // e.g. a' or 1' or product-id-123'
-    if user_input.ends_with("'") && user_input.len() <= 200 && !user_input.contains("--") {
-        if regex!(r"^[a-z0-9-]+'$").is_match(user_input) {
-            return true;
-        }
+    if user_input.ends_with("'")
+        && user_input.len() <= 200
+        && !user_input.contains("--")
+        && regex!(r"^[a-z0-9-]+'$").is_match(user_input)
+    {
+        return true;
     }
 
     // e.g. "a or "1 or "product-id-123
-    if user_input.starts_with("\"") && user_input.len() <= 200 && !user_input.contains("--") {
-        if regex!(r#"^"[a-z0-9-]+$"#).is_match(user_input) {
-            return true;
-        }
+    if user_input.starts_with("\"")
+        && user_input.len() <= 200
+        && !user_input.contains("--")
+        && regex!(r#"^"[a-z0-9-]+$"#).is_match(user_input)
+    {
+        return true;
     }
 
     // e.g. a" or 1" or product-id-123"
-    if user_input.ends_with("\"") && user_input.len() <= 200 && !user_input.contains("--") {
-        if regex!(r#"^[a-z0-9-]+"$"#).is_match(user_input) {
-            return true;
-        }
+    if user_input.ends_with("\"")
+        && user_input.len() <= 200
+        && !user_input.contains("--")
+        && regex!(r#"^[a-z0-9-]+"$"#).is_match(user_input)
+    {
+        return true;
     }
 
     if user_input.contains(".") {
@@ -153,11 +163,12 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
     }
 
     // Allow strings with letters, digits and spaces that end with a comma,
-    if user_input.len() <= 40 && user_input.ends_with(',') {
-        if regex!(r"^[a-z0-9 ]+,$").is_match(user_input) {
-            return true;
-        }
+    if user_input.len() <= 40
+        && user_input.ends_with(',')
+        && regex!(r"^[a-z0-9 ]+,$").is_match(user_input)
+    {
+        return true;
     }
 
-    return false;
+    false
 }
