@@ -1,6 +1,8 @@
 use crate::idor::idor_analyze_sql::idor_analyze_sql;
 use crate::js_injection::detect_js_injection::detect_js_injection_str;
 use crate::sql_injection::detect_sql_injection::{detect_sql_injection_str, DetectionReason};
+use crate::waf::waf_evaluate::WafEngine;
+use crate::waf::waf_result::RuleInput;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -34,4 +36,44 @@ pub fn wasm_idor_analyze_sql(query: &str, dialect: i32) -> JsValue {
             obj.into()
         }
     }
+}
+
+#[wasm_bindgen]
+pub struct WasmWafEngine {
+    engine: WafEngine,
+}
+
+#[wasm_bindgen]
+pub fn create_waf_engine(rules_json: &str) -> Result<WasmWafEngine, JsValue> {
+    let rules: Vec<RuleInput> =
+        serde_json::from_str(rules_json).map_err(|error| JsValue::from_str(&error.to_string()))?;
+    let engine = WafEngine::from_rules(&rules).map_err(|result| {
+        JsValue::from_str(result.error.as_deref().unwrap_or("Invalid WAF rules"))
+    })?;
+    Ok(WasmWafEngine { engine })
+}
+
+#[wasm_bindgen]
+impl WasmWafEngine {
+    pub fn get_size(&self) -> usize {
+        self.engine.memory_size()
+    }
+
+    pub fn match_rules(&self, request_json: &str) -> JsValue {
+        let request = match serde_json::from_str(request_json) {
+            Ok(request) => request,
+            Err(_) => return no_waf_match(),
+        };
+
+        match self.engine.evaluate(&request) {
+            Ok(result) => serde_wasm_bindgen::to_value(&result).unwrap_or_else(|_| no_waf_match()),
+            Err(_) => no_waf_match(),
+        }
+    }
+}
+
+fn no_waf_match() -> JsValue {
+    let result = js_sys::Object::new();
+    let _ = js_sys::Reflect::set(&result, &"matched".into(), &false.into());
+    result.into()
 }

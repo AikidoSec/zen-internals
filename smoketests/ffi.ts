@@ -303,4 +303,82 @@ assertEquals(
     []
 );
 
+const wafLib = Deno.dlopen(fullTargetDir, {
+    waf_engine_create: {
+        parameters: ["pointer", "usize"],
+        result: "pointer",
+    },
+    waf_engine_memory_size: {
+        parameters: ["pointer"],
+        result: "usize",
+    },
+    waf_engine_match: {
+        parameters: ["pointer", "pointer", "usize"],
+        result: "pointer",
+    },
+    waf_engine_free: {
+        parameters: ["pointer"],
+        result: "void",
+    },
+    free_string: {
+        parameters: ["pointer"],
+        result: "void",
+    },
+});
+
+function createWafEngine(rules: unknown[]): Deno.PointerValue {
+    return wafLib.symbols.waf_engine_create(
+        ...getBufferAndLength(JSON.stringify(rules))
+    );
+}
+
+function matchWafRules(engine: Deno.PointerValue, request: unknown): unknown {
+    const resultPtr = wafLib.symbols.waf_engine_match(
+        engine,
+        ...getBufferAndLength(JSON.stringify(request))
+    );
+    const result = new Deno.UnsafePointerView(resultPtr!).getCString();
+    wafLib.symbols.free_string(resultPtr);
+    return JSON.parse(result);
+}
+
+const wafEngine = createWafEngine([
+    { id: "block-admin", expression: 'http.request.uri.path contains "/admin"', action: "block" }
+]);
+if (wafEngine === null) {
+    throw new Error("Failed to create WAF engine");
+}
+
+try {
+    if (wafLib.symbols.waf_engine_memory_size(wafEngine) <= 0n) {
+        throw new Error("WAF engine did not report its memory size");
+    }
+
+    assertEquals(
+        matchWafRules(wafEngine, {
+            host: "example.com", method: "GET", path: "/admin/users", query: "",
+            uri: "/admin/users", full_uri: "https://example.com/admin/users", ip_src: "1.2.3.4"
+        }),
+        { matched: true, rule_id: "block-admin", action: "block" }
+    );
+
+    assertEquals(
+        matchWafRules(wafEngine, {
+            host: "example.com", method: "GET", path: "/index.html", query: "",
+            uri: "/index.html", full_uri: "https://example.com/index.html", ip_src: "1.2.3.4"
+        }),
+        { matched: false }
+    );
+} finally {
+    wafLib.symbols.waf_engine_free(wafEngine);
+}
+
+assertEquals(
+    createWafEngine([
+        { id: "bad", expression: "not valid !!!", action: "block" }
+    ]),
+    null
+);
+
+wafLib.close();
 lib.close();

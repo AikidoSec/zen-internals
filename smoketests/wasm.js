@@ -1,5 +1,5 @@
 const internals = require("../pkg/zen_internals");
-const { deepStrictEqual } = require("node:assert");
+const { deepStrictEqual, throws } = require("node:assert");
 const test = require("node:test");
 
 test("wasm_detect_sql_injection", () => {
@@ -33,4 +33,34 @@ test("wasm_idor_analyze_sql", () => {
   internals.wasm_idor_analyze_sql("COMMIT", 9),
   []
  );
+});
+
+test("WAF engine lifecycle", () => {
+ const engine = internals.create_waf_engine(JSON.stringify([
+  { id: "block-admin", expression: 'http.request.uri.path contains "/admin"', action: "block" }
+ ]));
+
+ try {
+  deepStrictEqual(engine.get_size() > 0, true);
+
+  const matchResult = engine.match_rules(JSON.stringify({
+   host: "example.com", method: "GET", path: "/admin/users", query: "",
+   uri: "/admin/users", full_uri: "https://example.com/admin/users", ip_src: "1.2.3.4"
+  }));
+  deepStrictEqual(matchResult.matched, true);
+  deepStrictEqual(matchResult.rule_id, "block-admin");
+  deepStrictEqual(matchResult.action, "block");
+
+  const noMatchResult = engine.match_rules(JSON.stringify({
+   host: "example.com", method: "GET", path: "/index.html", query: "",
+   uri: "/index.html", full_uri: "https://example.com/index.html", ip_src: "1.2.3.4"
+  }));
+  deepStrictEqual(noMatchResult.matched, false);
+ } finally {
+  engine.free();
+ }
+
+ throws(() => internals.create_waf_engine(JSON.stringify([
+  { id: "bad", expression: "not valid !!!", action: "block" }
+ ])));
 });

@@ -6,6 +6,7 @@ Zen Internals is a library that can be used via FFI in different languages. Cont
 
 - SQL Injections
 - JS Code Injections
+- WAF (Web Application Firewall) rule evaluation using wirefilter compatible format
 
 ## Return codes
 
@@ -177,4 +178,63 @@ print(analyze_sql("INSERT INTO users (name, tenant_id) VALUES ('John', $1)", 9))
 #     "insert_columns": [[{ "column": "name", "value": "John" }, { "column": "tenant_id", "value": "$1" }]]
 #   }
 # ]
+```
+
+## WAF rule evaluation
+
+Evaluates WAF rules using [wirefilter](https://github.com/cloudflare/wirefilter) syntax. Available fields:
+
+| Field | Type |
+| --- | --- |
+| `http.host` | String |
+| `http.request.method` | String |
+| `http.request.uri` | String |
+| `http.request.uri.path` | String |
+| `http.request.uri.query` | String |
+| `http.request.full_uri` | String |
+| `http.user_agent` | String |
+| `http.cookie` | String |
+| `http.referer` | String |
+| `http.x_forwarded_for` | String |
+| `http.request.body.raw` | String |
+| `ip.src` | IP Address |
+
+#### FFI
+
+The FFI exposes immutable engine handles:
+
+- `waf_engine_create(rules_json, rules_json_len)`
+- `waf_engine_memory_size(engine)`
+- `waf_engine_match(engine, request_json, request_json_len)`
+- `waf_engine_free(engine)`
+
+`waf_engine_create` returns `NULL` for invalid JSON or rules. `waf_engine_memory_size` returns an estimate in bytes for native GC accounting. `waf_engine_match` returns an allocated JSON string that must be released with `free_string`. A handle can be used for concurrent matches, but it must remain alive until those calls finish.
+
+#### WASM
+
+```js
+const { create_waf_engine } = require("./some-directory/zen_internals");
+
+const engine = create_waf_engine(JSON.stringify([
+    {
+        id: "block-admin",
+        expression: 'http.request.uri.path contains "/admin" and http.request.method == "POST"',
+        action: "block"
+    }
+]));
+
+try {
+    console.log(engine.get_size());
+    console.log(engine.match_rules(JSON.stringify({
+        host: "example.com",
+        method: "POST",
+        path: "/admin/users",
+        query: "",
+        uri: "/admin/users",
+        full_uri: "https://example.com/admin/users",
+        ip_src: "1.2.3.4"
+    })));
+} finally {
+    engine.free();
+}
 ```
