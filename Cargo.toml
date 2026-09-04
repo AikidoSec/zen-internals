@@ -21,6 +21,7 @@ js-sys = { version = "0.3.85", optional = true }
 serde-wasm-bindgen = { version = "0.6.5", optional = true }
 wasm-bindgen = { version = "0.2", optional = true }
 
+# FFI is already fast, and we ship a binary per platform, so optimize for size.
 [profile.release]
 strip = true
 opt-level = "s"
@@ -30,6 +31,11 @@ lto = true
 # So, let’s tell it to do one chunk per crate:
 # See https://groups.google.com/a/chromium.org/g/rust-dev/c/ab_Y2FqgM64
 codegen-units = 1
+
+# We ship a single WASM file, so optimize it for speed.
+[profile.wasm]
+inherits = "release"
+opt-level = 2
 
 [features]
 default = []
@@ -41,5 +47,6 @@ members = [
     "benchmarks",
 ]
 
-[package.metadata.wasm-pack.profile.release]
+# wasm-pack reads this for custom profiles such as `wasm`.
+[package.metadata.wasm-pack.profile.custom]
 wasm-opt = ["-O", "--enable-bulk-memory", "--enable-sign-ext", "--enable-nontrapping-float-to-int"]

@@ -35,11 +35,17 @@ jobs:
         run: cargo install wasm-pack
 
       - name: Build PR branch (WASM)
-        run: wasm-pack build --target nodejs --features wasm-js
+        run: wasm-pack build --profile wasm --target nodejs --features wasm-js
 
       - name: Build main branch (WASM)
         working-directory: .main
-        run: wasm-pack build --target nodejs --features wasm-js
+        run: |
+          if grep -q '^\[profile\.wasm\]' Cargo.toml; then
+            wasm-pack build --profile wasm --target nodejs --features wasm-js
+          else
+            WASM_OPT_LEVEL=$(python3 -c 'import tomllib; print(tomllib.load(open("../Cargo.toml", "rb"))["profile"]["wasm"]["opt-level"])')
+            CARGO_PROFILE_RELEASE_OPT_LEVEL="$WASM_OPT_LEVEL" wasm-pack build --release --target nodejs --features wasm-js
+          fi
 
       - name: Compare sizes and enforce threshold
         run: |

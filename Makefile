@@ -27,7 +27,7 @@ smoketest:
 
 .PHONY: playground
 playground:
-	wasm-pack build --target web --features wasm-js
+	wasm-pack build --profile wasm --target web --features wasm-js
 	ln -sfn ../pkg playground/pkg
 	@echo "Open http://localhost:8080"
 	python3 -m http.server 8080 --directory playground
