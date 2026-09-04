@@ -18,3 +18,7 @@ harness = false
 [[bench]]
 name = "idor_analysis"
 harness = false
+
+[[bench]]
+name = "ip_matcher"
+harness = false
