@@ -190,7 +190,7 @@ fn test_set_rules_clears_previous() {
 }
 
 #[test]
-fn test_invalid_ip_returns_error() {
+fn test_invalid_ip_does_not_skip_non_ip_rules() {
     let mut engine = WafEngine::new();
     engine.set_rules(&[RuleInput {
         id: "rule1".to_string(),
@@ -201,6 +201,7 @@ fn test_invalid_ip_returns_error() {
     let mut request = make_request("/test");
     request.ip_src = "not-an-ip".to_string();
 
-    let result = engine.evaluate(&request);
-    assert!(result.is_err());
+    let result = engine.evaluate(&request).unwrap();
+    assert!(result.matched);
+    assert_eq!(result.rule_id.unwrap(), "rule1");
 }

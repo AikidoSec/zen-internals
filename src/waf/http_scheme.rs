@@ -1,40 +1,32 @@
-use wirefilter::{Scheme, Type};
+use wirefilter::{Scheme, SchemeBuilder, Type};
 
 pub fn build_http_scheme() -> Scheme {
-    let mut scheme = Scheme::new();
+    let mut scheme = SchemeBuilder::new();
 
-    // Standard fields (matching Cloudflare field naming)
-    // https://developers.cloudflare.com/ruleset-engine/rules-language/fields/reference/
-    scheme.add_field("http.host".into(), Type::Bytes).unwrap();
+    scheme.add_field("http.host", Type::Bytes).unwrap();
     scheme
-        .add_field("http.request.method".into(), Type::Bytes)
+        .add_field("http.request.method", Type::Bytes)
+        .unwrap();
+    scheme.add_field("http.request.uri", Type::Bytes).unwrap();
+    scheme
+        .add_field("http.request.uri.path", Type::Bytes)
         .unwrap();
     scheme
-        .add_field("http.request.uri".into(), Type::Bytes)
+        .add_field("http.request.uri.query", Type::Bytes)
         .unwrap();
     scheme
-        .add_field("http.request.uri.path".into(), Type::Bytes)
+        .add_field("http.request.full_uri", Type::Bytes)
+        .unwrap();
+    scheme.add_field("http.user_agent", Type::Bytes).unwrap();
+    scheme.add_field("http.cookie", Type::Bytes).unwrap();
+    scheme.add_field("http.referer", Type::Bytes).unwrap();
+    scheme
+        .add_field("http.x_forwarded_for", Type::Bytes)
         .unwrap();
     scheme
-        .add_field("http.request.uri.query".into(), Type::Bytes)
+        .add_field("http.request.body.raw", Type::Bytes)
         .unwrap();
-    scheme
-        .add_field("http.request.full_uri".into(), Type::Bytes)
-        .unwrap();
-    scheme
-        .add_field("http.user_agent".into(), Type::Bytes)
-        .unwrap();
-    scheme.add_field("http.cookie".into(), Type::Bytes).unwrap();
-    scheme
-        .add_field("http.referer".into(), Type::Bytes)
-        .unwrap();
-    scheme
-        .add_field("http.x_forwarded_for".into(), Type::Bytes)
-        .unwrap();
-    scheme
-        .add_field("http.request.body.raw".into(), Type::Bytes)
-        .unwrap();
-    scheme.add_field("ip.src".into(), Type::Ip).unwrap();
+    scheme.add_optional_field("ip.src", Type::Ip).unwrap();
 
-    scheme
+    scheme.build()
 }

@@ -17,8 +17,8 @@ regex = { version = "1.12.2", default-features = false, features = ["std", "perf
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.137"
 sqlparser = { version = "0.61.0", features = ["visitor"] }
-wirefilter-engine = "0.6.1"
-getrandom = { version = "0.3", optional = true }
+wirefilter-engine = { git = "https://github.com/cloudflare/wirefilter.git", rev = "748527154f9aef47a0080a6fb1f7e6d6b6e6f672", default-features = false, features = ["regex"] }
+getrandom = { version = "0.4", optional = true }
 js-sys = { version = "0.3.85", optional = true }
 serde-wasm-bindgen = { version = "0.6.5", optional = true }
 wasm-bindgen = { version = "0.2", optional = true }

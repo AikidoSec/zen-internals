@@ -199,30 +199,42 @@ Evaluates WAF rules using [wirefilter](https://github.com/cloudflare/wirefilter)
 | `http.request.body.raw` | String |
 | `ip.src` | IP Address |
 
+#### FFI
+
+The FFI exposes immutable engine handles:
+
+- `waf_engine_create(rules_json, rules_json_len)`
+- `waf_engine_memory_size(engine)`
+- `waf_engine_match(engine, request_json, request_json_len)`
+- `waf_engine_free(engine)`
+
+`waf_engine_create` returns `NULL` for invalid JSON or rules. `waf_engine_memory_size` returns an estimate in bytes for native GC accounting. `waf_engine_match` returns an allocated JSON string that must be released with `free_string`. A handle can be used for concurrent matches, but it must remain alive until those calls finish.
+
 #### WASM
 
 ```js
-const { wasm_waf_set_rules, wasm_waf_evaluate } = require("./some-directory/zen_internals");
+const { create_waf_engine } = require("./some-directory/zen_internals");
 
-// Set rules
-const setResult = wasm_waf_set_rules(JSON.stringify([
+const engine = create_waf_engine(JSON.stringify([
     {
         id: "block-admin",
         expression: 'http.request.uri.path contains "/admin" and http.request.method == "POST"',
         action: "block"
     }
 ]));
-console.log(setResult); // { success: true }
 
-// Evaluate a request
-const evalResult = wasm_waf_evaluate(JSON.stringify({
-    host: "example.com",
-    method: "POST",
-    path: "/admin/users",
-    query: "",
-    uri: "/admin/users",
-    full_uri: "https://example.com/admin/users",
-    ip_src: "1.2.3.4"
-}));
-console.log(evalResult); // { matched: true, rule_id: "block-admin", action: "block" }
+try {
+    console.log(engine.get_size());
+    console.log(engine.match_rules(JSON.stringify({
+        host: "example.com",
+        method: "POST",
+        path: "/admin/users",
+        query: "",
+        uri: "/admin/users",
+        full_uri: "https://example.com/admin/users",
+        ip_src: "1.2.3.4"
+    })));
+} finally {
+    engine.free();
+}
 ```
