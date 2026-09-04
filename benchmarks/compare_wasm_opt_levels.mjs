@@ -1,26 +1,11 @@
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-
-const selectedOptLevel = process.argv[2];
-const variants = await Promise.all(
-  process.argv.slice(3).map(async (argument) => {
-    const separator = argument.indexOf('=');
-    if (separator === -1) {
-      throw new Error(`Invalid variant: ${argument}`);
-    }
-
-    return {
-      name: argument.slice(0, separator),
-      internals: await import(
-        pathToFileURL(resolve(argument.slice(separator + 1)))
-      ),
-    };
-  })
-);
-
-if (!variants.some((variant) => variant.name === selectedOptLevel)) {
-  throw new Error(`Missing build for selected opt-level ${selectedOptLevel}`);
-}
+import {
+  isMainThread,
+  parentPort,
+  workerData,
+  Worker,
+} from 'node:worker_threads';
 
 const sql = "select * from users where id = '1' or 1=1 # '";
 const userInput = "1' or 1=1 # ";
@@ -98,38 +83,76 @@ function average(values) {
   return values.reduce((total, value) => total + value, 0) / values.length;
 }
 
-function compare(benchmark) {
-  const samples = new Map();
-
-  for (const variant of variants) {
-    runIterations(benchmark, variant.internals, benchmark.warmupIterations);
-    samples.set(variant.name, []);
+function parseVariant(argument) {
+  const separator = argument.indexOf('=');
+  if (separator === -1) {
+    throw new Error(`Invalid variant: ${argument}`);
   }
 
-  for (let sample = 0; sample < 3; sample++) {
-    const offset = sample % variants.length;
-    const orderedVariants = variants
-      .slice(offset)
-      .concat(variants.slice(0, offset));
+  return {
+    name: argument.slice(0, separator),
+    modulePath: argument.slice(separator + 1),
+  };
+}
 
-    for (const variant of orderedVariants) {
+async function benchmarkVariant(argument) {
+  const { name, modulePath } = parseVariant(argument);
+  const internals = await import(pathToFileURL(resolve(modulePath)));
+
+  if (internals.wasm_detect_sql_injection(sql, userInput, 8) !== 1) {
+    throw new Error(
+      `SQL injection benchmark input was not detected by opt-level ${name}`
+    );
+  }
+
+  const timings = {};
+  for (const benchmark of benchmarks) {
+    runIterations(benchmark, internals, benchmark.warmupIterations);
+    const samples = [];
+
+    for (let sample = 0; sample < 3; sample++) {
       if (global.gc) {
         global.gc();
       }
-      samples
-        .get(variant.name)
-        .push(
-          runIterations(
-            benchmark,
-            variant.internals,
-            benchmark.iterations
-          )
-        );
+      samples.push(
+        runIterations(benchmark, internals, benchmark.iterations)
+      );
     }
+
+    timings[benchmark.name] = average(samples);
   }
 
+  return { name, timings };
+}
+
+function runVariantInWorker(argument) {
+  return new Promise((resolveWorker, rejectWorker) => {
+    const worker = new Worker(new URL(import.meta.url), {
+      workerData: argument,
+    });
+    let result;
+    let receivedResult = false;
+
+    worker.once('message', (message) => {
+      result = message;
+      receivedResult = true;
+    });
+    worker.once('error', rejectWorker);
+    worker.once('exit', (code) => {
+      if (code !== 0) {
+        rejectWorker(new Error(`Benchmark worker exited with code ${code}`));
+      } else if (!receivedResult) {
+        rejectWorker(new Error('Benchmark worker exited without a result'));
+      } else {
+        resolveWorker(result);
+      }
+    });
+  });
+}
+
+function compare(benchmark, variants, selectedOptLevel) {
   const timings = new Map(
-    variants.map((variant) => [variant.name, average(samples.get(variant.name))])
+    variants.map((variant) => [variant.name, variant.timings[benchmark.name]])
   );
   const fastestVariant = variants.reduce((fastest, variant) =>
     timings.get(variant.name) < timings.get(fastest.name) ? variant : fastest
@@ -144,35 +167,47 @@ function compare(benchmark) {
   };
 }
 
-for (const variant of variants) {
-  if (variant.internals.wasm_detect_sql_injection(sql, userInput, 8) !== 1) {
+async function main() {
+  const selectedOptLevel = process.argv[2];
+  const variants = [];
+  for (const argument of process.argv.slice(3)) {
+    variants.push(await runVariantInWorker(argument));
+  }
+
+  if (!variants.some((variant) => variant.name === selectedOptLevel)) {
+    throw new Error(`Missing build for selected opt-level ${selectedOptLevel}`);
+  }
+
+  const results = benchmarks.map((benchmark) =>
+    compare(benchmark, variants, selectedOptLevel)
+  );
+  const headings = variants.map((variant) => `opt-level ${variant.name}`);
+
+  console.log(
+    `| Benchmark | ${headings.join(' | ')} | Fastest | selected / fastest |`
+  );
+  console.log(`|---|${variants.map(() => '---:|').join('')}---:|---:|`);
+  for (const result of results) {
+    const timings = variants.map(
+      (variant) => `${(result.timings.get(variant.name) / 1_000).toFixed(3)} µs`
+    );
+    console.log(
+      `| ${result.name} | ${timings.join(' | ')} | ${result.fastestOptLevel} | ${result.selectedRatio.toFixed(3)} |`
+    );
+  }
+
+  const slowResults = results.filter((result) => result.selectedRatio > 1.05);
+  if (slowResults.length > 0) {
     throw new Error(
-      `SQL injection benchmark input was not detected by opt-level ${variant.name}`
+      `Selected opt-level ${selectedOptLevel} is more than 5% slower than the fastest build for: ${slowResults.map((result) => result.name).join(', ')}`
     );
   }
 }
 
-const results = benchmarks.map(compare);
-const headings = variants.map((variant) => `opt-level ${variant.name}`);
-
-console.log(
-  `| Benchmark | ${headings.join(' | ')} | Fastest | selected / fastest |`
-);
-console.log(`|---|${variants.map(() => '---:|').join('')}---:|---:|`);
-for (const result of results) {
-  const timings = variants.map(
-    (variant) => `${(result.timings.get(variant.name) / 1_000).toFixed(3)} µs`
-  );
-  console.log(
-    `| ${result.name} | ${timings.join(' | ')} | ${result.fastestOptLevel} | ${result.selectedRatio.toFixed(3)} |`
-  );
-}
-
-const slowResults = results.filter((result) => result.selectedRatio > 1.05);
-if (slowResults.length > 0) {
-  throw new Error(
-    `Selected opt-level ${selectedOptLevel} is more than 5% slower than the fastest build for: ${slowResults.map((result) => result.name).join(', ')}`
-  );
+if (isMainThread) {
+  await main();
+} else {
+  parentPort.postMessage(await benchmarkVariant(workerData));
 }
 
 void sink;
