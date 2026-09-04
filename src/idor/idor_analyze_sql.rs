@@ -55,34 +55,13 @@ pub fn idor_analyze_sql(query: &str, dialect: i32) -> Result<Vec<SqlQueryResult>
     Ok(results)
 }
 
-/// Resolves the source-order positions of MySQL placeholders (`?`) in a statement.
+/// Uses tokenizer locations instead of AST traversal. In `MATCH (...) AGAINST (?)`, sqlparser
+/// stores the `?` in the `match_value` field of `Expr::MatchAgainst`. That field is a `Value`
+/// without a source span, while the corresponding token retains its source location.
 ///
-/// We read placeholder positions from the token stream instead of walking the AST. Some valid
-/// MySQL syntax, such as `MATCH (...) AGAINST (?)`, stores the placeholder as a value without a
-/// source span. The token still has its position in the query.
-///
-/// For `UPDATE t SET a = ? WHERE b = ?`, the AST is a tree:
-///
-/// ```text
-/// Update
-/// ├─ assignments: [ a = ? ]
-/// └─ selection: b = ?
-/// ```
-///
-/// The tokenizer keeps the `?` tokens in query order:
-///
-/// ```text
-/// [Location(1, 18), Location(1, 30)]
-/// //    ^ a's `?`        ^ b's `?`
-/// ```
-///
-/// `placeholder_starts` covers the whole query. `of_statement` keeps only the tokens inside the
-/// current statement, so each statement starts numbering at `0`.
-///
-/// `number_of` gets the extracted expression's span via `mysql_placeholder_span` and looks it up
-/// in `starts`.
+/// For queries containing multiple statements, placeholder numbering starts at zero for each
+/// statement.
 struct PlaceholderPositions {
-    /// Start location of every `?` token in this statement, in query order.
     starts: Vec<Location>,
 }
 
