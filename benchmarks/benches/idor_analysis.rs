@@ -131,6 +131,17 @@ fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
+    group.bench_function("negated_filter", |b| {
+        b.iter(|| {
+            idor_analyze_sql(
+                black_box(
+                    "SELECT * FROM orders WHERE id = $1 AND NOT NOT (tenant_id = $2) AND NOT (status = 'deleted')",
+                ),
+                black_box(9),
+            )
+        })
+    });
+
     group.bench_function("col_col_deep_transitive_chain", |b| {
         b.iter(|| {
             idor_analyze_sql(
