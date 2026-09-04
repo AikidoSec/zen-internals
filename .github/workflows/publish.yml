@@ -24,8 +24,11 @@ jobs:
   lint:
     uses: ./.github/workflows/lint.yml
 
+  jvm-wasm-compilation:
+    uses: ./.github/workflows/jvm-wasm-compilation.yml
+
   build:
-    needs: [tests, lint]
+    needs: [tests, lint, jvm-wasm-compilation]
     strategy:
       fail-fast: false
       matrix:
@@ -129,16 +132,16 @@ jobs:
           ${{ matrix.use_zig && 'cargo install --locked cargo-zigbuild' || format('rustup target add {0}', matrix.target) }}
 
       - name: Build
+        if: matrix.target != 'wasm32-unknown-unknown'
         run: |
           ${{ matrix.rustflags && format('RUSTFLAGS="{0}"', matrix.rustflags) || '' }} \
           ${{ matrix.use_zig && 'cargo zigbuild' || 'cargo build' }} \
           --target ${{ matrix.target }} --release
         shell: bash
 
-      - name: Optimize WASM
+      - name: Build WASM
         if: matrix.target == 'wasm32-unknown-unknown'
-        run: |
-          wasm-opt -O --enable-bulk-memory --enable-sign-ext --enable-nontrapping-float-to-int target/wasm32-unknown-unknown/release/zen_internals.wasm -o target/wasm32-unknown-unknown/release/zen_internals.wasm
+        run: ./scripts/build-wasm.sh
 
       - name: Prepare release (Unix)
         if: "!matrix.use_powershell"
