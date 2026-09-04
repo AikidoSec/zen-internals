@@ -555,4 +555,4 @@ fn parse_ipv6(value: &str, bytes: &mut [u8; 16]) -> bool {
 }
 
 #[cfg(test)]
-mod tests;
+mod ip_matcher_test;

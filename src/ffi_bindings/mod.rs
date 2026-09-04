@@ -5,6 +5,8 @@
 //! `# Safety` contract that the caller must uphold.
 
 mod ip_matcher;
+#[cfg(test)]
+mod ip_matcher_test;
 
 use crate::idor::idor_analyze_sql::idor_analyze_sql;
 use crate::js_injection::detect_js_injection::detect_js_injection_str;
