@@ -7,7 +7,7 @@ wasm_path="target/wasm32-unknown-unknown/release/zen_internals.wasm"
 # Limit single-caller inlining so Chicory does not generate JVM methods larger than 64 KB.
 wasm-opt \
   -O \
-  --one-caller-inline-max-function-size=512 \
+  --one-caller-inline-max-function-size=256 \
   --enable-bulk-memory \
   --enable-sign-ext \
   --enable-nontrapping-float-to-int \
