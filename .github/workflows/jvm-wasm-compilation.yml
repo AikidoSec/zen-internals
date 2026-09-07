@@ -39,7 +39,10 @@ jobs:
           sudo apt-get install -y binaryen
 
       - name: Build WASM
-        run: ./scripts/build-wasm.sh
+        run: cargo build --target wasm32-unknown-unknown --release
+
+      - name: Optimize WASM
+        run: ./scripts/optimize-wasm.sh
 
       - name: Install Chicory compiler
         run: |

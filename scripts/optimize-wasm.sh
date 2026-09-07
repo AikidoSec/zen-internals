@@ -4,8 +4,6 @@ set -euo pipefail
 
 wasm_path="target/wasm32-unknown-unknown/release/zen_internals.wasm"
 
-cargo build --target wasm32-unknown-unknown --release
-
 # Limit single-caller inlining so Chicory does not generate JVM methods larger than 64 KB.
 wasm-opt \
   -O \

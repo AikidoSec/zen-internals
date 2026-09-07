@@ -132,16 +132,15 @@ jobs:
           ${{ matrix.use_zig && 'cargo install --locked cargo-zigbuild' || format('rustup target add {0}', matrix.target) }}
 
       - name: Build
-        if: matrix.target != 'wasm32-unknown-unknown'
         run: |
           ${{ matrix.rustflags && format('RUSTFLAGS="{0}"', matrix.rustflags) || '' }} \
           ${{ matrix.use_zig && 'cargo zigbuild' || 'cargo build' }} \
           --target ${{ matrix.target }} --release
         shell: bash
 
-      - name: Build WASM
+      - name: Optimize WASM
         if: matrix.target == 'wasm32-unknown-unknown'
-        run: ./scripts/build-wasm.sh
+        run: ./scripts/optimize-wasm.sh
 
       - name: Prepare release (Unix)
         if: "!matrix.use_powershell"
