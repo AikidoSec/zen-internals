@@ -131,10 +131,9 @@ jobs:
 
       - name: Build
         run: |
-          PROFILE="${{ matrix.profile || 'release' }}"
           ${{ matrix.rustflags && format('RUSTFLAGS="{0}"', matrix.rustflags) || '' }} \
           ${{ matrix.use_zig && 'cargo zigbuild' || 'cargo build' }} \
-          --target ${{ matrix.target }} --profile "$PROFILE"
+          --target ${{ matrix.target }} --profile "${{ matrix.profile || 'release' }}"
         shell: bash
 
       - name: Optimize WASM
@@ -186,7 +185,7 @@ jobs:
       - name: Install wasm-pack
         run: cargo install wasm-pack
       - name: Build with wasm-pack
-        run: wasm-pack build --profile wasm --target nodejs --features wasm-js
+        run: ./scripts/build-wasm.sh
       - name: Package and checksum
         run: |
           cd pkg
