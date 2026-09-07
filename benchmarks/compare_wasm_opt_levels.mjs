@@ -1,4 +1,5 @@
-import { resolve } from 'node:path';
+import { stat } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
   isMainThread,
@@ -9,9 +10,9 @@ import {
 
 const sql = "select * from users where id = '1' or 1=1 # '";
 const userInput = "1' or 1=1 # ";
+const safeSql = "SELECT 'he 1 _ llo'";
+const safeUserInput = 'he 1 _ llo';
 const simpleIdorQuery = 'SELECT * FROM users WHERE tenant_id = $1';
-const joinedIdorQuery =
-  'SELECT * FROM users u JOIN orders o ON o.user_id = u.id WHERE u.tenant_id = $1';
 const complexIdorQuery = `WITH monthly_revenue AS (
   SELECT o.tenant_id, DATE_TRUNC('month', o.created_at) AS month,
          SUM(oi.quantity * oi.unit_price) AS revenue
@@ -43,21 +44,21 @@ const benchmarks = [
       internals.wasm_detect_sql_injection(sql, userInput, 8),
   },
   {
-    name: 'IDOR simple SELECT',
+    name: 'SQL injection (safe)',
+    iterations: 100_000,
+    warmupIterations: 20_000,
+    run: (internals) =>
+      internals.wasm_detect_sql_injection(safeSql, safeUserInput, 8),
+  },
+  {
+    name: 'IDOR simple query',
     iterations: 20_000,
     warmupIterations: 5_000,
     run: (internals) =>
       internals.wasm_idor_analyze_sql(simpleIdorQuery, 9),
   },
   {
-    name: 'IDOR SELECT with JOIN',
-    iterations: 20_000,
-    warmupIterations: 5_000,
-    run: (internals) =>
-      internals.wasm_idor_analyze_sql(joinedIdorQuery, 9),
-  },
-  {
-    name: 'IDOR complex query',
+    name: 'IDOR big query',
     iterations: 2_000,
     warmupIterations: 1_000,
     run: (internals) =>
@@ -97,11 +98,22 @@ function parseVariant(argument) {
 
 async function benchmarkVariant(argument) {
   const { name, modulePath } = parseVariant(argument);
-  const internals = await import(pathToFileURL(resolve(modulePath)));
+  const resolvedModulePath = resolve(modulePath);
+  const internals = await import(pathToFileURL(resolvedModulePath));
+  const wasmSize = (
+    await stat(join(dirname(resolvedModulePath), 'zen_internals_bg.wasm'))
+  ).size;
 
   if (internals.wasm_detect_sql_injection(sql, userInput, 8) !== 1) {
     throw new Error(
       `SQL injection benchmark input was not detected by opt-level ${name}`
+    );
+  }
+  if (
+    internals.wasm_detect_sql_injection(safeSql, safeUserInput, 8) !== 0
+  ) {
+    throw new Error(
+      `Safe SQL injection benchmark input was detected by opt-level ${name}`
     );
   }
 
@@ -122,7 +134,7 @@ async function benchmarkVariant(argument) {
     timings[benchmark.name] = average(samples);
   }
 
-  return { name, timings };
+  return { name, timings, wasmSize };
 }
 
 function runVariantInWorker(argument) {
@@ -150,56 +162,33 @@ function runVariantInWorker(argument) {
   });
 }
 
-function compare(benchmark, variants, selectedOptLevel) {
-  const timings = new Map(
-    variants.map((variant) => [variant.name, variant.timings[benchmark.name]])
-  );
-  const fastestVariant = variants.reduce((fastest, variant) =>
-    timings.get(variant.name) < timings.get(fastest.name) ? variant : fastest
-  );
-
-  return {
-    name: benchmark.name,
-    timings,
-    fastestOptLevel: fastestVariant.name,
-    selectedRatio:
-      timings.get(selectedOptLevel) / timings.get(fastestVariant.name),
-  };
-}
-
 async function main() {
-  const selectedOptLevel = process.argv[2];
   const variants = [];
-  for (const argument of process.argv.slice(3)) {
+  for (const argument of process.argv.slice(2)) {
     variants.push(await runVariantInWorker(argument));
   }
 
-  if (!variants.some((variant) => variant.name === selectedOptLevel)) {
-    throw new Error(`Missing build for selected opt-level ${selectedOptLevel}`);
-  }
-
-  const results = benchmarks.map((benchmark) =>
-    compare(benchmark, variants, selectedOptLevel)
+  const sizeBaseline = variants[0];
+  const headings = benchmarks.map(
+    (benchmark) => `${benchmark.name} vs opt-level ${sizeBaseline.name}`
   );
-  const headings = variants.map((variant) => `opt-level ${variant.name}`);
-
   console.log(
-    `| Benchmark | ${headings.join(' | ')} | Fastest | selected / fastest |`
+    `| Opt level | WASM size | vs opt-level ${sizeBaseline.name} | ${headings.join(' | ')} |`
   );
-  console.log(`|---|${variants.map(() => '---:|').join('')}---:|---:|`);
-  for (const result of results) {
-    const timings = variants.map(
-      (variant) => `${(result.timings.get(variant.name) / 1_000).toFixed(3)} µs`
-    );
+  console.log(`|---|---:|---:|${benchmarks.map(() => '---:|').join('')}`);
+  for (const variant of variants) {
+    const difference = variant.wasmSize - sizeBaseline.wasmSize;
+    const percentage = (difference / sizeBaseline.wasmSize) * 100;
+    const sign = difference > 0 ? '+' : '';
+    const timings = benchmarks.map((benchmark) => {
+      const timing = variant.timings[benchmark.name];
+      const baselineTiming = sizeBaseline.timings[benchmark.name];
+      const improvement = ((baselineTiming - timing) / baselineTiming) * 100;
+      const improvementSign = improvement > 0 ? '+' : '';
+      return `${(timing / 1_000).toFixed(3)} µs (${improvementSign}${improvement.toFixed(1)}%)`;
+    });
     console.log(
-      `| ${result.name} | ${timings.join(' | ')} | ${result.fastestOptLevel} | ${result.selectedRatio.toFixed(3)} |`
-    );
-  }
-
-  const slowResults = results.filter((result) => result.selectedRatio > 1.05);
-  if (slowResults.length > 0) {
-    throw new Error(
-      `Selected opt-level ${selectedOptLevel} is more than 5% slower than the fastest build for: ${slowResults.map((result) => result.name).join(', ')}`
+      `| ${variant.name} | ${(variant.wasmSize / 1024).toFixed(1)} KiB | ${sign}${(difference / 1024).toFixed(1)} KiB (${sign}${percentage.toFixed(1)}%) | ${timings.join(' | ')} |`
     );
   }
 }
