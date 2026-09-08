@@ -553,6 +553,25 @@ mod tests {
     }
 
     #[test]
+    fn test_wordpress_author_not_in_timing_injection() {
+        // The raw batch body contains a percent-encoded URL. This is the decoded
+        // author_exclude parameter value that WordPress interpolates into the query.
+        let user_input = "SELECT IF((1=1),SLEEP(0.15),0)";
+        let query = r#"
+            SELECT SQL_CALC_FOUND_ROWS wp_posts.ID
+            FROM wp_posts
+            WHERE 1=1
+              AND wp_posts.post_author NOT IN (SELECT IF((1=1),SLEEP(0.15),0))
+              AND wp_posts.post_type = 'post'
+              AND wp_posts.post_status = 'publish'
+            ORDER BY wp_posts.post_date DESC
+            LIMIT 0, 10
+        "#;
+
+        is_injection!(query, user_input, dialect("mysql"));
+    }
+
+    #[test]
     fn test_single_line_comments() {
         is_injection!(
             "SELECT * FROM users WHERE id = '1' OR 1=1 # '",
