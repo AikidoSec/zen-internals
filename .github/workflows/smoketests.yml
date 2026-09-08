@@ -22,9 +22,9 @@ jobs:
       - run: cargo install wasm-pack
       - run: wasm-pack build --target nodejs --features wasm-js
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "22"
+          node-version: "lts/*"
       - uses: denoland/setup-deno@4606d5cc6fb3f673efd4f594850e3f4b3e9d29cd # v2
         with:
           deno-version: v2.x
