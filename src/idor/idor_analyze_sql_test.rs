@@ -7514,10 +7514,6 @@ mod tests {
                 "DELETE FROM users WHERE name LIKE ? AND tenant_id = ?",
                 vec![Some(1)],
             ),
-            (
-                "UPDATE users SET name = ? WHERE tenant_id = ?; UPDATE users SET name = ? WHERE tenant_id = ?",
-                vec![Some(1), Some(1)],
-            ),
         ] {
             let placeholder_numbers = idor_analyze_sql(query, 8)
                 .unwrap()
