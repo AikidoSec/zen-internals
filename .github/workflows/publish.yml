@@ -24,8 +24,11 @@ jobs:
   lint:
     uses: ./.github/workflows/lint.yml
 
+  jvm-wasm-compilation:
+    uses: ./.github/workflows/jvm-wasm-compilation.yml
+
   build:
-    needs: [tests, lint]
+    needs: [tests, lint, jvm-wasm-compilation]
     strategy:
       fail-fast: false
       matrix:
@@ -137,8 +140,7 @@ jobs:
 
       - name: Optimize WASM
         if: matrix.target == 'wasm32-unknown-unknown'
-        run: |
-          wasm-opt -O --enable-bulk-memory --enable-sign-ext --enable-nontrapping-float-to-int target/wasm32-unknown-unknown/release/zen_internals.wasm -o target/wasm32-unknown-unknown/release/zen_internals.wasm
+        run: ./scripts/optimize-wasm.sh
 
       - name: Prepare release (Unix)
         if: "!matrix.use_powershell"
