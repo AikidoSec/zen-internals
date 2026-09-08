@@ -41,6 +41,17 @@ fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
+    group.bench_function("update_with_set_placeholders", |b| {
+        b.iter(|| {
+            idor_analyze_sql(
+                black_box(
+                    "UPDATE tickets t SET t.sys_group_id = ?, status = ? WHERE t.sys_group_id = ?",
+                ),
+                black_box(8),
+            )
+        })
+    });
+
     group.bench_function("cte_with_multiple_queries", |b| {
         b.iter(|| {
             idor_analyze_sql(
