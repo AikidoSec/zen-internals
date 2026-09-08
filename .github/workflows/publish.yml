@@ -209,6 +209,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -219,8 +223,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ github.ref_name }}
         run: |
+          PRERELEASE=$(node scripts/is-prerelease.js "$VERSION")
           if ! gh release view "$VERSION" &>/dev/null; then
-            gh release create "$VERSION" --draft --title "$VERSION" --generate-notes
+            gh release create "$VERSION" --draft --prerelease="$PRERELEASE" --title "$VERSION" --generate-notes
           fi
           gh release upload "$VERSION" --clobber \
             ./artifacts/linux-binaries/* \
@@ -233,5 +238,5 @@ jobs:
             ./artifacts/mac-binaries-arm64/* \
             ./artifacts/wasm-node-binaries/* \
             ./artifacts/wasm-binaries/*
-          gh release edit "$VERSION" --draft=false
+          gh release edit "$VERSION" --draft=false --prerelease="$PRERELEASE"
 

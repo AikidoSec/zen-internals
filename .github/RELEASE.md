@@ -11,6 +11,17 @@ Also, ensure you are prepared to test all changes in at least one Zen agent afte
 Create a new tag with a leading `v` followed by the version number using `git tag` (e.g. `git tag v1.0.0`) and push the tag to the repository using `git push origin v1.0.0`.
 This will trigger the release workflow that will build the binaries and create the GitHub release.
 
+### Beta releases
+
+Tag betas as `vX.Y.Z-beta.N`:
+
+```sh
+git tag v1.0.0-beta.1
+git push origin v1.0.0-beta.1
+```
+
+Only `vX.Y.Z` and `vX.Y.Z-beta.N` tags are accepted. Beta tags are GitHub prereleases and do not replace the latest stable release.
+
 ## 3. Monitor release workflow
 
 Monitor [the workflow](https://github.com/AikidoSec/zen-internals/actions/workflows/publish.yml) for any errors and ensure that the release is published successfully.
