@@ -6,6 +6,7 @@ Zen Internals is a library that can be used via FFI in different languages. Cont
 
 - SQL Injections
 - JS Code Injections
+- IP matching
 
 ## Return codes
 
@@ -35,6 +36,56 @@ if __name__ == "__main__":
 ```
 
 See [list of dialects](https://github.com/AikidoSec/zen-internals/blob/main/src/sql_injection/helpers/select_dialect_based_on_enum.rs#L18)
+
+## IP matcher
+
+The IP matcher is not exposed in WASM. It uses pointer and length byte slices, so the input does not need null terminators.
+
+```py
+import ctypes
+
+class IpMatcherByteSlice(ctypes.Structure):
+    _fields_ = [
+        ("ptr", ctypes.POINTER(ctypes.c_uint8)),
+        ("len", ctypes.c_size_t),
+    ]
+
+zen_internals = ctypes.CDLL("target/release/libzen_internals.so")
+zen_internals.ip_matcher_create.argtypes = [ctypes.POINTER(IpMatcherByteSlice), ctypes.c_size_t]
+zen_internals.ip_matcher_create.restype = ctypes.c_void_p
+zen_internals.ip_matcher_has.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t]
+zen_internals.ip_matcher_has.restype = ctypes.c_int
+zen_internals.ip_matcher_memory_size.argtypes = [ctypes.c_void_p]
+zen_internals.ip_matcher_memory_size.restype = ctypes.c_size_t
+zen_internals.ip_matcher_free.argtypes = [ctypes.c_void_p]
+zen_internals.ip_matcher_free.restype = None
+
+network_bytes = [value.encode("utf-8") for value in ["10.0.0.0/8", "2001:db8::/32"]]
+network_buffers = [(ctypes.c_uint8 * len(value)).from_buffer_copy(value) for value in network_bytes]
+networks = (IpMatcherByteSlice * len(network_buffers))(*[
+    IpMatcherByteSlice(buffer, len(buffer)) for buffer in network_buffers
+])
+
+matcher = zen_internals.ip_matcher_create(networks, len(networks))
+if not matcher:
+    raise RuntimeError("ip_matcher_create returned null")
+
+try:
+    lookup_bytes = b"10.2.3.4"
+    lookup_buffer = (ctypes.c_uint8 * len(lookup_bytes)).from_buffer_copy(lookup_bytes)
+    result = zen_internals.ip_matcher_has(matcher, lookup_buffer, len(lookup_buffer))
+    print(result)  # 1 = match, 0 = no match, 2 = error
+    print("Native memory:", zen_internals.ip_matcher_memory_size(matcher))
+finally:
+    zen_internals.ip_matcher_free(matcher)
+```
+
+### Notes
+
+- Invalid network strings are ignored.
+- `ip_matcher_create` returns `NULL` for malformed input, more than 1,000,000 entries, or more than 64 MiB of input.
+- `ip_matcher_has` returns `1` for a match, `0` for no match, and `2` for invalid FFI input, including lookups longer than 128 bytes.
+- Call `ip_matcher_free` exactly once for each matcher. Lookups may run concurrently, but the matcher must remain alive until all lookups finish.
 
 ## Node.js bindings (using WASM)
 
