@@ -278,6 +278,47 @@ mod tests {
     }
 
     #[test]
+    fn test_comma_separated_numbers() {
+        for input in [
+            "1,2",
+            "1, 2, 3",
+            " 1,2 ",
+            "12.34,56.78",
+            "12.34, 56.78",
+            "0.0,0.0",
+        ] {
+            assert!(is_common_sql_string(input), "expected `{input}` to be safe");
+        }
+
+        for input in [
+            ",,,",
+            ".,.",
+            "1,-2",
+            "1,+2",
+            "1,2e3",
+            "1,2--",
+            "1,2#",
+            "1,2/*",
+            "1,2;",
+            "1,2=3",
+            "1,2/3",
+            "1,2*3",
+            "1,(2",
+            "1,2)",
+            "1,'2'",
+            "1,2 or 1=1",
+            "1,\t2",
+            "1,\n2",
+            "1,٢",
+        ] {
+            assert!(
+                !is_common_sql_string(input),
+                "expected `{input}` to be scanned"
+            );
+        }
+    }
+
+    #[test]
     fn test_single_line_comment_with_single_quote() {
         assert!(!is_common_sql_string("--"));
         assert!(!is_common_sql_string("--'"));
