@@ -134,6 +134,13 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         return true;
     }
 
+    if user_input.contains(',')
+        && user_input.bytes().any(|b| b.is_ascii_digit())
+        && regex!(r"^[0-9., ]+$").is_match(user_input)
+    {
+        return true;
+    }
+
     if user_input.contains(".") {
         // Check if it is just a decimal (e.g. `16.2`)
         if regex!(r"^-?[0-9]+\.[0-9]+$").is_match(user_input) {

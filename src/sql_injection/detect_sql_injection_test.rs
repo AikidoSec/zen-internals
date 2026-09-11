@@ -795,6 +795,11 @@ mod tests {
             "121.25 ELSE 1"
         );
 
+        not_injection!("INSERT INTO locations VALUES (12.34,56.78)", "12.34,56.78");
+        is_injection!(
+            "INSERT INTO locations VALUES (12.34,56.78), (1,2)",
+            "12.34,56.78), (1,2"
+        );
         not_injection!(
             "SELECT CASE WHEN age > 18.0 THEN 'adult' ELSE 'minor' END AS status FROM users;",
             "18.0"
