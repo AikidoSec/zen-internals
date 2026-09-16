@@ -184,7 +184,10 @@ fn analyze_statement(
         | Statement::Explain { .. }
         | Statement::Fetch { .. }
         | Statement::Close { .. }
-        | Statement::Analyze { .. } => {}
+        | Statement::Analyze { .. }
+        | Statement::LISTEN { .. }
+        | Statement::UNLISTEN { .. }
+        | Statement::NOTIFY { .. } => {}
         _ => {
             return Err("Unrecognized SQL statement".to_string());
         }

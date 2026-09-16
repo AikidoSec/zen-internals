@@ -4060,6 +4060,19 @@ mod tests {
     }
 
     #[test]
+    fn test_postgres_notification_statements_ignored() {
+        for query in [
+            "LISTEN zen_events;",
+            "UNLISTEN zen_events;",
+            "UNLISTEN *;",
+            "NOTIFY zen_events;",
+            "NOTIFY zen_events, 'ready';",
+        ] {
+            assert_eq!(idor_analyze_sql(query, 9).unwrap(), vec![], "{query}");
+        }
+    }
+
+    #[test]
     fn test_session_statements_ignored_mysql() {
         assert_eq!(idor_analyze_sql("SET NAMES 'utf8mb4';", 8).unwrap(), vec![]);
         assert_eq!(idor_analyze_sql("SET NAMES DEFAULT;", 8).unwrap(), vec![]);
