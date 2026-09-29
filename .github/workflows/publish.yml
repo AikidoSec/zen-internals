@@ -183,10 +183,12 @@ jobs:
         run: |
           rustup update --no-self-update stable
           rustup default stable
-      - name: Install wasm-pack
-        run: cargo install wasm-pack
-      - name: Build with wasm-pack
-        run: wasm-pack build --target nodejs --features wasm-js
+      - name: Install WASM tools
+        run: |
+          cargo install wasm-pack
+          cargo install wasm-bindgen-cli --version '=0.2.129' --locked
+      - name: Build WASM package
+        run: ./scripts/build-wasm.sh
       - name: Package and checksum
         run: |
           cd pkg

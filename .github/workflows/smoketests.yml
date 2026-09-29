@@ -20,7 +20,8 @@ jobs:
           rustup default stable
 
       - run: cargo install wasm-pack
-      - run: wasm-pack build --target nodejs --features wasm-js
+      - run: cargo install wasm-bindgen-cli --version '=0.2.129' --locked
+      - run: ./scripts/build-wasm.sh
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
