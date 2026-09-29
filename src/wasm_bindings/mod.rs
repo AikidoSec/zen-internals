@@ -3,6 +3,9 @@ use crate::js_injection::detect_js_injection::detect_js_injection_str;
 use crate::sql_injection::detect_sql_injection::{detect_sql_injection_str, DetectionReason};
 use wasm_bindgen::prelude::*;
 
+#[wasm_bindgen(start, private)]
+pub fn start() {}
+
 #[wasm_bindgen]
 pub fn wasm_detect_sql_injection(query: &str, userinput: &str, dialect: i32) -> i32 {
     let detection_results = detect_sql_injection_str(query, userinput, dialect);

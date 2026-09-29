@@ -1,5 +1,5 @@
 const internals = require("../pkg/zen_internals");
-const { deepStrictEqual } = require("node:assert");
+const { deepStrictEqual, throws } = require("node:assert");
 const test = require("node:test");
 
 test("wasm_detect_sql_injection", () => {
@@ -13,6 +13,15 @@ test("wasm_detect_sql_injection", () => {
 test("wasm_detect_js_injection", () => {
  deepStrictEqual(internals.wasm_detect_js_injection("const test = 'Hello World!'; //';", "Hello World!'; //", 0), true);
  deepStrictEqual(internals.wasm_detect_js_injection("const test = 'Hello World!'; //';", "Hello World!", 0), false);
+});
+
+test("reset WASM after a failed call", () => {
+ const nested = "(".repeat(10_000);
+ for (let i = 0; i < 2; i++) {
+  throws(() => internals.wasm_detect_js_injection(nested, nested, 0));
+  internals.__wbg_reset_state();
+ }
+ deepStrictEqual(internals.wasm_detect_js_injection("const value = 'safe';", "safe", 0), false);
 });
 
 test("wasm_idor_analyze_sql", () => {
