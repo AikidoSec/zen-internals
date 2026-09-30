@@ -1291,4 +1291,60 @@ mod tests {
             ));
         }
     }
+
+    #[test]
+    fn does_not_flag_safely_escaped_postgres_inputs() {
+        for (query, input) in [
+            (
+                "SELECT \"records\".\"id\" FROM \"records\" WHERE \"records\".\"value\" = '''+encode(IMAGE)+'''",
+                "'+encode(IMAGE)+'",
+            ),
+            (
+                r#"SELECT "records"."id" FROM "records" WHERE "records"."value" = 'mixed,,"),)(,)'''"#,
+                r#"mixed,,"),)(,)'"#,
+            ),
+            (
+                "SELECT \"id\" FROM \"records\" WHERE \"value\" = 'resource(''' LIMIT 1",
+                "resource('",
+            ),
+            (
+                "UPDATE \"records\" SET \"title\" = '''RETRO EDITION    ' WHERE \"id\" = 1",
+                "'RETRO EDITION    ",
+            ),
+            (
+                "SELECT \"id\" FROM \"records\" WHERE \"name\" ILIKE 'A sentence that doesn''%' LIMIT 10",
+                "A sentence that doesn'",
+            ),
+            (
+                r#"SELECT "id" FROM "records" WHERE LOWER("value") = LOWER('text)").)''')"#,
+                r#"text)").)'"#,
+            ),
+            (
+                "INSERT INTO \"records\" VALUES ('sample;''\n') RETURNING \"reason\"",
+                "sample;'",
+            ),
+        ] {
+            let result = detect_sql_injection_str(query, input, 9);
+
+            assert!(!result.detected, "{result:?}\nquery: {query}\ninput: {input}");
+        }
+    }
+
+    #[test]
+    fn detects_postgres_injection_with_nonconforming_strings() {
+        let input = "'; SELECT 2; --";
+        let query = format!("SELECT '\\' || ''{input}'");
+        let result = detect_sql_injection_str(&query, input, 9);
+
+        assert!(result.detected, "{result:?}");
+    }
+
+    #[test]
+    fn detects_mssql_injection_in_dynamic_sql() {
+        let input = "'; SELECT 2;--";
+        let query = format!("EXEC('SELECT 1 WHERE ''x'' = ''' + ''{input}');");
+        let result = detect_sql_injection_str(&query, input, 7);
+
+        assert!(result.detected, "{result:?}");
+    }
 }
