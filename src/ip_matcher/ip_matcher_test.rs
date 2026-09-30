@@ -298,8 +298,29 @@ fn preserves_embedded_ipv4_and_mapped_address_forms() {
             ("::ffff:0.0.0.0", true),
             ("::ffff:0:0:0:0", true),
             ("127.0.0.1", false),
-            ("::ffff:192.0.2.55", false),
+            ("::ffff:192.0.2.55", true),
             ("::ffff:123", false),
+        ],
+    );
+}
+
+#[test]
+fn matches_ipv4_mapped_lookups_against_ipv4_networks() {
+    assert_cases(
+        &["192.0.2.55", "10.0.0.0/8", "2001:db8::/32"],
+        &[
+            ("::ffff:192.0.2.55", true),
+            ("[::ffff:192.0.2.55]", true),
+            ("::FFFF:192.0.2.55", true),
+            ("::ffff:c000:237", true),
+            ("0:0:0:0:0:ffff:c000:237", true),
+            ("::ffff:10.1.2.3", true),
+            ("::ffff:198.51.100.1", false),
+            ("::c000:237", false),
+            ("::ffff:0:c000:237", false),
+            ("64:ff9b::c000:237", false),
+            ("192.0.2.55", true),
+            ("2001:db8::1", true),
         ],
     );
 }
