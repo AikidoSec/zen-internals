@@ -41,6 +41,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         let matcher = IpMatcher::new(networks.iter());
         let ipv4_hit = ipv4_address((size - 2) / 2);
         let ipv6_hit = format!("2001:db8::{:x}", (size - 1) / 2);
+        let ipv4_mapped_hit = format!("::ffff:{ipv4_hit}");
         group.bench_with_input(
             BenchmarkId::new("lookup_ipv4_hit", size),
             &ipv4_hit,
@@ -49,6 +50,11 @@ fn criterion_benchmark(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("lookup_ipv6_hit", size),
             &ipv6_hit,
+            |b, lookup| b.iter(|| matcher.has(black_box(lookup))),
+        );
+        group.bench_with_input(
+            BenchmarkId::new("lookup_ipv4_mapped_hit", size),
+            &ipv4_mapped_hit,
             |b, lookup| b.iter(|| matcher.has(black_box(lookup))),
         );
     }

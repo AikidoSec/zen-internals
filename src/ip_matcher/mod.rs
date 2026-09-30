@@ -161,6 +161,9 @@ impl IpMatcher {
         let Some(network) = parse_base_network(network) else {
             return false;
         };
+        if mapped_ipv4(&network).is_some_and(|bytes| self.has_ipv4(&bytes)) {
+            return true;
+        }
         let index = self
             .sorted
             .partition_point(|candidate| candidate <= &network);
@@ -390,6 +393,20 @@ fn parse_strict_ipv4_address(value: &str) -> Option<[u8; 16]> {
 
 fn ipv4_value(bytes: &[u8; 16]) -> u32 {
     u32::from_be_bytes(bytes[..4].try_into().expect("IPv4 has four bytes"))
+}
+
+fn mapped_ipv4(network: &Network) -> Option<[u8; 16]> {
+    let is_mapped_address = network.byte_length == IPV6_BYTES
+        && network.cidr == 128
+        && network.bytes[..10] == [0; 10]
+        && network.bytes[10..12] == [0xff, 0xff];
+    if !is_mapped_address {
+        return None;
+    }
+
+    let mut bytes = [0; 16];
+    bytes[..4].copy_from_slice(&network.bytes[12..16]);
+    Some(bytes)
 }
 
 fn parse_hextet(value: &str) -> Option<u16> {
