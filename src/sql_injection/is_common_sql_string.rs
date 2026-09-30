@@ -47,6 +47,11 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         return true;
     }
 
+    // Not SQL syntax, but a common form value (e.g. newsletter signup reason).
+    if user_input == "join us" {
+        return true;
+    }
+
     if user_input.len() <= 5 && regex!(r"^[0-9a-z]+ [0-9a-z]+$").is_match(user_input) {
         // It's very difficult to exploit a query using a short string of only alphanumerical chars and a space.
         return true;

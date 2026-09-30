@@ -1176,4 +1176,13 @@ mod tests {
             "TIME ZONE 'UTC'"
         );
     }
+
+    #[test]
+    fn test_join_us() {
+        // "JOIN US" is a substring of the "JOIN users" table join in the query.
+        not_injection!(
+            "SELECT 1 FROM referrals JOIN users ON users.id = referrals.referred_user_id WHERE referrals.user_id = 123456789 AND users.active = true",
+            "JOIN US"
+        );
+    }
 }

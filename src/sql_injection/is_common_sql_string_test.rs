@@ -482,4 +482,9 @@ mod tests {
         let over_limit = format!("{}a,", "a".repeat(39));
         assert!(!is_common_sql_string(&over_limit));
     }
+
+    #[test]
+    fn test_join_us() {
+        assert!(is_common_sql_string("join us"));
+    }
 }
