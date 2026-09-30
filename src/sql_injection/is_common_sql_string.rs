@@ -82,6 +82,13 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         return true;
     }
 
+    // ORMs sometimes emit predicates with fixed truth values, e.g.
+    // `WHERE 1=0` to match no rows
+    // `WHERE 1=1` to simplify query construction
+    if user_input == "1=" {
+        return true;
+    }
+
     // `:p` from `:param`
     // `1)` from `(1)`
     // `(s` from `(select`
