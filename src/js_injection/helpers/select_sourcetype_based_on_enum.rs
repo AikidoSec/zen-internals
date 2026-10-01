@@ -1,4 +1,4 @@
-use oxc::span::SourceType;
+use oxc_lexer::LexOptions;
 
 /*
 0 -> JS, auto-detect CJS or ESM
@@ -8,14 +8,11 @@ use oxc::span::SourceType;
 4 -> TSX
 Default -> JS, auto-detect CJS or ESM
 */
-pub fn select_sourcetype_based_on_enum(enumerator: i32) -> SourceType {
-    // 0 is generic type.
-    match enumerator {
-        0 => SourceType::unambiguous(),
-        1 => SourceType::ts(),
-        2 => SourceType::cjs(),
-        3 => SourceType::mjs(),
-        4 => SourceType::tsx(),
-        _ => SourceType::unambiguous(),
+pub fn select_sourcetype_based_on_enum(enumerator: i32) -> LexOptions {
+    LexOptions {
+        source_type_module: matches!(enumerator, 1 | 3 | 4),
+        ts: matches!(enumerator, 1 | 4),
+        jsx: enumerator == 4,
+        ..LexOptions::default()
     }
 }
