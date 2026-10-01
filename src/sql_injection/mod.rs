@@ -6,6 +6,8 @@ pub mod helpers;
 pub mod is_common_sql_string;
 pub mod is_common_sql_string_test;
 
+mod is_safely_escaped_user_input;
+
 pub mod tokenize_query;
 pub mod tokenize_query_test;
 
