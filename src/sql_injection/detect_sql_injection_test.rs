@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::sql_injection::detect_sql_injection::detect_sql_injection_str;
+    use crate::sql_injection::detect_sql_injection::{detect_sql_injection_str, DetectionReason};
 
     fn dialect(s: &str) -> i32 {
         match s {
@@ -26,12 +26,14 @@ mod tests {
     macro_rules! is_injection {
         ($query:expr, $input:expr) => {
             for dia in get_supported_dialects().iter() {
+                let result = detect_sql_injection_str($query, $input, dia.clone());
                 assert!(
-                    detect_sql_injection_str($query, $input, dia.clone()).detected,
-                    "should be an injection\nquery: {}\ninput: {}\ndialect: {}\n",
+                    result.detected,
+                    "should be an injection\nquery: {}\ninput: {}\ndialect: {}\nreason: {:?}\n",
                     $query,
                     $input,
-                    dia.clone()
+                    dia.clone(),
+                    result.reason
                 )
             }
         };
@@ -42,12 +44,14 @@ mod tests {
     macro_rules! not_injection {
         ($query:expr, $input:expr) => {
             for dia in get_supported_dialects().iter() {
+                let result = detect_sql_injection_str($query, $input, dia.clone());
                 assert!(
-                    !(detect_sql_injection_str($query, $input, dia.clone()).detected),
-                    "should not be an injection\nquery: {}\ninput: {}\ndialect: {}\n",
+                    !(result.detected),
+                    "should not be an injection\nquery: {}\ninput: {}\ndialect: {}\nreason: {:?}\n",
                     $query,
                     $input,
-                    dia.clone()
+                    dia.clone(),
+                    result.reason
                 )
             }
         };
@@ -1198,5 +1202,196 @@ mod tests {
             "SELECT 1 FROM referrals JOIN users ON users.id = referrals.referred_user_id WHERE referrals.user_id = 123456789 AND users.active = true",
             "JOIN US"
         );
+    }
+
+    #[test]
+    fn test_safely_encapsulated_single_quoted_string() {
+        for dia in [
+            dialect("mysql"),
+            dialect("postgresql"),
+            dialect("sqlite"),
+            dialect("clickhouse"),
+        ] {
+            not_injection!(
+                r#"
+                    SELECT '''_''';
+                "#,
+                "'_'",
+                dia
+            );
+            not_injection!(
+                r#"
+                    SELECT '''_';
+                "#,
+                "'_",
+                dia
+            );
+            not_injection!(
+                r#"
+                    SELECT '_''';
+                "#,
+                "_'",
+                dia
+            );
+            not_injection!(
+                r#"
+                    SELECT a FROM b WHERE b.a = '1; SELECT SLEEP(10) -- -''';
+                "#,
+                "1; SELECT SLEEP(10) -- -'",
+                dia
+            );
+        }
+        not_injection!(
+            r#"
+                SELECT a FROM b WHERE (b.a ILIKE '''; sleep 15 ;''' OR b.c ILIKE 'x y');
+            "#,
+            "'; sleep 15 ;'",
+            dialect("postgresql")
+        );
+
+        // We do flag as SQL injection when the input occurs multiple times
+        is_injection!(
+            r#"
+                SELECT '_''', '_''';
+            "#,
+            "_'"
+        );
+        is_injection!(
+            r#"
+                SELECT '''_', '''_';
+            "#,
+            "'_"
+        );
+        is_injection!(
+            r#"
+                SELECT '''_''', '''_''';
+            "#,
+            "'_'"
+        );
+    }
+
+    #[test]
+    fn test_single_quote_shortcut_dialects() {
+        for (query, safe_dialects) in [
+            ("SELECT '_'''", vec![3, 8, 9, 12]),
+            (r"SELECT '\n', '_'''", vec![]),
+        ] {
+            for dia in -1..=13 {
+                let result = detect_sql_injection_str(query, "_'", dia);
+
+                assert_eq!(
+                    !result.detected
+                        && matches!(&result.reason, DetectionReason::SafelyEscapedUserInput),
+                    safe_dialects.contains(&dia),
+                    "{result:?}\nquery: {query}\ndialect: {dia}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_input_must_match_the_entire_string() {
+        for dia in get_supported_dialects() {
+            let result = detect_sql_injection_str("SELECT 'prefix_'''", "_'", dia);
+
+            assert!(!matches!(
+                &result.reason,
+                DetectionReason::SafelyEscapedUserInput
+            ));
+        }
+    }
+
+    #[test]
+    fn test_single_quotes_in_comments_are_not_escaped_strings() {
+        for dia in get_supported_dialects() {
+            let result = detect_sql_injection_str("SELECT 1 -- _''\n", "_'", dia);
+
+            assert!(!matches!(
+                &result.reason,
+                DetectionReason::SafelyEscapedUserInput
+            ));
+        }
+    }
+
+    #[test]
+    fn test_input_with_quotes_in_the_middle_is_not_safely_escaped() {
+        for dia in get_supported_dialects() {
+            let result = detect_sql_injection_str("SELECT 'it''s'''", "it's'", dia);
+
+            assert!(!matches!(
+                &result.reason,
+                DetectionReason::SafelyEscapedUserInput
+            ));
+        }
+    }
+
+    #[test]
+    fn does_not_flag_safely_escaped_postgres_inputs() {
+        for (query, input) in [
+            (
+                "SELECT \"records\".\"id\" FROM \"records\" WHERE \"records\".\"value\" = '''+encode(IMAGE)+'''",
+                "'+encode(IMAGE)+'",
+            ),
+            (
+                r#"SELECT "records"."id" FROM "records" WHERE "records"."value" = 'mixed,,"),)(,)'''"#,
+                r#"mixed,,"),)(,)'"#,
+            ),
+            (
+                "SELECT \"id\" FROM \"records\" WHERE \"value\" = 'resource(''' LIMIT 1",
+                "resource('",
+            ),
+            (
+                "UPDATE \"records\" SET \"title\" = '''RETRO EDITION    ' WHERE \"id\" = 1",
+                "'RETRO EDITION    ",
+            ),
+            (
+                r#"SELECT "id" FROM "records" WHERE LOWER("value") = LOWER('text)").)''')"#,
+                r#"text)").)'"#,
+            ),
+        ] {
+            let result = detect_sql_injection_str(query, input, 9);
+
+            assert!(!result.detected, "{result:?}\nquery: {query}\ninput: {input}");
+        }
+    }
+
+    #[test]
+    #[ignore] // The trailing % prevents a full string match.
+    fn does_not_flag_safely_escaped_postgres_input_with_wildcard_suffix() {
+        let query = "SELECT \"id\" FROM \"records\" WHERE \"name\" ILIKE 'A sentence that doesn''%' LIMIT 10";
+        let input = "A sentence that doesn'";
+        let result = detect_sql_injection_str(query, input, 9);
+
+        assert!(
+            !result.detected,
+            "{result:?}\nquery: {query}\ninput: {input}"
+        );
+    }
+
+    #[test]
+    fn detects_postgres_injection_with_nonconforming_strings() {
+        let input = "'; SELECT 2; --";
+        let query = format!("SELECT '\\' || ''{input}'");
+        let result = detect_sql_injection_str(&query, input, 9);
+
+        assert!(result.detected, "{result:?}");
+    }
+
+    #[test]
+    fn detects_mysql_injection_with_no_backslash_escapes() {
+        let input = "' OR 1=1 -- ";
+        let query = format!("SELECT id FROM records WHERE value = '\\' ' || ''{input}'");
+        let result = detect_sql_injection_str(&query, input, dialect("mysql"));
+
+        assert!(result.detected, "{result:?}");
+    }
+
+    #[test]
+    fn detects_mssql_injection_in_dynamic_sql() {
+        let input = "'; SELECT 2;--";
+        let query = format!("EXEC('SELECT 1 WHERE ''x'' = ''' + ''{input}');");
+        let result = detect_sql_injection_str(&query, input, 7);
+
+        assert!(result.detected, "{result:?}");
     }
 }
