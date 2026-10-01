@@ -487,4 +487,17 @@ mod tests {
     fn test_join_us() {
         assert!(is_common_sql_string("join us"));
     }
+
+    #[test]
+    fn test_1_equal() {
+        assert!(is_common_sql_string("1="));
+
+        assert!(!is_common_sql_string("0="));
+        assert!(!is_common_sql_string("9="));
+        assert!(!is_common_sql_string("12="));
+        assert!(!is_common_sql_string("1=="));
+        assert!(!is_common_sql_string("1 ="));
+        assert!(!is_common_sql_string("1 = "));
+        assert!(!is_common_sql_string("=1"));
+    }
 }
