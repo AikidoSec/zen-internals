@@ -496,6 +496,7 @@ mod tests {
         assert!(!is_common_sql_string("9="));
         assert!(!is_common_sql_string("12="));
         assert!(!is_common_sql_string("1=="));
+        assert!(!is_common_sql_string("1=1"));
         assert!(!is_common_sql_string("1 ="));
         assert!(!is_common_sql_string("1 = "));
         assert!(!is_common_sql_string("=1"));
