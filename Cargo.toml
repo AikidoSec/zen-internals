@@ -39,6 +39,7 @@ wasm-js = ["wasm-bindgen", "serde-wasm-bindgen", "js-sys"]
 [workspace]
 members = [
     "benchmarks",
+    "zen-proxy",
 ]
 
 [package.metadata.wasm-pack.profile.release]

@@ -28,6 +28,9 @@ jobs:
       - name: Run tests
         run: cargo llvm-cov
 
+      - name: Run zen-proxy tests
+        run: cargo test -p zen-proxy
+
       - name: Generate coverage report
         run: cargo llvm-cov report --lcov --output-path target/lcov.info
 
