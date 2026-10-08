@@ -88,13 +88,16 @@ pub fn detect_sql_injection_str(
     // tokenize again. Replacing all occurrences at once would let an input that is interpolated
     // more than once change the query symmetrically, hiding the injection from the comparison.
     let safe_replace_str = "a".repeat(trimmed_userinput.len());
+    let mut query_without_input = String::with_capacity(query.len());
     for (start, matched) in query
         .match_indices(trimmed_userinput)
         .take(MAX_OCCURRENCES_TO_CHECK)
     {
         let end = start + matched.len();
-        let query_without_input =
-            format!("{}{}{}", &query[..start], safe_replace_str, &query[end..]);
+        query_without_input.clear();
+        query_without_input.push_str(&query[..start]);
+        query_without_input.push_str(&safe_replace_str);
+        query_without_input.push_str(&query[end..]);
         let tokens_without_input = tokenize_query(&query_without_input, dialect);
 
         // Check delta for both comment tokens and all tokens in general :
