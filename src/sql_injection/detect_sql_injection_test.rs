@@ -1388,11 +1388,150 @@ mod tests {
     }
 
     #[test]
+    fn detects_mysql_injection_when_input_occurs_multiple_times() {
+        let input = "'OR 1=1--";
+        let query = format!("SELECT * FROM users WHERE username = '{input}' OR email = '{input}'");
+
+        is_injection!(&query, input);
+    }
+
+    #[test]
+    fn detects_mysql_injection_when_input_occurs_four_times() {
+        let input = "'OR 1=1--";
+        let query = format!(
+            "SELECT * FROM users WHERE a = '{input}' OR b = '{input}' OR c = '{input}' OR d = '{input}'"
+        );
+
+        is_injection!(&query, input);
+    }
+
+    #[test]
+    fn detects_mysql_injection_with_semicolon_before_dashes() {
+        let input = "'OR 1=1;--";
+        let query = format!("SELECT * FROM users WHERE id = '{input}' OR owner = '{input}'");
+
+        is_injection!(&query, input);
+    }
+
+    #[test]
+    fn detects_hash_comment_injection_when_input_occurs_multiple_times() {
+        let input = "' OR 1=1 #";
+        let query = format!("SELECT * FROM users WHERE id = {input} OR owner = {input}");
+
+        is_injection!(&query, input);
+    }
+
+    #[test]
+    fn detects_injection_without_comment_when_input_occurs_multiple_times() {
+        let input = "'OR 1=1%00";
+        let query = format!("SELECT * FROM users WHERE username = '{input}' OR email = '{input}'");
+
+        is_injection!(&query, input);
+    }
+
+    #[test]
+    fn detects_injection_when_input_occurs_in_different_clauses() {
+        let input = "'OR 1=1--";
+        let query = format!(
+            "SELECT * FROM users WHERE username = '{input}' ORDER BY id LIMIT 1 -- {input}"
+        );
+
+        is_injection!(&query, input, dialect("mysql"));
+    }
+
+    #[test]
+    fn detects_injection_when_only_one_occurrence_is_unsafe() {
+        let input = "1 OR 1=1";
+        let query = format!("SELECT * FROM users WHERE note = '{input}' AND id = {input}");
+
+        is_injection!(&query, input);
+    }
+
+    #[test]
+    fn detects_injection_when_first_occurrence_is_safe_and_later_one_is_not() {
+        let input = "x' OR 'a'='a";
+        let query =
+            format!("SELECT * FROM users WHERE note = 'x'' OR ''a''=''a' AND name = '{input}'");
+
+        is_injection!(&query, input);
+    }
+
+    #[test]
+    fn does_not_flag_safe_input_occurring_multiple_times() {
+        let input = "john";
+        let query = format!("SELECT * FROM users WHERE username = '{input}' OR email = '{input}'");
+
+        not_injection!(&query, input);
+    }
+
+    #[test]
+    fn does_not_flag_safe_input_occurring_three_times() {
+        not_injection!(
+            "SELECT * FROM users WHERE a = 'john doe' OR b = 'john doe' OR c = 'john doe'",
+            "john doe"
+        );
+    }
+
+    #[test]
+    fn does_not_flag_safe_numeric_input_occurring_multiple_times() {
+        not_injection!(
+            "SELECT * FROM users WHERE id = 12345 OR parent_id = 12345",
+            "12345"
+        );
+    }
+
+    #[test]
+    fn does_not_flag_safe_input_that_is_also_part_of_another_word() {
+        not_injection!(
+            "SELECT * FROM users WHERE name = 'ann' OR nickname = 'joanne' OR alias = 'ann'",
+            "ann"
+        );
+    }
+
+    #[test]
+    fn does_not_flag_escaped_quote_input_occurring_multiple_times() {
+        not_injection!(
+            "SELECT * FROM users WHERE a = 'it''s here' OR b = 'it''s here'",
+            "it's here"
+        );
+    }
+
+    #[test]
+    fn does_not_flag_input_occurring_multiple_times_inside_a_comment() {
+        not_injection!(
+            "SELECT * FROM users WHERE a = 'john doe' /* john doe */ OR b = 'john doe'",
+            "john doe"
+        );
+    }
+
+    #[test]
     fn detects_mssql_injection_in_dynamic_sql() {
         let input = "'; SELECT 2;--";
         let query = format!("EXEC('SELECT 1 WHERE ''x'' = ''' + ''{input}');");
         let result = detect_sql_injection_str(&query, input, 7);
 
         assert!(result.detected, "{result:?}");
+    }
+
+    #[test]
+    fn detects_injection_when_many_occurrences_are_all_unsafe() {
+        let input = "'OR 1=1--";
+        let predicates: Vec<String> = (0..40).map(|i| format!("c{i} = '{input}'")).collect();
+        let query = format!("SELECT * FROM users WHERE {}", predicates.join(" OR "));
+
+        is_injection!(&query, input);
+    }
+
+    #[test]
+    fn does_not_check_occurrences_after_the_occurrence_cap() {
+        // This is a known accepted gap
+        let input = "1 OR 1=1";
+        let safe_copies: Vec<String> = (0..10).map(|i| format!("n{i} = 'safe {input}'")).collect();
+        let query = format!(
+            "SELECT * FROM users WHERE {} AND id = {input}",
+            safe_copies.join(" AND ")
+        );
+
+        not_injection!(&query, input);
     }
 }
