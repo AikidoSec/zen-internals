@@ -6,6 +6,10 @@ use crate::diff_in_vec_len;
 
 const SPACE_CHAR: char = ' ';
 
+// Every checked occurrence costs a full tokenization, so bound the work for queries that
+// repeat the user input many times.
+const MAX_OCCURRENCES_TO_CHECK: usize = 10;
+
 #[derive(Debug)]
 pub struct SqlInjectionDetectionResult {
     pub detected: bool,
@@ -84,7 +88,10 @@ pub fn detect_sql_injection_str(
     // tokenize again. Replacing all occurrences at once would let an input that is interpolated
     // more than once change the query symmetrically, hiding the injection from the comparison.
     let safe_replace_str = "a".repeat(trimmed_userinput.len());
-    for (start, matched) in query.match_indices(trimmed_userinput) {
+    for (start, matched) in query
+        .match_indices(trimmed_userinput)
+        .take(MAX_OCCURRENCES_TO_CHECK)
+    {
         let end = start + matched.len();
         let query_without_input =
             format!("{}{}{}", &query[..start], safe_replace_str, &query[end..]);

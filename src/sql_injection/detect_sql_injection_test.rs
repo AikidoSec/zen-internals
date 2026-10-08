@@ -1512,4 +1512,26 @@ mod tests {
 
         assert!(result.detected, "{result:?}");
     }
+
+    #[test]
+    fn detects_injection_when_many_occurrences_are_all_unsafe() {
+        let input = "'OR 1=1--";
+        let predicates: Vec<String> = (0..40).map(|i| format!("c{i} = '{input}'")).collect();
+        let query = format!("SELECT * FROM users WHERE {}", predicates.join(" OR "));
+
+        is_injection!(&query, input);
+    }
+
+    #[test]
+    fn does_not_check_occurrences_after_the_occurrence_cap() {
+        // This is a known accepted gap
+        let input = "1 OR 1=1";
+        let safe_copies: Vec<String> = (0..10).map(|i| format!("n{i} = 'safe {input}'")).collect();
+        let query = format!(
+            "SELECT * FROM users WHERE {} AND id = {input}",
+            safe_copies.join(" AND ")
+        );
+
+        not_injection!(&query, input);
+    }
 }
