@@ -39,3 +39,6 @@ jobs:
 
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run clippy on zen-proxy
+        run: cargo clippy -p zen-proxy --all-targets -- -D warnings
