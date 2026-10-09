@@ -125,8 +125,7 @@ mod tests {
             "Hello'; } //",
             1
         );
-        // Not an injection because code can not be parsed as JavaScript.
-        not_injection!(
+        is_injection!(
             "function test(): string { return 'Hello'; } //';}",
             "Hello'; } //",
             0
@@ -150,8 +149,13 @@ mod tests {
     }
 
     #[test]
+    fn test_invalid_js_can_contain_injection() {
+        is_injection!("Hello World!", "Hello World!", 0);
+        is_injection!("this.title === 'x' || (((('", "x' || ((((", 0);
+    }
+
+    #[test]
     fn test_no_js_injection() {
-        not_injection!("Hello World!", "Hello World!", 0);
         not_injection!("", "", 0);
         not_injection!("", "Hello World!", 0);
         not_injection!("Hello World!", "", 0);
@@ -431,6 +435,9 @@ mod tests {
         not_injection!("const elseWhere = getAlternateLocation();", "elseWhere", 0);
         not_injection!("const testCaseId = generateTestId();", "testCaseId", 0);
         not_injection!("const catchAll = createFallbackHandler();", "catchAll", 0);
+        not_injection!("const \\u006eame = 1;", "\\u006eame", 0);
+        is_injection!("const value = { catch: 1 };", "catch", 0);
+        not_injection!("const value = { 'catch': 1 };", "catch", 0);
     }
 
     #[test]
@@ -463,6 +470,98 @@ mod tests {
     }
 
     #[test]
+    fn test_deep_payloads_and_quoted_controls() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                for sourcetype in 0..5 {
+                    for depth in [1500, 10_000] {
+                        for input in [
+                            format!("x' || {}", "(".repeat(depth)),
+                            format!("x' || {}", "!".repeat(depth)),
+                            format!("x' || {}", "[".repeat(depth)),
+                            format!("x' || {}true{}//", "(".repeat(depth), ")".repeat(depth)),
+                            format!("x' || {}1//", "!".repeat(depth)),
+                        ] {
+                            let code = format!("this.title === '{input}'");
+                            assert!(
+                                detect_js_injection_str(&code, &input, sourcetype),
+                                "type={sourcetype} depth={depth}"
+                            );
+                        }
+                        for input in [
+                            "(".repeat(depth) + "1",
+                            "[".repeat(depth) + "1",
+                            "!".repeat(depth) + "1",
+                        ] {
+                            let code = format!("this.title === '{input}'");
+                            assert!(
+                                !detect_js_injection_str(&code, &input, sourcetype),
+                                "type={sourcetype} depth={depth}"
+                            );
+                        }
+                    }
+                }
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[test]
+    fn test_many_lexer_diagnostics() {
+        let input = "<Box<number>/>;".repeat(2048) + &"\u{1}".repeat(2048) + "1";
+        assert!(detect_js_injection_str(&input, &input, 4));
+        assert!(!detect_js_injection_str(
+            &format!("const text = '{input}';"),
+            &input,
+            4
+        ));
+    }
+
+    #[test]
+    fn test_arithmetic_exemption_with_deep_surrounding_code() {
+        for input in ["1+".repeat(128) + "1", "1".to_owned() + &" ".repeat(256)] {
+            for suffix in [
+                format!("{}true{};", "(".repeat(10_000), ")".repeat(10_000)),
+                format!("{}true;", "!".repeat(10_000)),
+            ] {
+                let code = format!("this.title === '{input}';{suffix}");
+                assert!(!detect_js_injection_str(&code, &input, 0));
+            }
+        }
+    }
+
+    #[test]
+    fn test_literal_boundaries() {
+        for (code, input, sourcetype, expected) in [
+            ("const x = `hello ${evil()}`;", "${evil()}", 0, true),
+            ("const x = `hello \\${evil()}`;", "\\${evil()}", 0, false),
+            ("if (ok) /hello/.test(value);", "hello", 0, false),
+            ("const x = left / divisor / right;", "divisor", 0, false),
+            ("const x = /x/; evil(); ///;", "x/; evil(); //", 0, true),
+            ("const x = <div>hello</div>;", "hello", 4, false),
+            ("export const x = await /hello/;", "hello", 0, false),
+            ("const x = '\\u00ff';", "\\u00ff", 0, false),
+            (
+                "const x = 'SELECT * FROM users WHERE id = 1';",
+                "SELECT * FROM users WHERE id = 1",
+                0,
+                false,
+            ),
+            ("const x = 'SQL'; evil(); //';", "SQL'; evil(); //", 0, true),
+            ("record('evil()'); evil();", "evil()", 0, true),
+            ("function f() { return /*\n \n*/ value; }", "\n \n", 0, true),
+        ] {
+            assert_eq!(
+                detect_js_injection_str(code, input, sourcetype),
+                expected,
+                "{code:?}"
+            );
+        }
+    }
+
+    #[test]
     fn test_js_html_like_comments() {
         not_injection!(
             "const test = '<!-- Hello World! -->';",
@@ -492,7 +591,7 @@ mod tests {
         );
 
         // ESM does not support HTML-like comments.
-        not_injection!(
+        is_injection!(
             "const test = 'a'; <!--\n console.log('injection'); //';",
             "a'; <!--\n console.log('injection'); //",
             3
