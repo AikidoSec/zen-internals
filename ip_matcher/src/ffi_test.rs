@@ -1,4 +1,4 @@
-use super::ip_matcher::{
+use crate::ffi::{
     ip_matcher_create, ip_matcher_free, ip_matcher_has, ip_matcher_memory_size, IpMatcherByteSlice,
     IpMatcherHandle,
 };

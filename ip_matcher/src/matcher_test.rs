@@ -1,4 +1,4 @@
-use super::IpMatcher;
+use crate::IpMatcher;
 
 fn assert_cases(networks: &[&str], cases: &[(&str, bool)]) {
     let matcher = IpMatcher::new(networks.iter().copied());

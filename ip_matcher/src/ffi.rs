@@ -1,8 +1,9 @@
-use crate::ip_matcher::IpMatcher;
-use std::os::raw::c_int;
-use std::panic;
-use std::ptr;
-use std::str;
+use crate::IpMatcher;
+use alloc::boxed::Box;
+use alloc::vec::Vec;
+use core::ffi::c_int;
+use core::ptr;
+use core::str;
 
 const MAX_NETWORKS: usize = 1_000_000;
 const MAX_INPUT_BYTES: usize = 64 * 1024 * 1024;
@@ -22,9 +23,20 @@ pub struct IpMatcherHandle {
     matcher: IpMatcher,
 }
 
+#[cfg(feature = "std")]
+fn catch_panic<T>(on_panic: T, run: impl FnOnce() -> T) -> T {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(run)).unwrap_or(on_panic)
+}
+
+// Without std a panic can't be caught, so the `#[panic_handler]` of the final binary decides.
+#[cfg(not(feature = "std"))]
+fn catch_panic<T>(_on_panic: T, run: impl FnOnce() -> T) -> T {
+    run()
+}
+
 /// Creates an immutable matcher. Invalid network strings are ignored.
 ///
-/// Returns null for invalid FFI input, exceeded limits, or a caught panic.
+/// Returns null for invalid FFI input, exceeded limits, or a caught panic (`std` feature).
 ///
 /// # Safety
 ///
@@ -37,13 +49,11 @@ pub unsafe extern "C" fn ip_matcher_create(
     networks: *const IpMatcherByteSlice,
     network_count: usize,
 ) -> *mut IpMatcherHandle {
-    panic::catch_unwind(|| unsafe {
+    catch_panic(ptr::null_mut(), || unsafe {
         create_matcher(networks, network_count)
             .map(|matcher| Box::into_raw(Box::new(IpMatcherHandle { matcher })))
+            .unwrap_or(ptr::null_mut())
     })
-    .ok()
-    .and_then(Result::ok)
-    .unwrap_or(ptr::null_mut())
 }
 
 unsafe fn create_matcher(
@@ -57,7 +67,7 @@ unsafe fn create_matcher(
     let descriptors = if network_count == 0 {
         &[]
     } else {
-        unsafe { std::slice::from_raw_parts(networks, network_count) }
+        unsafe { core::slice::from_raw_parts(networks, network_count) }
     };
 
     let mut total_input_bytes = 0_usize;
@@ -76,7 +86,7 @@ unsafe fn create_matcher(
         let bytes = if descriptor.len == 0 {
             &[]
         } else {
-            unsafe { std::slice::from_raw_parts(descriptor.ptr, descriptor.len) }
+            unsafe { core::slice::from_raw_parts(descriptor.ptr, descriptor.len) }
         };
         network_strings.push(str::from_utf8(bytes).map_err(|_| ())?);
     }
@@ -91,14 +101,13 @@ unsafe fn create_matcher(
 /// `handle` must be null or a live pointer returned by `ip_matcher_create`.
 #[no_mangle]
 pub unsafe extern "C" fn ip_matcher_memory_size(handle: *const IpMatcherHandle) -> usize {
-    panic::catch_unwind(|| {
+    catch_panic(0, || {
         if handle.is_null() {
             0
         } else {
             unsafe { &*handle }.matcher.memory_size()
         }
     })
-    .unwrap_or(0)
 }
 
 /// Returns `1` for a match, `0` for no match, and `2` for invalid FFI input or a caught panic.
@@ -114,7 +123,7 @@ pub unsafe extern "C" fn ip_matcher_has(
     network: *const u8,
     network_len: usize,
 ) -> c_int {
-    panic::catch_unwind(|| {
+    catch_panic(ERROR, || {
         if handle.is_null()
             || network_len > MAX_LOOKUP_BYTES
             || (network_len > 0 && network.is_null())
@@ -125,7 +134,7 @@ pub unsafe extern "C" fn ip_matcher_has(
         let bytes = if network_len == 0 {
             &[]
         } else {
-            unsafe { std::slice::from_raw_parts(network, network_len) }
+            unsafe { core::slice::from_raw_parts(network, network_len) }
         };
         let Ok(network) = str::from_utf8(bytes) else {
             return ERROR;
@@ -137,7 +146,6 @@ pub unsafe extern "C" fn ip_matcher_has(
             NO_MATCH
         }
     })
-    .unwrap_or(ERROR)
 }
 
 /// Releases an opaque IP matcher handle. Passing null has no effect.
@@ -152,7 +160,5 @@ pub unsafe extern "C" fn ip_matcher_free(handle: *mut IpMatcherHandle) {
         return;
     }
 
-    let _ = panic::catch_unwind(|| unsafe {
-        drop(Box::from_raw(handle));
-    });
+    catch_panic((), || unsafe { drop(Box::from_raw(handle)) });
 }

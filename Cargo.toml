@@ -21,6 +21,9 @@ js-sys = { version = "0.3.85", optional = true }
 serde-wasm-bindgen = { version = "0.6.5", optional = true }
 wasm-bindgen = { version = "=0.2.129", optional = true }
 
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+zen_ip_matcher = { path = "ip_matcher" }
+
 [profile.release]
 strip = true
 opt-level = "s"
@@ -39,7 +42,10 @@ wasm-js = ["wasm-bindgen", "serde-wasm-bindgen", "js-sys"]
 [workspace]
 members = [
     "benchmarks",
+    "ip_matcher",
 ]
+# So plain `cargo test` also runs the IP matcher tests, but skips the benchmarks.
+default-members = [".", "ip_matcher"]
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ["-O", "--one-caller-inline-max-function-size=256", "--enable-bulk-memory", "--enable-sign-ext", "--enable-nontrapping-float-to-int"]
