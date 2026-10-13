@@ -39,7 +39,9 @@ See [list of dialects](https://github.com/AikidoSec/zen-internals/blob/main/src/
 
 ## IP matcher
 
-The IP matcher is not exposed in WASM. It uses pointer and length byte slices, so the input does not need null terminators.
+The IP matcher is only available in the native libraries, not in WASM. A WASM instance can't run lookups from multiple threads at the same time. You would need one lock around all lookups, which slows down requests, or a copy of every list per thread, which uses a lot of memory.
+
+It uses pointer and length byte slices, so the input does not need null terminators.
 
 ```py
 import ctypes

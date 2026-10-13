@@ -4,8 +4,9 @@
 //! validity the compiler can't verify. They are therefore `unsafe fn` with a
 //! `# Safety` contract that the caller must uphold.
 
+#[cfg(not(target_arch = "wasm32"))]
 mod ip_matcher;
-#[cfg(test)]
+#[cfg(all(test, not(target_arch = "wasm32")))]
 mod ip_matcher_test;
 
 use crate::idor::idor_analyze_sql::idor_analyze_sql;
