@@ -5,19 +5,20 @@
  */
 mod helpers;
 
+// Without this, libzen_internals wouldn't export the ip_matcher_* functions.
 #[cfg(all(
     feature = "benchmarking",
     not(feature = "wasm-js"),
     not(target_arch = "wasm32")
 ))]
-pub mod ip_matcher;
+pub extern crate zen_ip_matcher as ip_matcher;
 
 #[cfg(all(
     not(feature = "benchmarking"),
     not(feature = "wasm-js"),
     not(target_arch = "wasm32")
 ))]
-mod ip_matcher;
+extern crate zen_ip_matcher;
 
 // FFI Bindings
 #[cfg(not(feature = "wasm-js"))]

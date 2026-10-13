@@ -1,0 +1,14 @@
+[package]
+name = "zen_ip_matcher"
+version = "0.0.0"
+edition = "2021"
+authors = ["Aikido Security"]
+description = "IP network matcher used by Zen by Aikido, with a C ABI"
+license = "AGPL-3.0-or-later"
+
+# Don't add dependencies: zen-internals-node links this crate into its .node without std.
+[dependencies]
+
+[features]
+default = ["std"]
+std = []

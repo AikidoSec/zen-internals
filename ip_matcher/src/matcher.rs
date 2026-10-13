@@ -1,7 +1,8 @@
 // Exact port of firewall-node's core matcher, including its parsing behavior.
 // Based on https://github.com/demskie/netparser (MIT, Copyright (c) 2019 alex).
 
-use std::cmp::Ordering;
+use alloc::vec::Vec;
+use core::cmp::Ordering;
 
 const IPV4_BYTES: u8 = 4;
 const IPV6_BYTES: u8 = 16;
@@ -150,7 +151,7 @@ impl IpMatcher {
     }
 
     pub fn memory_size(&self) -> usize {
-        std::mem::size_of::<Self>() + self.sorted.capacity() * std::mem::size_of::<Network>()
+        core::mem::size_of::<Self>() + self.sorted.capacity() * core::mem::size_of::<Network>()
     }
 
     pub fn has(&self, network: &str) -> bool {
@@ -577,6 +578,3 @@ fn parse_ipv6(value: &str, bytes: &mut [u8; 16]) -> bool {
         None => true,
     }
 }
-
-#[cfg(test)]
-mod ip_matcher_test;
