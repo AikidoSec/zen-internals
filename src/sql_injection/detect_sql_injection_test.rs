@@ -786,6 +786,21 @@ mod tests {
     }
 
     #[test]
+    fn test_star_comma_in_projection_is_injection() {
+        is_injection!(
+            "select *, id from users where tenant_id = ?",
+            "*,",
+            dialect("mysql")
+        );
+        // Qualified wildcard elsewhere must not hide an unqualified one
+        is_injection!(
+            "select a.*, b.* from a inner join b on a.id = b.a_id where a.id = 5 union select *, id from c",
+            "*,",
+            dialect("mysql")
+        );
+    }
+
+    #[test]
     fn test_star_comma_still_injection() {
         is_injection!(
             "select *, (select password from users limit 1) as p from a where a.id = 5",

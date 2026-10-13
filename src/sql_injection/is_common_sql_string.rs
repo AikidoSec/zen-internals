@@ -1,7 +1,7 @@
 use regex::Regex;
 use std::sync::LazyLock;
 
-pub const COMMON_SQL_STRINGS: [&str; 29] = [
+pub const COMMON_SQL_STRINGS: [&str; 28] = [
     "select *",
     "select count(*)",
     "insert into",
@@ -30,7 +30,6 @@ pub const COMMON_SQL_STRINGS: [&str; 29] = [
     "not in",
     "time zone",
     ".*",
-    "*,",
 ];
 
 // Macro to create a static regex that is compiled only once.

@@ -501,13 +501,4 @@ mod tests {
         assert!(!is_common_sql_string("1 = "));
         assert!(!is_common_sql_string("=1"));
     }
-
-    #[test]
-    fn test_star_comma() {
-        assert!(is_common_sql_string("*,"));
-
-        assert!(!is_common_sql_string("*, "));
-        assert!(!is_common_sql_string(",*"));
-        assert!(!is_common_sql_string("**,"));
-    }
 }
