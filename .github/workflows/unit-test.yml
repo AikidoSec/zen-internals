@@ -39,6 +39,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
       
       - name: Upload coverage to Aikido
+        if: ${{ github.ref_type == 'branch' }}
         uses: AikidoSec/code-coverage-github-action@18138c9866f45cb159779a167d6e1330c967fe28 #v0.1.1
         with:
           lcov-file-paths: target/lcov.info
