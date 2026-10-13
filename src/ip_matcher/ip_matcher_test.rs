@@ -160,6 +160,20 @@ fn it_works_with_ipv6_ranges() {
 }
 
 #[test]
+fn it_strips_zones_from_scoped_ipv6_addresses() {
+    assert_cases(
+        &["fe80::/10", "::1/128"],
+        &[
+            ("fe80::1%eth0", true),
+            ("fe80::1%dummy0", true),
+            ("[fe80::1%eth0]", true),
+            ("::1%lo", true),
+            ("fe80::1%", false),
+        ],
+    );
+}
+
+#[test]
 fn mix_ipv4_and_ipv6() {
     assert_cases(
         &["2002:db8::/32", "10.0.0.0/8"],

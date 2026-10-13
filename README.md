@@ -89,6 +89,17 @@ finally:
 - `ip_matcher_has` returns `1` for a match, `0` for no match, and `2` for invalid FFI input, including lookups longer than 128 bytes.
 - Call `ip_matcher_free` exactly once for each matcher. Lookups may run concurrently, but the matcher must remain alive until all lookups finish.
 
+> [!NOTE]
+> An IPv4-mapped IPv6 lookup matches IPv4 networks. The other direction doesn't work: an IPv4 lookup doesn't match IPv4-mapped IPv6 networks.
+>
+> | Networks | Lookup | Result |
+> | --- | --- | --- |
+> | `192.0.2.0/24` | `::ffff:192.0.2.1` | match |
+> | `::ffff:192.0.2.0/120` | `192.0.2.1` | no match |
+
+> [!WARNING]
+> The matcher doesn't normalize IP addresses. `127.1`, `2130706433` and `0x7f000001` don't match `127.0.0.0/8`, and `0177.0.0.1` is read as `177.0.0.1` instead of `127.0.0.1`. Don't use it for SSRF checks on hostnames from user input. Pass the IP addresses that the DNS lookup returns instead.
+
 ## Node.js bindings (using WASM)
 
 ### Install

@@ -547,9 +547,15 @@ fn parse_ipv6_right_half(bytes: &mut [u8; 16], value: &str, left_byte_index: isi
 }
 
 fn parse_ipv6(value: &str, bytes: &mut [u8; 16]) -> bool {
-    let value = remove_brackets(value);
+    let mut value = remove_brackets(value);
     if value.is_empty() {
         return false;
+    }
+    if let Some(zone_index) = value.find('%') {
+        if zone_index == value.len() - 1 {
+            return false;
+        }
+        value = &value[..zone_index];
     }
     if value == "::" {
         return true;
