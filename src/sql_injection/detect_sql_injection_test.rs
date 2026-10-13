@@ -777,6 +777,39 @@ mod tests {
     }
 
     #[test]
+    fn test_star_comma() {
+        not_injection!(
+            "select a.*, b.* from a inner join b on a.id = b.a_id where a.id = 5",
+            "*,",
+            dialect("mysql")
+        );
+    }
+
+    #[test]
+    fn test_star_comma_still_injection() {
+        is_injection!(
+            "select *, (select password from users limit 1) as p from a where a.id = 5",
+            "*, (select password from users limit 1) as p",
+            dialect("mysql")
+        );
+        is_injection!(
+            "select a.*, b.* from a inner join b on a.id = b.a_id where a.id = 5 or 1=1 -- ",
+            "5 or 1=1 -- ",
+            dialect("mysql")
+        );
+        is_injection!(
+            "select a.*, b.* from a where a.id = 5; drop table a; -- , b.* from b",
+            "*, b.* from a where a.id = 5; drop table a; --",
+            dialect("mysql")
+        );
+        is_injection!(
+            "select a.*, b.* from a inner join b on a.id = b.a_id where a.id = 5 union select *, 1 from c",
+            "5 union select *,",
+            dialect("mysql")
+        );
+    }
+
+    #[test]
     fn test_1_equal() {
         not_injection!(
             "select column from table where 1=0 AND id=0",
