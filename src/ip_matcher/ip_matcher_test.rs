@@ -20,6 +20,15 @@ fn memory_size_includes_network_storage() {
 }
 
 #[test]
+fn memory_size_only_counts_summarized_networks() {
+    let adjacent: Vec<String> = (0..=255).map(|last| format!("192.0.2.{last}")).collect();
+    let summarized = IpMatcher::new(adjacent.iter());
+    let single = IpMatcher::new(["192.0.2.0/24"]);
+
+    assert_eq!(summarized.memory_size(), single.memory_size());
+}
+
+#[test]
 fn check_with_single_ipv4s() {
     assert_cases(
         &[

@@ -226,6 +226,7 @@ fn summarize_sorted_networks(sorted: Vec<Network>) -> Vec<Network> {
             summarized.pop();
         }
     }
+    summarized.shrink_to_fit();
     summarized
 }
 
