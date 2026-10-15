@@ -6,6 +6,7 @@ Zen Internals is a library that can be used via FFI in different languages. Cont
 
 - SQL Injections
 - JS Code Injections
+- IP matching
 
 ## Return codes
 
@@ -35,6 +36,72 @@ if __name__ == "__main__":
 ```
 
 See [list of dialects](https://github.com/AikidoSec/zen-internals/blob/main/src/sql_injection/helpers/select_dialect_based_on_enum.rs#L18)
+
+## IP matcher
+
+The IP matcher is only available in the native libraries, not in WASM. A WASM instance can't run lookups from multiple threads at the same time. You would need one lock around all lookups, which slows down requests, or a copy of every list per thread, which uses a lot of memory.
+
+It uses pointer and length byte slices, so the input does not need null terminators.
+
+```py
+import ctypes
+
+class IpMatcherByteSlice(ctypes.Structure):
+    _fields_ = [
+        ("ptr", ctypes.POINTER(ctypes.c_uint8)),
+        ("len", ctypes.c_size_t),
+    ]
+
+zen_internals = ctypes.CDLL("target/release/libzen_internals.so")
+zen_internals.ip_matcher_create.argtypes = [ctypes.POINTER(IpMatcherByteSlice), ctypes.c_size_t]
+zen_internals.ip_matcher_create.restype = ctypes.c_void_p
+zen_internals.ip_matcher_has.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t]
+zen_internals.ip_matcher_has.restype = ctypes.c_int
+zen_internals.ip_matcher_memory_size.argtypes = [ctypes.c_void_p]
+zen_internals.ip_matcher_memory_size.restype = ctypes.c_size_t
+zen_internals.ip_matcher_rejected_count.argtypes = [ctypes.c_void_p]
+zen_internals.ip_matcher_rejected_count.restype = ctypes.c_size_t
+zen_internals.ip_matcher_free.argtypes = [ctypes.c_void_p]
+zen_internals.ip_matcher_free.restype = None
+
+network_bytes = [value.encode("utf-8") for value in ["10.0.0.0/8", "2001:db8::/32"]]
+network_buffers = [(ctypes.c_uint8 * len(value)).from_buffer_copy(value) for value in network_bytes]
+networks = (IpMatcherByteSlice * len(network_buffers))(*[
+    IpMatcherByteSlice(buffer, len(buffer)) for buffer in network_buffers
+])
+
+matcher = zen_internals.ip_matcher_create(networks, len(networks))
+if not matcher:
+    raise RuntimeError("ip_matcher_create returned null")
+
+try:
+    lookup_bytes = b"10.2.3.4"
+    lookup_buffer = (ctypes.c_uint8 * len(lookup_bytes)).from_buffer_copy(lookup_bytes)
+    result = zen_internals.ip_matcher_has(matcher, lookup_buffer, len(lookup_buffer))
+    print(result)  # 1 = match, 0 = no match, 2 = error
+    print("Native memory:", zen_internals.ip_matcher_memory_size(matcher))
+    print("Rejected networks:", zen_internals.ip_matcher_rejected_count(matcher))
+finally:
+    zen_internals.ip_matcher_free(matcher)
+```
+
+### Notes
+
+- Invalid network strings are rejected. `ip_matcher_rejected_count` returns how many were rejected, so the caller can decide whether too many invalid networks were passed. Valid networks are never rejected, even if another network already covers them.
+- `ip_matcher_create` returns `NULL` for malformed input, more than 1,000,000 entries, or more than 64 MiB of input.
+- `ip_matcher_has` returns `1` for a match, `0` for no match, and `2` for invalid FFI input, including lookups longer than 128 bytes.
+- Call `ip_matcher_free` exactly once for each matcher. Lookups may run concurrently, but the matcher must remain alive until all lookups finish.
+
+> [!NOTE]
+> An IPv4-mapped IPv6 lookup matches IPv4 networks. The other direction doesn't work: an IPv4 lookup doesn't match IPv4-mapped IPv6 networks.
+>
+> | Networks | Lookup | Result |
+> | --- | --- | --- |
+> | `192.0.2.0/24` | `::ffff:192.0.2.1` | match |
+> | `::ffff:192.0.2.0/120` | `192.0.2.1` | no match |
+
+> [!WARNING]
+> The matcher doesn't normalize IP addresses. `127.1`, `2130706433` and `0x7f000001` don't match `127.0.0.0/8`, and `0177.0.0.1` is read as `177.0.0.1` instead of `127.0.0.1`. Don't use it for SSRF checks on hostnames from user input. Pass the IP addresses that the DNS lookup returns instead.
 
 ## Node.js bindings (using WASM)
 
