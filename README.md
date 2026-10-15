@@ -59,6 +59,8 @@ zen_internals.ip_matcher_has.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.
 zen_internals.ip_matcher_has.restype = ctypes.c_int
 zen_internals.ip_matcher_memory_size.argtypes = [ctypes.c_void_p]
 zen_internals.ip_matcher_memory_size.restype = ctypes.c_size_t
+zen_internals.ip_matcher_rejected_count.argtypes = [ctypes.c_void_p]
+zen_internals.ip_matcher_rejected_count.restype = ctypes.c_size_t
 zen_internals.ip_matcher_free.argtypes = [ctypes.c_void_p]
 zen_internals.ip_matcher_free.restype = None
 
@@ -78,13 +80,14 @@ try:
     result = zen_internals.ip_matcher_has(matcher, lookup_buffer, len(lookup_buffer))
     print(result)  # 1 = match, 0 = no match, 2 = error
     print("Native memory:", zen_internals.ip_matcher_memory_size(matcher))
+    print("Rejected networks:", zen_internals.ip_matcher_rejected_count(matcher))
 finally:
     zen_internals.ip_matcher_free(matcher)
 ```
 
 ### Notes
 
-- Invalid network strings are ignored.
+- Invalid network strings are rejected. `ip_matcher_rejected_count` returns how many were rejected, so the caller can decide whether too many invalid networks were passed. Valid networks are never rejected, even if another network already covers them.
 - `ip_matcher_create` returns `NULL` for malformed input, more than 1,000,000 entries, or more than 64 MiB of input.
 - `ip_matcher_has` returns `1` for a match, `0` for no match, and `2` for invalid FFI input, including lookups longer than 128 bytes.
 - Call `ip_matcher_free` exactly once for each matcher. Lookups may run concurrently, but the matcher must remain alive until all lookups finish.

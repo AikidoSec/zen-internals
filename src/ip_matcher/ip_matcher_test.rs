@@ -29,6 +29,37 @@ fn memory_size_only_counts_summarized_networks() {
 }
 
 #[test]
+fn rejected_count_is_zero_when_every_network_is_valid() {
+    let matcher = IpMatcher::new(["10.0.0.0/8", "2001:db8::/32", "192.0.2.1"]);
+    let empty = IpMatcher::new([] as [&str; 0]);
+
+    assert_eq!(matcher.rejected_count(), 0);
+    assert_eq!(empty.rejected_count(), 0);
+}
+
+#[test]
+fn rejected_count_does_count_invalid_networks() {
+    let matcher = IpMatcher::new(["10.0.0.0/8", "not-an-ip", "", "999.1.1.1", "2001:db8::/32"]);
+
+    assert_eq!(matcher.rejected_count(), 3);
+    assert!(matcher.has("10.1.2.3"));
+    assert!(matcher.has("2001:db8::1"));
+}
+
+#[test]
+fn rejected_count_does_not_count_valid_networks_covered_by_another_network() {
+    let adjacent: Vec<String> = (0..=255).map(|last| format!("192.0.2.{last}")).collect();
+    let matcher = IpMatcher::new(
+        adjacent
+            .iter()
+            .map(String::as_str)
+            .chain(["192.0.2.0/24", "192.0.2.0/24"]),
+    );
+
+    assert_eq!(matcher.rejected_count(), 0);
+}
+
+#[test]
 fn check_with_single_ipv4s() {
     assert_cases(
         &[
