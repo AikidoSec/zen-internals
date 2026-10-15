@@ -127,9 +127,14 @@ fn compare_addresses(left: &Network, right: &Network) -> Ordering {
 
 pub struct IpMatcher {
     sorted: Vec<Network>,
+    rejected: usize,
 }
 
 impl IpMatcher {
+    /// Creates a matcher. Each network is an IPv4 or IPv6 address with an optional `/prefix`
+    /// length, and strings that are not valid networks are rejected.
+    ///
+    /// Valid networks are never rejected, even if another network already covers them.
     pub fn new<I, S>(networks: I) -> Self
     where
         I: IntoIterator<Item = S>,
@@ -137,16 +142,24 @@ impl IpMatcher {
     {
         let networks = networks.into_iter();
         let mut subnets = Vec::with_capacity(networks.size_hint().1.unwrap_or(0).min(1024));
+        let mut rejected = 0;
         for network in networks {
-            if let Some(network) = parse_base_network(network.as_ref()) {
-                subnets.push(network);
+            match parse_base_network(network.as_ref()) {
+                Some(network) => subnets.push(network),
+                None => rejected += 1,
             }
         }
 
         subnets.sort_unstable();
         Self {
             sorted: summarize_sorted_networks(subnets),
+            rejected,
         }
+    }
+
+    /// Returns how many of the networks passed to `new` were rejected.
+    pub fn rejected_count(&self) -> usize {
+        self.rejected
     }
 
     pub fn memory_size(&self) -> usize {

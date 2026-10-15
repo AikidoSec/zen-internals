@@ -1,6 +1,6 @@
 use super::ip_matcher::{
-    ip_matcher_create, ip_matcher_free, ip_matcher_has, ip_matcher_memory_size, IpMatcherByteSlice,
-    IpMatcherHandle,
+    ip_matcher_create, ip_matcher_free, ip_matcher_has, ip_matcher_memory_size,
+    ip_matcher_rejected_count, IpMatcherByteSlice, IpMatcherHandle,
 };
 use std::os::raw::c_int;
 use std::ptr;
@@ -29,6 +29,7 @@ fn matcher_handle_lifecycle_preserves_matcher_behavior() {
     let handle = unsafe { ip_matcher_create(descriptors.as_ptr(), descriptors.len()) };
     assert!(!handle.is_null());
     assert!(unsafe { ip_matcher_memory_size(handle) } > 0);
+    assert_eq!(unsafe { ip_matcher_rejected_count(handle) }, 1);
     assert_eq!(unsafe { has(handle, b"10.255.255.255") }, MATCH);
     assert_eq!(unsafe { has(handle, b"[2001:db8::1]") }, MATCH);
     assert_eq!(unsafe { has(handle, b"::ffff:10.1.2.3") }, MATCH);
@@ -38,8 +39,25 @@ fn matcher_handle_lifecycle_preserves_matcher_behavior() {
 }
 
 #[test]
+fn rejected_count_is_zero_when_every_network_is_valid() {
+    let values: &[&[u8]] = &[b"10.0.0.0/8", b"2001:db8::/32"];
+    let descriptors: Vec<_> = values.iter().map(|value| descriptor(value)).collect();
+
+    let handle = unsafe { ip_matcher_create(descriptors.as_ptr(), descriptors.len()) };
+    assert!(!handle.is_null());
+    assert_eq!(unsafe { ip_matcher_rejected_count(handle) }, 0);
+    unsafe { ip_matcher_free(handle) };
+
+    let empty = unsafe { ip_matcher_create(ptr::null(), 0) };
+    assert!(!empty.is_null());
+    assert_eq!(unsafe { ip_matcher_rejected_count(empty) }, 0);
+    unsafe { ip_matcher_free(empty) };
+}
+
+#[test]
 fn creation_rejects_structural_errors_and_limits() {
     assert_eq!(unsafe { ip_matcher_memory_size(ptr::null()) }, 0);
+    assert_eq!(unsafe { ip_matcher_rejected_count(ptr::null()) }, 0);
     assert!(unsafe { ip_matcher_create(ptr::null(), 1) }.is_null());
     assert!(unsafe { ip_matcher_create(ptr::null(), 1_000_001) }.is_null());
 

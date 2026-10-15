@@ -22,7 +22,10 @@ pub struct IpMatcherHandle {
     matcher: IpMatcher,
 }
 
-/// Creates an immutable matcher. Invalid network strings are ignored.
+/// Creates an immutable matcher. Each network is an IPv4 or IPv6 address with an optional
+/// `/prefix` length, and strings that are not valid networks are rejected.
+///
+/// Valid networks are never rejected, even if another network already covers them.
 ///
 /// Returns null for invalid FFI input, exceeded limits, or a caught panic.
 ///
@@ -96,6 +99,24 @@ pub unsafe extern "C" fn ip_matcher_memory_size(handle: *const IpMatcherHandle) 
             0
         } else {
             unsafe { &*handle }.matcher.memory_size()
+        }
+    })
+    .unwrap_or(0)
+}
+
+/// Returns how many of the networks passed to `ip_matcher_create` were rejected, or zero for
+/// an invalid handle or panic.
+///
+/// # Safety
+///
+/// `handle` must be null or a live pointer returned by `ip_matcher_create`.
+#[no_mangle]
+pub unsafe extern "C" fn ip_matcher_rejected_count(handle: *const IpMatcherHandle) -> usize {
+    panic::catch_unwind(|| {
+        if handle.is_null() {
+            0
+        } else {
+            unsafe { &*handle }.matcher.rejected_count()
         }
     })
     .unwrap_or(0)

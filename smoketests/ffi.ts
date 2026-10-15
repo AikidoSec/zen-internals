@@ -32,6 +32,10 @@ const lib = Deno.dlopen(fullTargetDir, {
         parameters: ["pointer"],
         result: "usize",
     },
+    ip_matcher_rejected_count: {
+        parameters: ["pointer"],
+        result: "usize",
+    },
     ip_matcher_free: {
         parameters: ["pointer"],
         result: "void",
@@ -353,7 +357,7 @@ function encodeIpMatcherInput(networks: string[]): Uint8Array {
     return input;
 }
 
-const ipMatcherNetworks = ["10.0.0.0/8", "2001:db8::/32"];
+const ipMatcherNetworks = ["10.0.0.0/8", "2001:db8::/32", "not-a-network"];
 const ipMatcherInput = encodeIpMatcherInput(ipMatcherNetworks);
 const ipMatcher = lib.symbols.ip_matcher_create(
     ipMatcherInput,
@@ -367,6 +371,7 @@ try {
     if (lib.symbols.ip_matcher_memory_size(ipMatcher) <= 0n) {
         throw new Error("IP matcher did not report its memory size");
     }
+    assertEquals(lib.symbols.ip_matcher_rejected_count(ipMatcher), 1n);
 
     const ipv4Match = new TextEncoder().encode("10.2.3.4");
     assertEquals(
