@@ -11,19 +11,13 @@ const NO_MATCH: c_int = 0;
 const MATCH: c_int = 1;
 const ERROR: c_int = 2;
 
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct IpMatcherByteSlice {
-    pub ptr: *const u8,
-    pub len: usize,
-}
-
 pub struct IpMatcherHandle {
     matcher: IpMatcher,
 }
 
-/// Creates an immutable matcher. Each network is an IPv4 or IPv6 address with an optional
-/// `/prefix` length, and strings that are not valid networks are rejected.
+/// Creates an immutable matcher from a UTF-8 string of newline-separated networks. Each network
+/// is an IPv4 or IPv6 address with an optional `/prefix` length. Invalid networks are rejected.
+/// An empty string creates an empty matcher.
 ///
 /// Valid networks are never rejected, even if another network already covers them.
 ///
@@ -31,17 +25,16 @@ pub struct IpMatcherHandle {
 ///
 /// # Safety
 ///
-/// For `network_count` in `1..=1_000_000`, `networks` must reference that many aligned,
-/// initialized descriptors. Each nonempty descriptor must reference `len` contiguous,
-/// initialized bytes. All referenced memory must remain valid and unchanged for this call.
-/// Free a non-null result exactly once with `ip_matcher_free`.
+/// For `networks_len` greater than zero, `networks` must point to `networks_len` initialized
+/// bytes that remain valid and unchanged for this call. Free a non-null result exactly once
+/// with `ip_matcher_free`.
 #[no_mangle]
 pub unsafe extern "C" fn ip_matcher_create(
-    networks: *const IpMatcherByteSlice,
-    network_count: usize,
+    networks: *const u8,
+    networks_len: usize,
 ) -> *mut IpMatcherHandle {
     panic::catch_unwind(|| unsafe {
-        create_matcher(networks, network_count)
+        create_matcher(networks, networks_len)
             .map(|matcher| Box::into_raw(Box::new(IpMatcherHandle { matcher })))
     })
     .ok()
@@ -49,42 +42,29 @@ pub unsafe extern "C" fn ip_matcher_create(
     .unwrap_or(ptr::null_mut())
 }
 
-unsafe fn create_matcher(
-    networks: *const IpMatcherByteSlice,
-    network_count: usize,
-) -> Result<IpMatcher, ()> {
-    if network_count > MAX_NETWORKS || (network_count > 0 && networks.is_null()) {
+unsafe fn create_matcher(networks: *const u8, networks_len: usize) -> Result<IpMatcher, ()> {
+    if networks_len > MAX_INPUT_BYTES || (networks_len > 0 && networks.is_null()) {
         return Err(());
     }
 
-    let descriptors = if network_count == 0 {
+    let bytes = if networks_len == 0 {
         &[]
     } else {
-        unsafe { std::slice::from_raw_parts(networks, network_count) }
+        unsafe { std::slice::from_raw_parts(networks, networks_len) }
     };
 
-    let mut total_input_bytes = 0_usize;
-    for descriptor in descriptors {
-        if descriptor.len > 0 && descriptor.ptr.is_null() {
-            return Err(());
-        }
-        total_input_bytes = total_input_bytes.checked_add(descriptor.len).ok_or(())?;
-        if total_input_bytes > MAX_INPUT_BYTES {
-            return Err(());
-        }
+    let networks = str::from_utf8(bytes).map_err(|_| ())?;
+
+    if networks.is_empty() {
+        return Ok(IpMatcher::new([] as [&str; 0]));
     }
 
-    let mut network_strings = Vec::with_capacity(network_count.min(1024));
-    for descriptor in descriptors {
-        let bytes = if descriptor.len == 0 {
-            &[]
-        } else {
-            unsafe { std::slice::from_raw_parts(descriptor.ptr, descriptor.len) }
-        };
-        network_strings.push(str::from_utf8(bytes).map_err(|_| ())?);
+    let separators = bytes.iter().filter(|&&byte| byte == b'\n').count();
+    if separators >= MAX_NETWORKS {
+        return Err(());
     }
 
-    Ok(IpMatcher::new(network_strings))
+    Ok(IpMatcher::new(networks.split('\n')))
 }
 
 /// Returns the number of bytes allocated by a matcher, or zero for an invalid handle or panic.

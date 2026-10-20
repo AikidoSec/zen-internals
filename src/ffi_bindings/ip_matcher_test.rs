@@ -1,6 +1,6 @@
 use super::ip_matcher::{
     ip_matcher_create, ip_matcher_free, ip_matcher_has, ip_matcher_memory_size,
-    ip_matcher_rejected_count, IpMatcherByteSlice, IpMatcherHandle,
+    ip_matcher_rejected_count, IpMatcherHandle,
 };
 use std::os::raw::c_int;
 use std::ptr;
@@ -10,11 +10,9 @@ const NO_MATCH: c_int = 0;
 const MATCH: c_int = 1;
 const ERROR: c_int = 2;
 
-fn descriptor(value: &[u8]) -> IpMatcherByteSlice {
-    IpMatcherByteSlice {
-        ptr: value.as_ptr(),
-        len: value.len(),
-    }
+unsafe fn create(networks: &[&str]) -> *mut IpMatcherHandle {
+    let networks = networks.join("\n");
+    unsafe { ip_matcher_create(networks.as_ptr(), networks.len()) }
 }
 
 unsafe fn has(handle: *const IpMatcherHandle, value: &[u8]) -> c_int {
@@ -23,10 +21,7 @@ unsafe fn has(handle: *const IpMatcherHandle, value: &[u8]) -> c_int {
 
 #[test]
 fn matcher_handle_lifecycle_preserves_matcher_behavior() {
-    let values: &[&[u8]] = &[b"10.0.0.42/8", b"2001:db8::/32", b"invalid network"];
-    let descriptors: Vec<_> = values.iter().map(|value| descriptor(value)).collect();
-
-    let handle = unsafe { ip_matcher_create(descriptors.as_ptr(), descriptors.len()) };
+    let handle = unsafe { create(&["10.0.0.42/8", "2001:db8::/32", "invalid network"]) };
     assert!(!handle.is_null());
     assert!(unsafe { ip_matcher_memory_size(handle) } > 0);
     assert_eq!(unsafe { ip_matcher_rejected_count(handle) }, 1);
@@ -40,10 +35,7 @@ fn matcher_handle_lifecycle_preserves_matcher_behavior() {
 
 #[test]
 fn rejected_count_is_zero_when_every_network_is_valid() {
-    let values: &[&[u8]] = &[b"10.0.0.0/8", b"2001:db8::/32"];
-    let descriptors: Vec<_> = values.iter().map(|value| descriptor(value)).collect();
-
-    let handle = unsafe { ip_matcher_create(descriptors.as_ptr(), descriptors.len()) };
+    let handle = unsafe { create(&["10.0.0.0/8", "2001:db8::/32"]) };
     assert!(!handle.is_null());
     assert_eq!(unsafe { ip_matcher_rejected_count(handle) }, 0);
     unsafe { ip_matcher_free(handle) };
@@ -59,22 +51,33 @@ fn creation_rejects_structural_errors_and_limits() {
     assert_eq!(unsafe { ip_matcher_memory_size(ptr::null()) }, 0);
     assert_eq!(unsafe { ip_matcher_rejected_count(ptr::null()) }, 0);
     assert!(unsafe { ip_matcher_create(ptr::null(), 1) }.is_null());
-    assert!(unsafe { ip_matcher_create(ptr::null(), 1_000_001) }.is_null());
 
-    let null_buffer = IpMatcherByteSlice {
-        ptr: ptr::null(),
-        len: 1,
-    };
-    assert!(unsafe { ip_matcher_create(&null_buffer, 1) }.is_null());
+    let invalid_utf8 = [0xc3, 0x28];
+    assert!(unsafe { ip_matcher_create(invalid_utf8.as_ptr(), invalid_utf8.len()) }.is_null());
 
-    let invalid_utf8 = descriptor(&[0xc3, 0x28]);
-    assert!(unsafe { ip_matcher_create(&invalid_utf8, 1) }.is_null());
+    let oversized = NonNull::<u8>::dangling().as_ptr();
+    assert!(unsafe { ip_matcher_create(oversized, 64 * 1024 * 1024 + 1) }.is_null());
 
-    let oversized = IpMatcherByteSlice {
-        ptr: NonNull::<u8>::dangling().as_ptr(),
-        len: 64 * 1024 * 1024 + 1,
-    };
-    assert!(unsafe { ip_matcher_create(&oversized, 1) }.is_null());
+    let at_limit = unsafe { create(&vec!["10.0.0.1"; 1_000_000]) };
+    assert!(!at_limit.is_null());
+    unsafe { ip_matcher_free(at_limit) };
+    assert!(unsafe { create(&vec!["10.0.0.1"; 1_000_001]) }.is_null());
+}
+
+#[test]
+fn networks_are_separated_by_newlines() {
+    let empty = unsafe { create(&[]) };
+    assert!(!empty.is_null());
+    assert_eq!(unsafe { ip_matcher_rejected_count(empty) }, 0);
+    assert_eq!(unsafe { has(empty, b"10.0.0.1") }, NO_MATCH);
+    unsafe { ip_matcher_free(empty) };
+
+    // A trailing newline adds an empty entry, which is rejected.
+    let trailing = unsafe { ip_matcher_create(b"10.0.0.0/8\n".as_ptr(), 11) };
+    assert!(!trailing.is_null());
+    assert_eq!(unsafe { ip_matcher_rejected_count(trailing) }, 1);
+    assert_eq!(unsafe { has(trailing, b"10.1.2.3") }, MATCH);
+    unsafe { ip_matcher_free(trailing) };
 }
 
 #[test]

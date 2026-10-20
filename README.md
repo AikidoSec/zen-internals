@@ -41,19 +41,13 @@ See [list of dialects](https://github.com/AikidoSec/zen-internals/blob/main/src/
 
 The IP matcher is only available in the native libraries, not in WASM. A WASM instance can't run lookups from multiple threads at the same time. You would need one lock around all lookups, which slows down requests, or a copy of every list per thread, which uses a lot of memory.
 
-It uses pointer and length byte slices, so the input does not need null terminators.
+`ip_matcher_create` takes a single newline-separated UTF-8 string of networks and its length in bytes, so the input needs no null terminator. An empty string creates an empty IP matcher.
 
 ```py
 import ctypes
 
-class IpMatcherByteSlice(ctypes.Structure):
-    _fields_ = [
-        ("ptr", ctypes.POINTER(ctypes.c_uint8)),
-        ("len", ctypes.c_size_t),
-    ]
-
 zen_internals = ctypes.CDLL("target/release/libzen_internals.so")
-zen_internals.ip_matcher_create.argtypes = [ctypes.POINTER(IpMatcherByteSlice), ctypes.c_size_t]
+zen_internals.ip_matcher_create.argtypes = [ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t]
 zen_internals.ip_matcher_create.restype = ctypes.c_void_p
 zen_internals.ip_matcher_has.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t]
 zen_internals.ip_matcher_has.restype = ctypes.c_int
@@ -64,13 +58,10 @@ zen_internals.ip_matcher_rejected_count.restype = ctypes.c_size_t
 zen_internals.ip_matcher_free.argtypes = [ctypes.c_void_p]
 zen_internals.ip_matcher_free.restype = None
 
-network_bytes = [value.encode("utf-8") for value in ["10.0.0.0/8", "2001:db8::/32"]]
-network_buffers = [(ctypes.c_uint8 * len(value)).from_buffer_copy(value) for value in network_bytes]
-networks = (IpMatcherByteSlice * len(network_buffers))(*[
-    IpMatcherByteSlice(buffer, len(buffer)) for buffer in network_buffers
-])
+networks = "\n".join(["10.0.0.0/8", "2001:db8::/32"]).encode("utf-8")
+networks_buffer = (ctypes.c_uint8 * len(networks)).from_buffer_copy(networks)
 
-matcher = zen_internals.ip_matcher_create(networks, len(networks))
+matcher = zen_internals.ip_matcher_create(networks_buffer, len(networks_buffer))
 if not matcher:
     raise RuntimeError("ip_matcher_create returned null")
 

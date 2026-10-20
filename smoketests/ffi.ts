@@ -323,45 +323,11 @@ assertEquals(
     []
 );
 
-function encodeIpMatcherInput(networks: string[]): Uint8Array {
-    const encodedNetworks = networks.map((network) =>
-        new TextEncoder().encode(network)
-    );
-    const descriptorBytes = networks.length * 2 * BigUint64Array.BYTES_PER_ELEMENT;
-    const input = new Uint8Array(
-        descriptorBytes +
-            encodedNetworks.reduce((size, network) => size + network.length, 0)
-    );
-    const descriptors = new BigUint64Array(
-        input.buffer,
-        input.byteOffset,
-        networks.length * 2
-    );
-    const inputPointer = Deno.UnsafePointer.of(input);
-    if (inputPointer === null) {
-        throw new Error("Failed to allocate IP matcher input");
-    }
-
-    let networkOffset = descriptorBytes;
-    for (const [index, network] of encodedNetworks.entries()) {
-        input.set(network, networkOffset);
-        const networkPointer = Deno.UnsafePointer.offset(
-            inputPointer,
-            networkOffset
-        );
-        descriptors[index * 2] = Deno.UnsafePointer.value(networkPointer);
-        descriptors[index * 2 + 1] = BigInt(network.length);
-        networkOffset += network.length;
-    }
-
-    return input;
-}
-
 const ipMatcherNetworks = ["10.0.0.0/8", "2001:db8::/32", "not-a-network"];
-const ipMatcherInput = encodeIpMatcherInput(ipMatcherNetworks);
+const ipMatcherInput = new TextEncoder().encode(ipMatcherNetworks.join("\n"));
 const ipMatcher = lib.symbols.ip_matcher_create(
     ipMatcherInput,
-    BigInt(ipMatcherNetworks.length)
+    BigInt(ipMatcherInput.length)
 );
 if (ipMatcher === null) {
     throw new Error("Failed to create IP matcher");
