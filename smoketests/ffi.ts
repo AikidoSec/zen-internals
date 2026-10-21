@@ -20,6 +20,26 @@ const lib = Deno.dlopen(fullTargetDir, {
         parameters: ["pointer"],
         result: "void",
     },
+    ip_matcher_create: {
+        parameters: ["buffer", "usize"],
+        result: "pointer",
+    },
+    ip_matcher_has: {
+        parameters: ["pointer", "buffer", "usize"],
+        result: "i32",
+    },
+    ip_matcher_memory_size: {
+        parameters: ["pointer"],
+        result: "usize",
+    },
+    ip_matcher_rejected_count: {
+        parameters: ["pointer"],
+        result: "usize",
+    },
+    ip_matcher_free: {
+        parameters: ["pointer"],
+        result: "void",
+    },
 });
 
 function getBufferAndLength(str: string): [Deno.PointerValue, number] {
@@ -302,5 +322,42 @@ assertEquals(
     callIdorAnalyzeSql("COMMIT", 9),
     []
 );
+
+const ipMatcherNetworks = ["10.0.0.0/8", "2001:db8::/32", "not-a-network"];
+const ipMatcherInput = new TextEncoder().encode(ipMatcherNetworks.join("\n"));
+const ipMatcher = lib.symbols.ip_matcher_create(
+    ipMatcherInput,
+    BigInt(ipMatcherInput.length)
+);
+if (ipMatcher === null) {
+    throw new Error("Failed to create IP matcher");
+}
+
+try {
+    if (lib.symbols.ip_matcher_memory_size(ipMatcher) <= 0n) {
+        throw new Error("IP matcher did not report its memory size");
+    }
+    assertEquals(lib.symbols.ip_matcher_rejected_count(ipMatcher), 1n);
+
+    const ipv4Match = new TextEncoder().encode("10.2.3.4");
+    assertEquals(
+        lib.symbols.ip_matcher_has(ipMatcher, ipv4Match, BigInt(ipv4Match.length)),
+        1
+    );
+
+    const ipv6Match = new TextEncoder().encode("2001:db8::1");
+    assertEquals(
+        lib.symbols.ip_matcher_has(ipMatcher, ipv6Match, BigInt(ipv6Match.length)),
+        1
+    );
+
+    const noMatch = new TextEncoder().encode("192.0.2.1");
+    assertEquals(
+        lib.symbols.ip_matcher_has(ipMatcher, noMatch, BigInt(noMatch.length)),
+        0
+    );
+} finally {
+    lib.symbols.ip_matcher_free(ipMatcher);
+}
 
 lib.close();
