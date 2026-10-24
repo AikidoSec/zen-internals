@@ -204,16 +204,19 @@ fn analyze_update(
     placeholders: &PlaceholderPositions,
     cte_names: &HashSet<String>,
 ) -> Result<(), String> {
-    let mut tables = extract_tables_from_table_with_joins(table);
-    if let Some(from_kind) = from {
-        let from_tables = match from_kind {
-            sqlparser::ast::UpdateTableFromKind::BeforeSet(twjs)
-            | sqlparser::ast::UpdateTableFromKind::AfterSet(twjs) => twjs,
-        };
-        for twj in from_tables {
-            tables.extend(extract_tables_from_table_with_joins(twj));
-        }
-    }
+    let from_tables: &[TableWithJoins] = match from {
+        Some(sqlparser::ast::UpdateTableFromKind::BeforeSet(twjs))
+        | Some(sqlparser::ast::UpdateTableFromKind::AfterSet(twjs)) => twjs,
+        None => &[],
+    };
+    let mut tables = Vec::new();
+    let mut derived_subqueries = Vec::new();
+    collect_relations(
+        std::slice::from_ref(table),
+        &mut tables,
+        &mut derived_subqueries,
+    );
+    collect_relations(from_tables, &mut tables, &mut derived_subqueries);
 
     // Filter out common table expression names
     tables.retain(|t| !cte_names.contains(&t.name.to_lowercase()));
@@ -229,13 +232,7 @@ fn analyze_update(
     col_col_pairs.extend(collect_col_col_pairs_from_joins(std::slice::from_ref(
         table,
     )));
-    if let Some(from_clause) = from {
-        let from_tables = match from_clause {
-            sqlparser::ast::UpdateTableFromKind::BeforeSet(twjs)
-            | sqlparser::ast::UpdateTableFromKind::AfterSet(twjs) => twjs,
-        };
-        col_col_pairs.extend(collect_col_col_pairs_from_joins(from_tables));
-    }
+    col_col_pairs.extend(collect_col_col_pairs_from_joins(from_tables));
 
     if !col_col_pairs.is_empty() {
         let resolved = resolve_col_col_filters(&filters, &col_col_pairs, &tables);
@@ -257,6 +254,10 @@ fn analyze_update(
         analyze_query_with_ctes(&subquery, results, placeholders, cte_names)?;
     }
 
+    for subquery in derived_subqueries {
+        analyze_query_with_ctes(subquery, results, placeholders, cte_names)?;
+    }
+
     Ok(())
 }
 
@@ -266,18 +267,14 @@ fn analyze_delete(
     placeholders: &PlaceholderPositions,
     cte_names: &HashSet<String>,
 ) -> Result<(), String> {
-    let mut tables: Vec<TableRef> = match &delete.from {
-        FromTable::WithFromKeyword(twjs) | FromTable::WithoutKeyword(twjs) => twjs
-            .iter()
-            .flat_map(extract_tables_from_table_with_joins)
-            .collect(),
+    let from_twjs: &[TableWithJoins] = match &delete.from {
+        FromTable::WithFromKeyword(twjs) | FromTable::WithoutKeyword(twjs) => twjs,
     };
-
-    if let Some(using_clauses) = &delete.using {
-        for twj in using_clauses {
-            tables.extend(extract_tables_from_table_with_joins(twj));
-        }
-    }
+    let using_clauses = delete.using.as_deref().unwrap_or(&[]);
+    let mut tables = Vec::new();
+    let mut derived_subqueries = Vec::new();
+    collect_relations(from_twjs, &mut tables, &mut derived_subqueries);
+    collect_relations(using_clauses, &mut tables, &mut derived_subqueries);
 
     // Filter out common table expression names
     tables.retain(|t| !cte_names.contains(&t.name.to_lowercase()));
@@ -287,13 +284,8 @@ fn analyze_delete(
         None => (Vec::new(), Vec::new(), Vec::new()),
     };
 
-    let from_twjs: &[TableWithJoins] = match &delete.from {
-        FromTable::WithFromKeyword(twjs) | FromTable::WithoutKeyword(twjs) => twjs,
-    };
     col_col_pairs.extend(collect_col_col_pairs_from_joins(from_twjs));
-    if let Some(using_clauses) = &delete.using {
-        col_col_pairs.extend(collect_col_col_pairs_from_joins(using_clauses));
-    }
+    col_col_pairs.extend(collect_col_col_pairs_from_joins(using_clauses));
 
     if !col_col_pairs.is_empty() {
         let resolved = resolve_col_col_filters(&filters, &col_col_pairs, &tables);
@@ -309,6 +301,10 @@ fn analyze_delete(
 
     for subquery in subqueries {
         analyze_query_with_ctes(&subquery, results, placeholders, cte_names)?;
+    }
+
+    for subquery in derived_subqueries {
+        analyze_query_with_ctes(subquery, results, placeholders, cte_names)?;
     }
 
     Ok(())
@@ -1037,17 +1033,28 @@ fn is_mssql_table_hint_arg(arg: &FunctionArg) -> bool {
     )
 }
 
-fn extract_tables_from_table_with_joins(twj: &TableWithJoins) -> Vec<TableRef> {
-    let mut tables = Vec::new();
-    if let Some(t) = table_ref_from_factor(&twj.relation) {
-        tables.push(t);
-    }
-    for join in &twj.joins {
-        if let Some(t) = table_ref_from_factor(&join.relation) {
-            tables.push(t);
+fn collect_relations<'a>(
+    twjs: &'a [TableWithJoins],
+    tables: &mut Vec<TableRef>,
+    subqueries: &mut Vec<&'a Query>,
+) {
+    for twj in twjs {
+        for factor in
+            std::iter::once(&twj.relation).chain(twj.joins.iter().map(|join| &join.relation))
+        {
+            match factor {
+                TableFactor::Derived { subquery, .. } => subqueries.push(subquery),
+                TableFactor::NestedJoin {
+                    table_with_joins, ..
+                } => collect_relations(
+                    std::slice::from_ref(table_with_joins.as_ref()),
+                    tables,
+                    subqueries,
+                ),
+                _ => tables.extend(table_ref_from_factor(factor)),
+            }
         }
     }
-    tables
 }
 
 fn extract_insert_columns(
