@@ -2392,6 +2392,119 @@ mod tests {
     }
 
     #[test]
+    fn test_update_delete_with_unfiltered_derived_tables() {
+        for (query, dialect, kind) in [
+            (
+                "UPDATE orders SET note = b.card FROM (SELECT card, id FROM billing) b WHERE orders.id = b.id AND orders.tenant_id = 1",
+                9,
+                "update",
+            ),
+            (
+                "UPDATE orders SET note = b.card FROM (SELECT card, id FROM billing) b WHERE orders.id = b.id AND orders.tenant_id = 1",
+                12,
+                "update",
+            ),
+            (
+                "UPDATE orders JOIN (SELECT card, id FROM billing) b ON orders.id = b.id SET orders.note = b.card WHERE orders.tenant_id = 1",
+                8,
+                "update",
+            ),
+            (
+                "UPDATE orders SET note = b.card FROM (SELECT * FROM (SELECT card, id FROM billing) inner_b) b WHERE orders.id = b.id AND orders.tenant_id = 1",
+                9,
+                "update",
+            ),
+            (
+                "DELETE FROM orders USING (SELECT id FROM billing) b WHERE orders.id = b.id AND orders.tenant_id = 1",
+                9,
+                "delete",
+            ),
+            (
+                "DELETE orders FROM orders JOIN (SELECT id FROM billing) b ON orders.id = b.id WHERE orders.tenant_id = 1",
+                8,
+                "delete",
+            ),
+            (
+                "DELETE FROM orders USING orders JOIN (SELECT id FROM billing) b ON orders.id = b.id WHERE orders.tenant_id = 1",
+                8,
+                "delete",
+            ),
+            (
+                "UPDATE orders JOIN ((SELECT card, id FROM billing) b JOIN (SELECT 1 AS id) dummy ON b.id = dummy.id) ON orders.id = b.id SET orders.note = b.card WHERE orders.tenant_id = 1",
+                8,
+                "update",
+            ),
+        ] {
+            let results = idor_analyze_sql(query, dialect).unwrap();
+            assert_eq!(results[0].kind, kind, "{query}");
+            assert!(results[0].tables.iter().all(|table| table.name == "orders"), "{query}");
+            assert_eq!(results[0].filters, vec![FilterColumn {
+                table: Some("orders".into()),
+                column: "tenant_id".into(),
+                value: "1".into(),
+                placeholder_number: None,
+                is_placeholder: false,
+            }], "{query}");
+            assert!(results.len() >= 2, "{query}");
+            assert_eq!(results[1].kind, "select", "{query}");
+            assert_eq!(results[1].tables, vec![TableRef {
+                name: "billing".into(),
+                alias: None,
+            }], "{query}");
+            assert!(results[1].filters.is_empty(), "{query}");
+        }
+    }
+
+    #[test]
+    fn test_update_delete_with_filtered_derived_tables() {
+        for (query, kind, outer_placeholder) in [
+            (
+                "UPDATE orders JOIN (SELECT card, id FROM billing WHERE tenant_id = ?) b ON orders.id = b.id SET orders.note = ? WHERE orders.tenant_id = ?",
+                "update",
+                2,
+            ),
+            (
+                "DELETE orders FROM orders JOIN (SELECT id FROM billing WHERE tenant_id = ?) b ON orders.id = b.id WHERE orders.tenant_id = ?",
+                "delete",
+                1,
+            ),
+        ] {
+            assert_eq!(idor_analyze_sql(query, 8).unwrap(), vec![
+                SqlQueryResult {
+                    kind: kind.into(),
+                    tables: vec![TableRef {
+                        name: "orders".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: Some("orders".into()),
+                        column: "tenant_id".into(),
+                        value: "?".into(),
+                        placeholder_number: Some(outer_placeholder),
+                        is_placeholder: true,
+                    }],
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "billing".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "?".into(),
+                        placeholder_number: Some(0),
+                        is_placeholder: true,
+                    }],
+                    insert_columns: None,
+                },
+            ], "{query}");
+        }
+    }
+
+    #[test]
     fn test_insert_select_simple() {
         assert_eq!(
             idor_analyze_sql(
