@@ -5,6 +5,20 @@
  */
 mod helpers;
 
+#[cfg(all(
+    feature = "benchmarking",
+    not(feature = "wasm-js"),
+    not(target_arch = "wasm32")
+))]
+pub mod ip_matcher;
+
+#[cfg(all(
+    not(feature = "benchmarking"),
+    not(feature = "wasm-js"),
+    not(target_arch = "wasm32")
+))]
+mod ip_matcher;
+
 // FFI Bindings
 #[cfg(not(feature = "wasm-js"))]
 pub mod ffi_bindings;
