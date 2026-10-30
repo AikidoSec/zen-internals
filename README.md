@@ -206,23 +206,25 @@ zen_internals.idor_analyze_sql_ffi.argtypes = [
     ctypes.c_size_t,
     ctypes.c_int,
 ]
-zen_internals.idor_analyze_sql_ffi.restype = ctypes.c_char_p
-zen_internals.free_string.argtypes = [ctypes.c_char_p]
+zen_internals.idor_analyze_sql_ffi.restype = ctypes.c_void_p
+zen_internals.free_string.argtypes = [ctypes.c_void_p]
+zen_internals.free_string.restype = None
 
 def analyze_sql(query_str, dialect):
     query = query_str.encode("utf-8")
     query_buffer = (ctypes.c_uint8 * len(query)).from_buffer_copy(query)
     result_ptr = zen_internals.idor_analyze_sql_ffi(query_buffer, len(query), dialect)
-    result = json.loads(result_ptr.decode("utf-8"))
-    zen_internals.free_string(result_ptr)
-    return result
+    try:
+        return json.loads(ctypes.string_at(result_ptr).decode("utf-8"))
+    finally:
+        zen_internals.free_string(result_ptr)
 
 print(analyze_sql("SELECT * FROM users u WHERE u.tenant_id = $1", 9))
 # [
 #   {
 #     "kind": "select",
 #     "tables": [{ "name": "users", "alias": "u" }],
-#     "filters": [{ "table": "u", "column": "tenant_id", "value": "$1" }]
+#     "filters": [{ "table": "u", "column": "tenant_id", "value": "$1", "is_placeholder": true }]
 #   }
 # ]
 
@@ -232,7 +234,7 @@ print(analyze_sql("INSERT INTO users (name, tenant_id) VALUES ('John', $1)", 9))
 #     "kind": "insert",
 #     "tables": [{ "name": "users" }],
 #     "filters": [],
-#     "insert_columns": [[{ "column": "name", "value": "John" }, { "column": "tenant_id", "value": "$1" }]]
+#     "insert_columns": [[{ "column": "name", "value": "John", "is_placeholder": false }, { "column": "tenant_id", "value": "$1", "is_placeholder": true }]]
 #   }
 # ]
 ```
