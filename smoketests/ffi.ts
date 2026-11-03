@@ -307,6 +307,12 @@ assertEquals(
     { error: "sql parser error: Expected: an SQL statement, found: INVALID at Line: 1, Column: 1" }
 );
 
+// Parser errors containing double quotes must still produce valid JSON
+assertEquals(
+    callIdorAnalyzeSql('SELECT 1 "unexpected" "second"', 9),
+    { error: 'sql parser error: Expected: end of statement, found: "second" at Line: 1, Column: 23' }
+);
+
 assertEquals(
     (() => {
         const resultPtr = lib.symbols.idor_analyze_sql_ffi(null, 0, 9);
