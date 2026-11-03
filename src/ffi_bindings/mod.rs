@@ -174,9 +174,8 @@ pub unsafe extern "C" fn idor_analyze_sql_ffi(
         };
 
         let json = match idor_analyze_sql(query_str, dialect) {
-            Ok(results) => serde_json::to_string(&results)
-                .unwrap_or_else(|e| format!(r#"{{"error":"{}"}}"#, e)),
-            Err(e) => format!(r#"{{"error":"{}"}}"#, e),
+            Ok(results) => serde_json::to_string(&results).unwrap_or_else(error_json),
+            Err(e) => error_json(e),
         };
 
         CString::new(json)
@@ -189,6 +188,10 @@ pub unsafe extern "C" fn idor_analyze_sql_ffi(
             .unwrap()
             .into_raw()
     })
+}
+
+fn error_json(message: impl std::fmt::Display) -> String {
+    serde_json::json!({ "error": message.to_string() }).to_string()
 }
 
 /// # Safety
