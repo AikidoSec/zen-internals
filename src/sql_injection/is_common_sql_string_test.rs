@@ -489,6 +489,16 @@ mod tests {
     }
 
     #[test]
+    fn test_join_identifier() {
+        assert!(is_common_sql_string("join orders"));
+        assert!(is_common_sql_string("join order_items"));
+        assert!(!is_common_sql_string("join orders on"));
+        assert!(!is_common_sql_string("join orders;"));
+        assert!(!is_common_sql_string("join 1"));
+        assert!(!is_common_sql_string("join (select"));
+    }
+
+    #[test]
     fn test_1_equal() {
         assert!(is_common_sql_string("1="));
 
