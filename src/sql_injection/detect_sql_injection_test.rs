@@ -1206,6 +1206,34 @@ mod tests {
     }
 
     #[test]
+    fn test_join_table_name() {
+        not_injection!(
+            "SELECT * FROM invoice_line JOIN orders ON orders.id = invoice_line.order_id",
+            "Join orders"
+        );
+        not_injection!(
+            "select * from invoice_line join orders on orders.id = invoice_line.order_id",
+            "join orders"
+        );
+    }
+
+    #[test]
+    fn test_join_table_name_injection() {
+        is_injection!(
+            "SELECT * FROM invoice_line WHERE id = 1 JOIN orders ON 1=1 -- ",
+            "1 JOIN orders ON 1=1 -- "
+        );
+        is_injection!(
+            "SELECT * FROM invoice_line WHERE name = 'x' JOIN orders ON 1=1 -- '",
+            "x' JOIN orders ON 1=1 -- "
+        );
+        is_injection!(
+            "SELECT * FROM invoice_line WHERE name = 'x' UNION SELECT * FROM orders JOIN payments ON 1=1",
+            "x' UNION SELECT * FROM orders JOIN payments ON 1=1"
+        );
+    }
+
+    #[test]
     fn test_safely_encapsulated_single_quoted_string() {
         for dia in [
             dialect("mysql"),
