@@ -48,7 +48,7 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
     }
 
     // e.g. `join orders` from `... join orders on ...` (or a form value like "join us")
-    if user_input.len() <= 50 && regex!(r"^join [a-z_][a-z0-9_]*$").is_match(user_input) {
+    if user_input.len() <= 25 && regex!(r"^join [a-z_][a-z0-9_]*$").is_match(user_input) {
         return true;
     }
 
