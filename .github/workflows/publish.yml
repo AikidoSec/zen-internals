@@ -13,7 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Set up Rust
         run: |
           rustup update --no-self-update stable
@@ -22,10 +24,10 @@ jobs:
         run: cargo test
 
   lint:
-    uses: ./.github/workflows/lint.yml
+    uses: $/.github/workflows/lint.yml
 
   jvm-wasm-compilation:
-    uses: ./.github/workflows/jvm-wasm-compilation.yml
+    uses: $/.github/workflows/jvm-wasm-compilation.yml
 
   build:
     needs: [tests, lint, jvm-wasm-compilation]
@@ -106,11 +108,15 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install ziglang
         if: matrix.use_zig
-        uses: mlugg/setup-zig@8d6198c65fb0feaa111df26e6b467fea8345e46f # v2.0.5
+        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          use-cache: false
 
       - name: Install APT packages
         if: matrix.apt_packages
@@ -164,7 +170,7 @@ jobs:
           (Get-Content "$FILE.sha256sum") -replace "`r`n", "`n`n" | Set-Content "$FILE.sha256sum" -NoNewline
 
       - name: Store artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ matrix.artifact_name }}
           path: |
@@ -175,10 +181,13 @@ jobs:
     needs: [tests, lint]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "lts/*"
+          package-manager-cache: false
       - name: Install Rust toolchain
         run: |
           rustup update --no-self-update stable
@@ -197,7 +206,7 @@ jobs:
           sudo touch ${FILE}.sha256sum && sudo chmod 777 ${FILE}.sha256sum
           sudo sha256sum "${FILE}" > ${FILE}.sha256sum
       - name: Store artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: wasm-node-binaries
           path: pkg/zen_internals.tgz*
@@ -209,14 +218,17 @@ jobs:
       contents: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "lts/*"
+          package-manager-cache: false
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: ./artifacts
 
@@ -241,4 +253,3 @@ jobs:
             ./artifacts/wasm-node-binaries/* \
             ./artifacts/wasm-binaries/*
           gh release edit "$VERSION" --draft=false --prerelease="$PRERELEASE"
-
