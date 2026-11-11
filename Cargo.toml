@@ -11,8 +11,7 @@ name = "zen_internals"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-oxc = "0.111.0"
-oxc_ast_visit = "0.111.0"
+oxc_lexer = { git = "https://github.com/oxc-project/oxc", rev = "05e0ed59a620e3049858f73d35e53124b6bb3b64" }
 regex = { version = "1.12.2", default-features = false, features = ["std", "perf"] }
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.137"

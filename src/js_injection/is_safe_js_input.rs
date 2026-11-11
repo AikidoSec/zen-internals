@@ -1,89 +1,99 @@
-use oxc::allocator::Allocator;
-use oxc::ast::ast::{BinaryOperator, UnaryOperator};
-use oxc::ast::AstKind;
-use oxc::parser::{ParseOptions, Parser};
-use oxc::span::SourceType;
-use oxc_ast_visit::Visit;
+use oxc_lexer::TokenKind;
 
-// Safe binary operators
-const SAFE_OPERATORS: [BinaryOperator; 6] = [
-    BinaryOperator::Addition,
-    BinaryOperator::Subtraction,
-    BinaryOperator::Multiplication,
-    BinaryOperator::Division,
-    BinaryOperator::Exponential,
-    BinaryOperator::Remainder,
-];
+use super::have_tokens_changed::has_line_break;
+use super::tokenize_code::tokenize_code;
 
-// Safe unary operators (e.g. negative/positive numbers like -10, +5)
-const SAFE_UNARY_OPERATORS: [UnaryOperator; 2] =
-    [UnaryOperator::UnaryNegation, UnaryOperator::UnaryPlus];
-
-pub fn is_safe_js_input(user_input: &str, allocator: &Allocator, source_type: SourceType) -> bool {
-    // Right now this function only returns true if the user input contains numbers
-    // This is a early return to avoid parsing the user input if it doesn't contain any numbers
-    if !user_input.bytes().any(|b| b.is_ascii_digit()) {
+pub fn is_safe_js_input(user_input: &str, sourcetype: i32) -> bool {
+    if matches!(
+        user_input.trim_matches(is_js_whitespace),
+        "true" | "false" | "null"
+    ) {
+        return true;
+    }
+    if !user_input.bytes().any(|byte| byte.is_ascii_digit()) {
         return false;
     }
-
-    let parser_result = Parser::new(allocator, user_input, source_type)
-        .with_options(ParseOptions {
-            allow_return_outside_function: true,
-            ..ParseOptions::default()
-        })
-        .parse();
-
-    if parser_result.panicked || !parser_result.errors.is_empty() {
+    // Raw lexer diagnostics omit deferred Unicode validation.
+    if !user_input.is_ascii()
+        && user_input
+            .chars()
+            .any(|ch| !ch.is_ascii() && !is_js_whitespace(ch))
+    {
         return false;
     }
-
-    let mut ast_pass = ASTPass {
-        contains_only_safe_tokens: true,
+    let Some(tokens) = tokenize_code(user_input, sourcetype) else {
+        return false;
     };
-    ast_pass.visit_program(&parser_result.program);
-
-    ast_pass.contains_only_safe_tokens
-}
-
-struct ASTPass {
-    contains_only_safe_tokens: bool,
-}
-
-impl<'a> Visit<'a> for ASTPass {
-    fn enter_node(&mut self, kind: AstKind<'a>) {
-        if !self.contains_only_safe_tokens {
-            // Early return if we already know the input might be unsafe, no need to check further nodes
-            return;
-        }
-        match kind {
-            // Allow without additional checks, all subnodes of the AST will still be checked, so e.g. a sequence of unsafe tokens will be caught
-            AstKind::ExpressionStatement(_) // Allow expressions, this contains the more specific expression type, like BinaryExpression
-            | AstKind::NumericLiteral(_) // Allow numbers (e.g. 1, 3.14, 5e8)
-            | AstKind::ParenthesizedExpression(_) // Allow parentheses
-            | AstKind::SequenceExpression(_) => {} // Allow sequences, like 1, 2, 3
-            // Check if program comments, directives or hashbang are present
-            AstKind::Program(p) => {
-                if !p.comments.is_empty() || !p.directives.is_empty() || p.hashbang.is_some() {
-                    self.contains_only_safe_tokens = false;
-                }
-            }
-            // Check if operator is allowed
-            AstKind::BinaryExpression(b) => {
-                // Check if the binary operator is safe
-                if !SAFE_OPERATORS.contains(&b.operator) {
-                    self.contains_only_safe_tokens = false;
-                }
-            }
-            // Check if unary operator is allowed (e.g. -10, +5)
-            AstKind::UnaryExpression(u) => {
-                if !SAFE_UNARY_OPERATORS.contains(&u.operator) {
-                    self.contains_only_safe_tokens = false;
-                }
-            }
-            // Default to unsafe
-            _ => {
-                self.contains_only_safe_tokens = false;
-            }
-        }
+    if tokens.has_errors()
+        || tokens.comments().next().is_some()
+        || user_input.trim_start_matches('\u{feff}').starts_with("#!")
+    {
+        return false;
     }
+
+    let mut groups = Vec::new();
+    let mut expecting_operand = true;
+    let mut pending_unary = false;
+    let mut left_is_unary = false;
+    let mut ended_statement = false;
+    let mut previous_end = 0;
+    for (kind, span) in tokens.tokens() {
+        match kind {
+            TokenKind::Number => {
+                if !expecting_operand
+                    && (!groups.is_empty()
+                        || !has_line_break(&user_input[previous_end..span.start]))
+                {
+                    return false;
+                }
+                expecting_operand = false;
+                left_is_unary = pending_unary;
+                pending_unary = false;
+                ended_statement = false;
+            }
+            TokenKind::Plus | TokenKind::Minus if expecting_operand => {
+                pending_unary = true;
+                ended_statement = false;
+            }
+            TokenKind::LParen if expecting_operand => {
+                groups.push(pending_unary);
+                pending_unary = false;
+                ended_statement = false;
+            }
+            TokenKind::RParen if !expecting_operand => {
+                let Some(unary) = groups.pop() else {
+                    return false;
+                };
+                left_is_unary = unary;
+            }
+            TokenKind::Plus
+            | TokenKind::Minus
+            | TokenKind::Star
+            | TokenKind::Slash
+            | TokenKind::Percent
+            | TokenKind::StarStar
+            | TokenKind::Comma
+                if !expecting_operand =>
+            {
+                if kind == TokenKind::StarStar && left_is_unary {
+                    return false;
+                }
+                expecting_operand = true;
+                pending_unary = false;
+                ended_statement = false;
+            }
+            TokenKind::Semi if !expecting_operand && groups.is_empty() => {
+                expecting_operand = true;
+                pending_unary = false;
+                ended_statement = true;
+            }
+            _ => return false,
+        }
+        previous_end = span.end;
+    }
+    groups.is_empty() && (!expecting_operand || ended_statement)
+}
+
+fn is_js_whitespace(ch: char) -> bool {
+    ch == '\u{feff}' || (ch.is_whitespace() && ch != '\u{85}')
 }
