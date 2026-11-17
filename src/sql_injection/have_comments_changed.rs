@@ -39,7 +39,7 @@ pub fn have_comments_changed(tokens1: Vec<Token>, tokens2: Vec<Token>) -> bool {
 
 /* Optimalization to keep in mind : We only check length of comments since in case of attack
  *      the length of the comment will only be able to increase.
-*/
+ */
 fn comment_token_differs_from_singleline(
     comment1: String,
     prefix1: String,
@@ -64,7 +64,7 @@ fn comment_token_differs_from_singleline(
 
 /* Optimalization to keep in mind : We only check length of comments since in case of attack
  *      the length of the comment will only be able to increase.
-*/
+ */
 fn comment_token_differs_from_multiline(comment1: String, comment_token2: Whitespace) -> bool {
     if let Whitespace::MultiLineComment(comment2) = comment_token2 {
         // The length of both comments are not the same -> Strucutre is altered.
