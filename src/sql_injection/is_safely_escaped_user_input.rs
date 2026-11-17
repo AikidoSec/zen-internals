@@ -10,6 +10,39 @@ pub(super) fn is_safely_escaped_user_input(
 ) -> bool {
     let sql_dialect = select_dialect_based_on_enum(dialect);
 
+    // e.g. SELECT * FROM users WHERE name = 'hello\\'
+    //                                        ^^^^^^ hello\
+    let ends_with_backslash = userinput.ends_with('\\');
+    let is_mysql = sql_dialect.is::<MySqlDialect>();
+    if ends_with_backslash && is_mysql {
+        let userinput_has_quotes = userinput.contains('\'') || userinput.contains('"');
+        // Skip this shortcut if strings contain quotes because NO_BACKSLASH_ESCAPES
+        // can change where strings end and we don't know the connection's SQL mode.
+        let query_has_escaped_quotes = tokens.iter().any(|token| match token {
+            Token::SingleQuotedString(s) | Token::NationalStringLiteral(s) => s.contains('\''),
+            Token::DoubleQuotedString(s) => s.contains('"'),
+            _ => false,
+        });
+
+        if !userinput_has_quotes && !query_has_escaped_quotes {
+            let amount_of_backslashes = userinput.matches('\\').count();
+            if amount_of_backslashes == 1 {
+                let escaped_userinput = userinput.replace('\\', "\\\\");
+                let escaped_occurrences = tokens
+                    .iter()
+                    .filter(
+                        |token| matches!(token, Token::SingleQuotedString(s) if *s == escaped_userinput),
+                    )
+                    .count();
+                let input_occurrences = query.matches(userinput).count();
+
+                if escaped_occurrences > 0 && escaped_occurrences == input_occurrences {
+                    return true;
+                }
+            }
+        }
+    }
+
     // Handle edge case where user input starts or ends with a single quote
     // You can escape single quotes by prepending them with another single quote
     // e.g. SELECT a FROM b WHERE b.a = '1; SELECT SLEEP(10) -- -''';

@@ -321,7 +321,72 @@ mod tests {
 
     #[test]
     fn test_escape_sequences() {
-        not_injection!("SELECT * FROM users WHERE id = 'users\\\\'", "users\\\\")
+        not_injection!("SELECT * FROM users WHERE id = 'users\\\\'", "users\\\\");
+
+        for (query, input) in [
+            ("SELECT N'some text';", "some text"),
+            ("SELECT n'some text';", "some text"),
+            ("SELECT _utf8'some text';", "some text"),
+            (r"SELECT 'hello\\'", r"hello\"),
+            (r"SELECT _utf8'hello\\'", r"hello\"),
+            (r"SELECT '\\hello'", r"\hello"),
+            (
+                r"INSERT INTO records (value) VALUES ('hello\\'), ('hello\\')",
+                r"hello\",
+            ),
+        ] {
+            let result = detect_sql_injection_str(query, input, dialect("mysql"));
+            assert!(
+                !result.detected,
+                "{result:?}\nquery: {query}\ninput: {input}"
+            );
+            assert_eq!(
+                matches!(result.reason, DetectionReason::SafelyEscapedUserInput),
+                input.ends_with('\\'),
+                "{result:?}\nquery: {query}\ninput: {input}"
+            );
+        }
+
+        for query in [r"SELECT N'hello\\'", r"SELECT n'hello\\'"] {
+            let input = r"hello\";
+            let result = detect_sql_injection_str(query, input, dialect("mysql"));
+            assert!(
+                result.detected,
+                "{result:?}\nquery: {query}\ninput: {input}"
+            );
+            assert!(matches!(result.reason, DetectionReason::TokensHaveDelta));
+        }
+    }
+
+    #[test]
+    fn test_mysql_backslash_shortcut_rejects_extra_backslashes_and_quotes() {
+        for (query, input) in [
+            (r"SELECT '\\hello\\'", r"\hello\"),
+            (r#"SELECT 'hello"\\'"#, r#"hello"\"#),
+            (r"SELECT '''hello\\'", r"'hello\"),
+            (r"SELECT 'it\'s', 'hello\\'", r"hello\"),
+            (r"SELECT N'it\'s', 'hello\\'", r"hello\"),
+            (r"SELECT n'it\'s', 'hello\\'", r"hello\"),
+            (r"SELECT _utf8'it\'s', 'hello\\'", r"hello\"),
+            (r#"SELECT "say \"hello\"", 'hello\\'"#, r"hello\"),
+        ] {
+            let result = detect_sql_injection_str(query, input, dialect("mysql"));
+            assert!(
+                result.detected,
+                "{result:?}\nquery: {query}\ninput: {input}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_mysql_backslash_escape_does_not_hide_unescaped_matches() {
+        let input = r"1 OR 1=1#\";
+        let query = format!(
+            "SELECT '{}' FROM records WHERE id = {input}\n",
+            input.replace('\\', "\\\\")
+        );
+        let result = detect_sql_injection_str(&query, input, dialect("mysql"));
+        assert!(result.detected, "{result:?}\nquery: {query}");
     }
 
     #[test]
