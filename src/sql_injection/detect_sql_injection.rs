@@ -51,6 +51,15 @@ pub fn detect_sql_injection_str(
         };
     }
 
+    // Only safe if every occurrence in the query is a qualified wildcard (e.g. `table.*` or `schema.table.*`).
+    // In a projection like `select *, id from users` the input would expand the selected columns.
+    if userinput == "*," && query.matches("*,").count() == query.matches(".*,").count() {
+        return SqlInjectionDetectionResult {
+            detected: false,
+            reason: DetectionReason::CommonSQLString,
+        };
+    }
+
     // Remove leading and trailing spaces from userinput :
     let trimmed_userinput = userinput.trim_matches(SPACE_CHAR);
 
