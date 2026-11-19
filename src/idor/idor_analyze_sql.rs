@@ -2,10 +2,11 @@ use crate::idor::sql_query_result::{FilterColumn, InsertColumn, SqlQueryResult, 
 use crate::sql_injection::helpers::select_dialect_based_on_enum::select_dialect_based_on_enum;
 use core::ops::ControlFlow;
 use sqlparser::ast::{
-    BinaryOperator, Expr, FromTable, FunctionArg, FunctionArgExpr, JoinConstraint, JoinOperator,
-    ObjectName, ObjectNamePart, Query, SetExpr, Spanned, Statement, TableFactor, TableObject,
-    TableWithJoins, Value, ValueWithSpan, Visit, Visitor,
+    BinaryOperator, Expr, FromTable, Function, FunctionArg, FunctionArgExpr, FunctionArguments,
+    JoinConstraint, JoinOperator, ObjectName, ObjectNamePart, Query, SetExpr, Spanned, Statement,
+    TableFactor, TableObject, TableWithJoins, Value, ValueWithSpan, Visit, Visitor,
 };
+use sqlparser::dialect::{ClickHouseDialect, Dialect};
 use sqlparser::parser::Parser;
 use sqlparser::tokenizer::{Location, Span, Token, Tokenizer};
 use std::collections::HashSet;
@@ -44,12 +45,13 @@ use std::collections::HashSet;
 /// statements, placeholders in SET assignments are counted first, so WHERE placeholders
 /// have correct offsets.
 pub fn idor_analyze_sql(query: &str, dialect: i32) -> Result<Vec<SqlQueryResult>, String> {
-    let (statements, placeholder_starts) = parse_sql(query, dialect)?;
+    let dialect = select_dialect_based_on_enum(dialect);
+    let (statements, placeholder_starts) = parse_sql(query, dialect.as_ref())?;
     let mut results = Vec::new();
 
     for stmt in &statements {
         let placeholders = PlaceholderPositions::of_statement(stmt, &placeholder_starts);
-        analyze_statement(stmt, &mut results, &placeholders)?;
+        analyze_statement(stmt, &mut results, &placeholders, dialect.as_ref())?;
     }
 
     Ok(results)
@@ -93,13 +95,15 @@ fn mysql_placeholder_span(expr: &Expr) -> Option<Span> {
     }
 }
 
-fn parse_sql(query: &str, dialect: i32) -> Result<(Vec<Statement>, Vec<Location>), String> {
+fn parse_sql(
+    query: &str,
+    dialect: &dyn Dialect,
+) -> Result<(Vec<Statement>, Vec<Location>), String> {
     if query.trim().is_empty() {
         return Err("Empty query".to_string());
     }
 
-    let dialect = select_dialect_based_on_enum(dialect);
-    let tokens = Tokenizer::new(&*dialect, query)
+    let tokens = Tokenizer::new(dialect, query)
         .tokenize_with_location()
         .map_err(|e| e.to_string())?;
     let placeholder_starts = tokens
@@ -109,7 +113,7 @@ fn parse_sql(query: &str, dialect: i32) -> Result<(Vec<Statement>, Vec<Location>
             _ => None,
         })
         .collect();
-    let statements = Parser::new(&*dialect)
+    let statements = Parser::new(dialect)
         .with_tokens_with_locations(tokens)
         .parse_statements()
         .map_err(|e| e.to_string())?;
@@ -125,10 +129,11 @@ fn analyze_statement(
     stmt: &Statement,
     results: &mut Vec<SqlQueryResult>,
     placeholders: &PlaceholderPositions,
+    dialect: &dyn Dialect,
 ) -> Result<(), String> {
     match stmt {
         Statement::Query(query) => {
-            analyze_query(query, results, placeholders)?;
+            analyze_query(query, results, placeholders, dialect)?;
         }
         Statement::Update(update) => {
             analyze_update(
@@ -139,13 +144,14 @@ fn analyze_statement(
                 results,
                 placeholders,
                 &HashSet::new(),
+                dialect,
             )?;
         }
         Statement::Delete(delete) => {
-            analyze_delete(delete, results, placeholders, &HashSet::new())?;
+            analyze_delete(delete, results, placeholders, &HashSet::new(), dialect)?;
         }
         Statement::Insert(insert) => {
-            analyze_insert(insert, results, placeholders, &HashSet::new())?;
+            analyze_insert(insert, results, placeholders, &HashSet::new(), dialect)?;
         }
         Statement::Commit { .. }
         | Statement::Rollback { .. }
@@ -195,6 +201,7 @@ fn analyze_statement(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn analyze_update(
     table: &TableWithJoins,
     assignments: &[sqlparser::ast::Assignment],
@@ -203,6 +210,7 @@ fn analyze_update(
     results: &mut Vec<SqlQueryResult>,
     placeholders: &PlaceholderPositions,
     cte_names: &HashSet<String>,
+    dialect: &dyn Dialect,
 ) -> Result<(), String> {
     let mut tables = extract_tables_from_table_with_joins(table);
     if let Some(from_kind) = from {
@@ -222,7 +230,7 @@ fn analyze_update(
     let assignment_subqueries = extract_subqueries_from_exprs(&assignment_exprs);
 
     let (mut filters, mut col_col_pairs, subqueries) = match selection {
-        Some(expr) => extract_filters_from_where(expr, placeholders),
+        Some(expr) => extract_filters_from_where(expr, placeholders, dialect),
         None => (Vec::new(), Vec::new(), Vec::new()),
     };
 
@@ -250,11 +258,11 @@ fn analyze_update(
     });
 
     for subquery in assignment_subqueries {
-        analyze_query_with_ctes(&subquery, results, placeholders, cte_names)?;
+        analyze_query_with_ctes(&subquery, results, placeholders, cte_names, dialect)?;
     }
 
     for subquery in subqueries {
-        analyze_query_with_ctes(&subquery, results, placeholders, cte_names)?;
+        analyze_query_with_ctes(&subquery, results, placeholders, cte_names, dialect)?;
     }
 
     Ok(())
@@ -265,6 +273,7 @@ fn analyze_delete(
     results: &mut Vec<SqlQueryResult>,
     placeholders: &PlaceholderPositions,
     cte_names: &HashSet<String>,
+    dialect: &dyn Dialect,
 ) -> Result<(), String> {
     let mut tables: Vec<TableRef> = match &delete.from {
         FromTable::WithFromKeyword(twjs) | FromTable::WithoutKeyword(twjs) => twjs
@@ -283,7 +292,7 @@ fn analyze_delete(
     tables.retain(|t| !cte_names.contains(&t.name.to_lowercase()));
 
     let (mut filters, mut col_col_pairs, subqueries) = match &delete.selection {
-        Some(expr) => extract_filters_from_where(expr, placeholders),
+        Some(expr) => extract_filters_from_where(expr, placeholders, dialect),
         None => (Vec::new(), Vec::new(), Vec::new()),
     };
 
@@ -308,7 +317,7 @@ fn analyze_delete(
     });
 
     for subquery in subqueries {
-        analyze_query_with_ctes(&subquery, results, placeholders, cte_names)?;
+        analyze_query_with_ctes(&subquery, results, placeholders, cte_names, dialect)?;
     }
 
     Ok(())
@@ -319,6 +328,7 @@ fn analyze_insert(
     results: &mut Vec<SqlQueryResult>,
     placeholders: &PlaceholderPositions,
     cte_names: &HashSet<String>,
+    dialect: &dyn Dialect,
 ) -> Result<(), String> {
     let table_name = match &insert.table {
         TableObject::TableName(name) => object_name_to_string(name),
@@ -329,12 +339,12 @@ fn analyze_insert(
         alias: insert.table_alias.as_ref().map(|a| a.value.clone()),
     };
     let columns: Vec<&str> = insert.columns.iter().map(|c| c.value.as_str()).collect();
-    let insert_columns = extract_insert_columns(&insert.source, &columns, placeholders);
+    let insert_columns = extract_insert_columns(&insert.source, &columns, placeholders, dialect);
 
     // For INSERT ... SELECT, analyze the SELECT source
     if insert_columns.is_none() {
         if let Some(source) = &insert.source {
-            analyze_query_with_ctes(source, results, placeholders, cte_names)?;
+            analyze_query_with_ctes(source, results, placeholders, cte_names, dialect)?;
         }
     }
 
@@ -359,8 +369,9 @@ fn analyze_query(
     query: &Query,
     results: &mut Vec<SqlQueryResult>,
     placeholders: &PlaceholderPositions,
+    dialect: &dyn Dialect,
 ) -> Result<(), String> {
-    analyze_query_with_ctes(query, results, placeholders, &HashSet::new())
+    analyze_query_with_ctes(query, results, placeholders, &HashSet::new(), dialect)
 }
 
 fn analyze_query_with_ctes(
@@ -368,6 +379,7 @@ fn analyze_query_with_ctes(
     results: &mut Vec<SqlQueryResult>,
     placeholders: &PlaceholderPositions,
     parent_cte_names: &HashSet<String>,
+    dialect: &dyn Dialect,
 ) -> Result<(), String> {
     let mut cte_names = parent_cte_names.clone();
 
@@ -379,11 +391,11 @@ fn analyze_query_with_ctes(
 
         // Second pass: analyze each common table expression's body
         for cte in &with.cte_tables {
-            analyze_query_with_ctes(&cte.query, results, placeholders, &cte_names)?;
+            analyze_query_with_ctes(&cte.query, results, placeholders, &cte_names, dialect)?;
         }
     }
 
-    analyze_set_expr(&query.body, results, placeholders, &cte_names)
+    analyze_set_expr(&query.body, results, placeholders, &cte_names, dialect)
 }
 
 fn analyze_set_expr(
@@ -391,15 +403,16 @@ fn analyze_set_expr(
     results: &mut Vec<SqlQueryResult>,
     placeholders: &PlaceholderPositions,
     cte_names: &HashSet<String>,
+    dialect: &dyn Dialect,
 ) -> Result<(), String> {
     match set_expr {
         SetExpr::SetOperation { left, right, .. } => {
-            analyze_set_expr(left, results, placeholders, cte_names)?;
-            analyze_set_expr(right, results, placeholders, cte_names)?;
+            analyze_set_expr(left, results, placeholders, cte_names, dialect)?;
+            analyze_set_expr(right, results, placeholders, cte_names, dialect)?;
         }
         SetExpr::Query(query) => {
             // Nested query may have its own common table expressions
-            analyze_query_with_ctes(query, results, placeholders, cte_names)?;
+            analyze_query_with_ctes(query, results, placeholders, cte_names, dialect)?;
         }
         SetExpr::Update(stmt) => {
             if let Statement::Update(update) = stmt {
@@ -411,16 +424,17 @@ fn analyze_set_expr(
                     results,
                     placeholders,
                     cte_names,
+                    dialect,
                 )?;
             }
         }
         SetExpr::Insert(stmt) => {
             if let Statement::Insert(insert) = stmt {
-                analyze_insert(insert, results, placeholders, cte_names)?;
+                analyze_insert(insert, results, placeholders, cte_names, dialect)?;
             }
         }
         _ => {
-            visit_select(set_expr, results, placeholders, cte_names)?;
+            visit_select(set_expr, results, placeholders, cte_names, dialect)?;
         }
     }
     Ok(())
@@ -431,8 +445,9 @@ fn visit_select(
     results: &mut Vec<SqlQueryResult>,
     placeholders: &PlaceholderPositions,
     cte_names: &HashSet<String>,
+    dialect: &dyn Dialect,
 ) -> Result<(), String> {
-    let mut visitor = SelectVisitor::new(placeholders, cte_names.clone());
+    let mut visitor = SelectVisitor::new(placeholders, cte_names.clone(), dialect);
     let _ = set_expr.visit(&mut visitor);
 
     let mut filters = visitor.filters;
@@ -452,7 +467,7 @@ fn visit_select(
     });
 
     for subquery in visitor.subqueries {
-        analyze_query_with_ctes(&subquery, results, placeholders, cte_names)?;
+        analyze_query_with_ctes(&subquery, results, placeholders, cte_names, dialect)?;
     }
     Ok(())
 }
@@ -461,6 +476,7 @@ struct SelectVisitor<'a> {
     tables: Vec<TableRef>,
     filters: Vec<FilterColumn>,
     placeholders: &'a PlaceholderPositions,
+    dialect: &'a dyn Dialect,
     subqueries: Vec<Query>,
     /// Tracks nesting depth inside subqueries. When > 0, we skip collecting tables/filters
     /// because the Visitor walks into subquery children automatically, but we want to
@@ -479,11 +495,16 @@ struct SelectVisitor<'a> {
 }
 
 impl<'a> SelectVisitor<'a> {
-    fn new(placeholders: &'a PlaceholderPositions, cte_names: HashSet<String>) -> Self {
+    fn new(
+        placeholders: &'a PlaceholderPositions,
+        cte_names: HashSet<String>,
+        dialect: &'a dyn Dialect,
+    ) -> Self {
         Self {
             tables: Vec::new(),
             filters: Vec::new(),
             placeholders,
+            dialect,
             subqueries: Vec::new(),
             skip_depth: 0,
             or_depth: 0,
@@ -555,7 +576,7 @@ impl Visitor for SelectVisitor<'_> {
             return ControlFlow::Continue(());
         }
 
-        if let Some(filter) = try_extract_filter(expr, self.placeholders) {
+        if let Some(filter) = try_extract_filter(expr, self.placeholders, self.dialect) {
             self.filters.push(filter);
         } else if !self.potential_col_col {
             if let Expr::BinaryOp {
@@ -609,7 +630,11 @@ fn extract_subquery(expr: &Expr) -> Option<&Query> {
     }
 }
 
-fn try_extract_filter(expr: &Expr, placeholders: &PlaceholderPositions) -> Option<FilterColumn> {
+fn try_extract_filter(
+    expr: &Expr,
+    placeholders: &PlaceholderPositions,
+    dialect: &dyn Dialect,
+) -> Option<FilterColumn> {
     let Expr::BinaryOp { left, op, right } = expr else {
         return None;
     };
@@ -618,8 +643,8 @@ fn try_extract_filter(expr: &Expr, placeholders: &PlaceholderPositions) -> Optio
         return None;
     }
 
-    extract_column_value_pair(left, right, placeholders)
-        .or_else(|| extract_column_value_pair(right, left, placeholders))
+    extract_column_value_pair(left, right, placeholders, dialect)
+        .or_else(|| extract_column_value_pair(right, left, placeholders, dialect))
 }
 
 struct ColColPair {
@@ -806,6 +831,7 @@ fn extract_column_value_pair(
     maybe_column: &Expr,
     maybe_value: &Expr,
     placeholders: &PlaceholderPositions,
+    dialect: &dyn Dialect,
 ) -> Option<FilterColumn> {
     let (table, column) = extract_column_ref(maybe_column)?;
 
@@ -813,12 +839,13 @@ fn extract_column_value_pair(
         return None;
     }
 
+    let (value, is_placeholder) = extract_value(maybe_value, dialect)?;
     Some(FilterColumn {
         table,
         column,
-        value: expr_to_value_string(maybe_value)?,
+        value,
         placeholder_number: placeholders.number_of(maybe_value),
-        is_placeholder: is_placeholder(maybe_value),
+        is_placeholder,
     })
 }
 
@@ -836,6 +863,57 @@ fn extract_column_ref(expr: &Expr) -> Option<(Option<String>, String)> {
 
 fn is_column_ref(expr: &Expr) -> bool {
     matches!(expr, Expr::Identifier(_) | Expr::CompoundIdentifier(_))
+}
+
+fn extract_value(expr: &Expr, dialect: &dyn Dialect) -> Option<(String, bool)> {
+    if dialect.is::<ClickHouseDialect>() {
+        if let Some(name) = extract_clickhouse_placeholder(expr) {
+            return Some((name.to_string(), true));
+        }
+    }
+
+    Some((expr_to_value_string(expr)?, is_placeholder(expr)))
+}
+
+fn extract_clickhouse_placeholder(expr: &Expr) -> Option<&str> {
+    // sqlparser uses dictionaries for both {tenant:String} and maps like {'a': 1}.
+    let Expr::Dictionary(fields) = expr else {
+        return None;
+    };
+    // Exclude empty or multi-entry maps: {} or {'a': 1, 'b': 2}.
+    let [field] = fields.as_slice() else {
+        return None;
+    };
+    // {'a': 1} has a quoted key. {tenant:String} needs an unquoted name.
+    if field.key.quote_style.is_some() {
+        return None;
+    }
+
+    let type_name = match field.value.as_ref() {
+        Expr::Identifier(ident) => ident, // {tenant:String}
+        // sqlparser reads Nullable(String) as a function call, even though it's a type.
+        // Accept {tenant:Nullable(String)}, but not {tenant:Nullable(String) OVER ()}.
+        Expr::Function(Function {
+            name,
+            uses_odbc_syntax: false,
+            parameters: FunctionArguments::None,
+            filter: None,
+            null_treatment: None,
+            over: None,
+            within_group,
+            ..
+        }) if within_group.is_empty() => match name.0.as_slice() {
+            [ObjectNamePart::Identifier(ident)] => ident,
+            _ => return None, // {tenant:db.String()} is not a type name.
+        },
+        _ => return None, // {tenant:1} or {tenant:String + 1} is not a type.
+    };
+    // {column:Identifier} substitutes a column name, not a value.
+    if type_name.value.eq_ignore_ascii_case("Identifier") {
+        return None;
+    }
+
+    Some(field.key.value.as_str())
 }
 
 fn expr_to_value_string(expr: &Expr) -> Option<String> {
@@ -882,6 +960,7 @@ fn object_name_to_string(name: &ObjectName) -> String {
 fn extract_filters_from_where(
     expr: &Expr,
     placeholders: &PlaceholderPositions,
+    dialect: &dyn Dialect,
 ) -> (Vec<FilterColumn>, Vec<ColColPair>, Vec<Query>) {
     let mut filters = Vec::new();
     let mut col_col_pairs = Vec::new();
@@ -894,6 +973,7 @@ fn extract_filters_from_where(
         &mut col_col_pairs,
         &mut subqueries,
         false,
+        dialect,
     );
     (filters, col_col_pairs, subqueries)
 }
@@ -905,10 +985,11 @@ fn walk_expr(
     col_col_pairs: &mut Vec<ColColPair>,
     subqueries: &mut Vec<Query>,
     in_or: bool,
+    dialect: &dyn Dialect,
 ) {
     // Skip filters inside OR branches: OR does not guarantee the filter is enforced
     if !in_or {
-        if let Some(filter) = try_extract_filter(expr, placeholders) {
+        if let Some(filter) = try_extract_filter(expr, placeholders, dialect) {
             filters.push(filter);
         } else if let Some(pair) = try_extract_col_col_pair(expr) {
             col_col_pairs.push(pair);
@@ -930,6 +1011,7 @@ fn walk_expr(
                 col_col_pairs,
                 subqueries,
                 in_or,
+                dialect,
             );
             walk_expr(
                 right,
@@ -938,6 +1020,7 @@ fn walk_expr(
                 col_col_pairs,
                 subqueries,
                 in_or,
+                dialect,
             );
         }
         Expr::Nested(inner) => {
@@ -948,6 +1031,7 @@ fn walk_expr(
                 col_col_pairs,
                 subqueries,
                 in_or,
+                dialect,
             );
         }
         _ => {}
@@ -1054,6 +1138,7 @@ fn extract_insert_columns(
     source: &Option<Box<Query>>,
     columns: &[&str],
     placeholders: &PlaceholderPositions,
+    dialect: &dyn Dialect,
 ) -> Option<Vec<Vec<InsertColumn>>> {
     let source = source.as_ref()?;
     let values = match source.body.as_ref() {
@@ -1072,11 +1157,12 @@ fn extract_insert_columns(
                         return None;
                     }
 
+                    let (value, is_placeholder) = extract_value(expr, dialect)?;
                     Some(InsertColumn {
                         column: columns[i].to_string(),
-                        value: expr_to_value_string(expr)?,
+                        value,
                         placeholder_number: placeholders.number_of(expr),
-                        is_placeholder: is_placeholder(expr),
+                        is_placeholder,
                     })
                 })
                 .collect()

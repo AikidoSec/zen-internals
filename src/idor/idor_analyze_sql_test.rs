@@ -4,6 +4,221 @@ mod tests {
     use crate::idor::sql_query_result::{FilterColumn, InsertColumn, SqlQueryResult, TableRef};
 
     #[test]
+    fn test_clickhouse_typed_parameters() {
+        for (query, value, is_placeholder) in [
+            (
+                "SELECT petname FROM cats_idor WHERE tenant_id = {tenant:String}",
+                "tenant",
+                true,
+            ),
+            (
+                "SELECT petname FROM cats_idor PREWHERE tenant_id = {tenant:Nullable(String)}",
+                "tenant",
+                true,
+            ),
+            (
+                "SELECT petname FROM cats_idor FINAL PREWHERE tenant_id = {tenant:String} SETTINGS max_threads = 1 FORMAT JSONEachRow",
+                "tenant",
+                true,
+            ),
+            (
+                "SELECT petname FROM cats_idor WHERE tenant_id = { Tenant_42 : String }",
+                "Tenant_42",
+                true,
+            ),
+            (
+                "SELECT petname FROM cats_idor WHERE tenant_id = {/*name*/ _tenant /*colon*/ :\n LowCardinality(Nullable(String)) /*end*/}",
+                "_tenant",
+                true,
+            ),
+            (
+                "SELECT petname FROM cats_idor WHERE tenant_id = {select:FixedString(7)}",
+                "select",
+                true,
+            ),
+            (
+                "SELECT petname FROM cats_idor WHERE tenant_id = {tenant:Map(String, Array(UInt64))}",
+                "tenant",
+                true,
+            ),
+            (
+                "SELECT petname FROM cats_idor WHERE tenant_id = {tenant:Tuple(String, UInt64)}",
+                "tenant",
+                true,
+            ),
+            (
+                "SELECT petname FROM cats_idor WHERE tenant_id = {tenant:Enum8('a' = 1, 'b' = 2)}",
+                "tenant",
+                true,
+            ),
+            (
+                "SELECT petname FROM cats_idor WHERE tenant_id = {tenant:DateTime64(3, 'UTC')}",
+                "tenant",
+                true,
+            ),
+            (
+                "SELECT petname FROM cats_idor WHERE tenant_id = {tenant:`String`}",
+                "tenant",
+                true,
+            ),
+            (
+                "SELECT petname FROM cats_idor WHERE tenant_id = '{tenant:String}'",
+                "{tenant:String}",
+                false,
+            ),
+            (
+                "SELECT petname FROM cats_idor WHERE tenant_id = $${tenant:String}$$",
+                "{tenant:String}",
+                false,
+            ),
+        ] {
+            let results = idor_analyze_sql(query, 3).unwrap();
+            assert_eq!(results.len(), 1, "{query}");
+            assert_eq!(results[0].tables[0].name, "cats_idor", "{query}");
+            assert_eq!(
+                results[0].filters,
+                vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: value.into(),
+                    placeholder_number: None,
+                    is_placeholder,
+                }],
+                "{query}",
+            );
+        }
+    }
+
+    #[test]
+    fn test_clickhouse_insert_parameters() {
+        let results = idor_analyze_sql(
+            "INSERT INTO cats_idor (petname, tenant_id) VALUES ('Felix', {tenant:String}), ('Mittens', '{tenant:String}')",
+            3,
+        )
+        .unwrap();
+        let rows = results[0].insert_columns.as_ref().unwrap();
+        for (row, (value, is_placeholder)) in rows
+            .iter()
+            .zip([("tenant", true), ("{tenant:String}", false)])
+        {
+            assert_eq!(
+                row[1],
+                InsertColumn {
+                    column: "tenant_id".into(),
+                    value: value.into(),
+                    placeholder_number: None,
+                    is_placeholder,
+                },
+            );
+        }
+        assert_eq!(rows.len(), 2);
+    }
+
+    #[test]
+    fn test_clickhouse_identifier_parameter_is_not_a_tenant_value() {
+        let results = idor_analyze_sql(
+            "SELECT petname FROM cats_idor WHERE tenant_id = {tenant:Identifier}",
+            3,
+        )
+        .unwrap();
+        assert!(results[0].filters.is_empty());
+    }
+
+    #[test]
+    fn test_clickhouse_braces_without_value_parameters() {
+        for expression in [
+            "{'a': 1}",
+            "{}",
+            "{'a': 1, 'b': 2}",
+            "{'a': {'b': 1}}",
+            "{'tenant': 'String'}",
+            "{`tenant`: String}",
+            "{\"tenant\": String}",
+            "{tenant: 1}",
+            "{tenant: 'String'}",
+            "{tenant: [1, 2]}",
+            "{tenant: {'a': 1}}",
+            "{tenant: String + 1}",
+            "{tenant: db.String}",
+            "{tenant: db.String()}",
+        ] {
+            let query = format!("SELECT petname FROM cats_idor WHERE tenant_id = {expression}");
+            if let Ok(results) = idor_analyze_sql(&query, 3) {
+                assert!(results[0].filters.is_empty(), "{query}");
+            }
+
+            let query = format!("INSERT INTO cats_idor (tenant_id) VALUES ({expression})");
+            if let Ok(results) = idor_analyze_sql(&query, 3) {
+                assert_eq!(
+                    results[0].insert_columns.as_ref().unwrap(),
+                    &vec![Vec::<InsertColumn>::new()],
+                    "{query}",
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_clickhouse_settings_maps_are_not_tenant_filters() {
+        for (settings, parameter_type) in [
+            ("additional_table_filters = {}", "UInt64"),
+            (
+                "additional_table_filters = {'cats_idor': 'tenant_id = 1'}",
+                "UInt64",
+            ),
+            (
+                "additional_table_filters = {'cats_idor': 'tenant_id = 1', 'other': 'tenant_id = 2'}",
+                "UInt64",
+            ),
+            ("param_tenant = {'a': 1}", "Map(String, UInt64)"),
+            ("param_tenant = {'a': [1, 2]}", "Map(String, Array(UInt64))"),
+        ] {
+            let query = format!("SELECT petname FROM cats_idor SETTINGS {settings}");
+            let results = idor_analyze_sql(&query, 3).unwrap();
+            assert!(results[0].filters.is_empty(), "{query}");
+
+            let query = format!(
+                "SELECT petname FROM cats_idor WHERE tenant_id = {{tenant:{parameter_type}}} SETTINGS {settings}"
+            );
+            let results = idor_analyze_sql(&query, 3).unwrap();
+            assert_eq!(
+                results[0].filters,
+                vec![FilterColumn {
+                    table: None,
+                    column: "tenant_id".into(),
+                    value: "tenant".into(),
+                    placeholder_number: None,
+                    is_placeholder: true,
+                }],
+                "{query}",
+            );
+        }
+    }
+
+    #[test]
+    fn test_clickhouse_or_does_not_enforce_tenant() {
+        for query in [
+            "SELECT petname FROM cats_idor WHERE tenant_id = {tenant:String} OR petname = 'Felix'",
+            "SELECT petname FROM cats_idor PREWHERE tenant_id = {tenant:String} OR petname = 'Felix'",
+        ] {
+            let results = idor_analyze_sql(query, 3).unwrap();
+            assert!(results[0].filters.is_empty(), "{query}");
+        }
+    }
+
+    #[test]
+    fn test_clickhouse_unsupported_constructs_fail_closed() {
+        for query in [
+            "ALTER TABLE cats_idor UPDATE petname = 'Rex' WHERE tenant_id = {tenant:String}",
+            "ALTER TABLE cats_idor DELETE WHERE tenant_id = {tenant:String}",
+            "SELECT petname FROM cats_idor STREAM CURSOR {'offset': 42}",
+            "SELECT petname FROM cats_idor STREAM CURSOR {'shard': {'offset': 42}} WHERE tenant_id = {tenant:String}",
+        ] {
+            assert!(idor_analyze_sql(query, 3).is_err(), "{query}");
+        }
+    }
+
+    #[test]
     fn test_simple_select() {
         assert_eq!(
             idor_analyze_sql("SELECT * FROM users WHERE tenant_id = $1", 9).unwrap(),
