@@ -6,6 +6,10 @@ use crate::diff_in_vec_len;
 
 const SPACE_CHAR: char = ' ';
 
+// Every checked occurrence costs a full tokenization, so bound the work for queries that
+// repeat the user input many times.
+const MAX_OCCURRENCES_TO_CHECK: usize = 10;
+
 #[derive(Debug)]
 pub struct SqlInjectionDetectionResult {
     pub detected: bool,
@@ -80,28 +84,40 @@ pub fn detect_sql_injection_str(
         };
     }
 
-    // Replace user input with string of equal length and tokenize again :
+    // Replace each occurrence of the user input separately with a string of equal length and
+    // tokenize again. Replacing all occurrences at once would let an input that is interpolated
+    // more than once change the query symmetrically, hiding the injection from the comparison.
     let safe_replace_str = "a".repeat(trimmed_userinput.len());
-    let query_without_input: &str = &query.replace(trimmed_userinput, safe_replace_str.as_str());
-    let tokens_without_input = tokenize_query(query_without_input, dialect);
+    let mut query_without_input = String::with_capacity(query.len());
+    for (start, matched) in query
+        .match_indices(trimmed_userinput)
+        .take(MAX_OCCURRENCES_TO_CHECK)
+    {
+        let end = start + matched.len();
+        query_without_input.clear();
+        query_without_input.push_str(&query[..start]);
+        query_without_input.push_str(&safe_replace_str);
+        query_without_input.push_str(&query[end..]);
+        let tokens_without_input = tokenize_query(&query_without_input, dialect);
 
-    // Check delta for both comment tokens and all tokens in general :
-    if diff_in_vec_len!(tokens, tokens_without_input) {
-        // If a delta exists in all tokens, mark this as an injection.
-        return SqlInjectionDetectionResult {
-            detected: true,
-            reason: DetectionReason::TokensHaveDelta,
-        };
-    }
+        // Check delta for both comment tokens and all tokens in general :
+        if diff_in_vec_len!(tokens, tokens_without_input) {
+            // If a delta exists in all tokens, mark this as an injection.
+            return SqlInjectionDetectionResult {
+                detected: true,
+                reason: DetectionReason::TokensHaveDelta,
+            };
+        }
 
-    if have_comments_changed(tokens, tokens_without_input) {
-        // This checks if structure of comments in the query is altered after removing user input.
-        // It makes sure the lengths of all single line and multiline comments are all still the same
-        // And makes sure no extra comments were added or that the order was altered.
-        return SqlInjectionDetectionResult {
-            detected: true,
-            reason: DetectionReason::CommentStructureAltered,
-        };
+        if have_comments_changed(tokens.clone(), tokens_without_input) {
+            // This checks if structure of comments in the query is altered after removing user input.
+            // It makes sure the lengths of all single line and multiline comments are all still the same
+            // And makes sure no extra comments were added or that the order was altered.
+            return SqlInjectionDetectionResult {
+                detected: true,
+                reason: DetectionReason::CommentStructureAltered,
+            };
+        }
     }
 
     SqlInjectionDetectionResult {
