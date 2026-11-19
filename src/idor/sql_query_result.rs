@@ -32,6 +32,7 @@ pub struct InsertColumn {
 pub enum ValueType {
     Literal,
     Placeholder,
+    InsertColumnReference,
     Unsupported,
 }
 

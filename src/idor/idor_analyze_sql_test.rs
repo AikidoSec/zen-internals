@@ -35,6 +35,16 @@ mod tests {
         }
     }
 
+    fn insert_column_reference_set(table: &str, column: &str, insert_column: &str) -> SetColumn {
+        SetColumn {
+            table: Some(table.into()),
+            column: column.into(),
+            value: insert_column.into(),
+            placeholder_number: None,
+            value_type: ValueType::InsertColumnReference,
+        }
+    }
+
     #[test]
     fn test_simple_select() {
         assert_eq!(
@@ -294,15 +304,59 @@ mod tests {
     }
 
     #[test]
-    fn test_update_set_columns_serialize_value_type() {
+    fn test_set_columns_serialize() {
         let analysis = idor_analyze_sql(
             "UPDATE tickets SET sys_group_id = 999 WHERE sys_group_id = ?",
             8,
         )
         .unwrap();
         let value = serde_json::to_value(analysis).unwrap();
+        assert_eq!(
+            value,
+            serde_json::json!([{
+                "kind": "update",
+                "tables": [{ "name": "tickets" }],
+                "filters": [{
+                    "column": "sys_group_id",
+                    "value": "?",
+                    "placeholder_number": 0,
+                    "is_placeholder": true,
+                }],
+                "set_columns": [{
+                    "table": "tickets",
+                    "column": "sys_group_id",
+                    "value": "999",
+                    "value_type": "literal",
+                }],
+            }])
+        );
 
-        assert_eq!(value[0]["set_columns"][0]["value_type"], "literal");
+        let analysis = idor_analyze_sql(
+            "INSERT INTO tickets (sys_group_id) VALUES (?) ON DUPLICATE KEY UPDATE sys_group_id = VALUES(sys_group_id)",
+            8,
+        )
+        .unwrap();
+        let value = serde_json::to_value(analysis).unwrap();
+        assert_eq!(
+            value,
+            serde_json::json!([{
+                "kind": "insert",
+                "tables": [{ "name": "tickets" }],
+                "filters": [],
+                "insert_columns": [[{
+                    "column": "sys_group_id",
+                    "value": "?",
+                    "placeholder_number": 0,
+                    "is_placeholder": true,
+                }]],
+                "set_columns": [{
+                    "table": "tickets",
+                    "column": "sys_group_id",
+                    "value": "sys_group_id",
+                    "value_type": "insert_column_reference",
+                }],
+            }])
+        );
     }
 
     #[test]
@@ -836,7 +890,7 @@ mod tests {
                     alias: None,
                 }],
                 filters: vec![],
-                set_columns: None,
+                set_columns: Some(vec![literal_set("users", "name", "y")]),
                 insert_columns: Some(vec![vec![
                     InsertColumn {
                         column: "name".into(),
@@ -856,6 +910,73 @@ mod tests {
     }
 
     #[test]
+    fn test_insert_on_conflict_excluded_postgres() {
+        assert_eq!(
+            idor_analyze_sql(
+                "INSERT INTO users (column1, column2) VALUES ('a', 'b') ON CONFLICT (column1) DO UPDATE SET column1 = EXCLUDED.column1, column2 = EXCLUDED.column2",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "insert".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![],
+                set_columns: Some(vec![
+                    insert_column_reference_set("users", "column1", "column1"),
+                    insert_column_reference_set("users", "column2", "column2"),
+                ]),
+                insert_columns: Some(vec![vec![
+                    InsertColumn {
+                        column: "column1".into(),
+                        value: "a".into(),
+                        placeholder_number: None,
+                        is_placeholder: false,
+                    },
+                    InsertColumn {
+                        column: "column2".into(),
+                        value: "b".into(),
+                        placeholder_number: None,
+                        is_placeholder: false,
+                    },
+                ]]),
+            }]
+        );
+    }
+
+    #[test]
+    fn test_insert_on_conflict_quoted_excluded_postgres() {
+        assert_eq!(
+            idor_analyze_sql(
+                "INSERT INTO users (Tenant_ID) VALUES ('a') ON CONFLICT (Tenant_ID) DO UPDATE SET Tenant_ID = \"excluded\".\"tenant_id\"",
+                9,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "insert".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![],
+                set_columns: Some(vec![insert_column_reference_set(
+                    "users",
+                    "Tenant_ID",
+                    "Tenant_ID",
+                )]),
+                insert_columns: Some(vec![vec![InsertColumn {
+                    column: "Tenant_ID".into(),
+                    value: "a".into(),
+                    placeholder_number: None,
+                    is_placeholder: false,
+                }]]),
+            }]
+        );
+    }
+
+    #[test]
     fn test_insert_on_duplicate_key_mysql() {
         assert_eq!(
             idor_analyze_sql(
@@ -870,7 +991,7 @@ mod tests {
                     alias: None,
                 }],
                 filters: vec![],
-                set_columns: None,
+                set_columns: Some(vec![literal_set("users", "name", "y")]),
                 insert_columns: Some(vec![vec![
                     InsertColumn {
                         column: "name".into(),
@@ -886,6 +1007,418 @@ mod tests {
                     },
                 ]]),
             }]
+        );
+
+        assert_eq!(
+            idor_analyze_sql(
+                "INSERT INTO users (column1, column2) VALUES ('a', 'b') AS vals ON DUPLICATE KEY UPDATE column1 = vals.column1, column2 = vals.column2",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "insert".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![],
+                set_columns: Some(vec![
+                    insert_column_reference_set("users", "column1", "column1"),
+                    insert_column_reference_set("users", "column2", "column2"),
+                ]),
+                insert_columns: Some(vec![vec![
+                    InsertColumn {
+                        column: "column1".into(),
+                        value: "a".into(),
+                        placeholder_number: None,
+                        is_placeholder: false,
+                    },
+                    InsertColumn {
+                        column: "column2".into(),
+                        value: "b".into(),
+                        placeholder_number: None,
+                        is_placeholder: false,
+                    },
+                ]]),
+            }]
+        );
+
+        assert_eq!(
+            idor_analyze_sql(
+                "INSERT INTO users (column1, column2) VALUES ('a', 'b') ON DUPLICATE KEY UPDATE column1 = VALUES(column1), column2 = VALUES(column2)",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "insert".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![],
+                set_columns: Some(vec![
+                    insert_column_reference_set("users", "column1", "column1"),
+                    insert_column_reference_set("users", "column2", "column2"),
+                ]),
+                insert_columns: Some(vec![vec![
+                    InsertColumn {
+                        column: "column1".into(),
+                        value: "a".into(),
+                        placeholder_number: None,
+                        is_placeholder: false,
+                    },
+                    InsertColumn {
+                        column: "column2".into(),
+                        value: "b".into(),
+                        placeholder_number: None,
+                        is_placeholder: false,
+                    },
+                ]]),
+            }]
+        );
+
+        assert_eq!(
+            idor_analyze_sql(
+                "INSERT INTO users (column1, column2) VALUES ('a', 'b') AS vals (first, second) ON DUPLICATE KEY UPDATE column1 = vals.first, column2 = vals.second",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "insert".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![],
+                set_columns: Some(vec![
+                    insert_column_reference_set("users", "column1", "column1"),
+                    insert_column_reference_set("users", "column2", "column2"),
+                ]),
+                insert_columns: Some(vec![vec![
+                    InsertColumn {
+                        column: "column1".into(),
+                        value: "a".into(),
+                        placeholder_number: None,
+                        is_placeholder: false,
+                    },
+                    InsertColumn {
+                        column: "column2".into(),
+                        value: "b".into(),
+                        placeholder_number: None,
+                        is_placeholder: false,
+                    },
+                ]]),
+            }]
+        );
+    }
+
+    #[test]
+    fn test_insert_on_duplicate_key_bare_column_aliases_mysql() {
+        assert_eq!(
+            idor_analyze_sql(
+                "INSERT INTO users (column1, column2) VALUES ('a', 'b') AS vals (first, second) ON DUPLICATE KEY UPDATE column1 = first, column2 = second",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "insert".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![],
+                set_columns: Some(vec![
+                    insert_column_reference_set("users", "column1", "column1"),
+                    insert_column_reference_set("users", "column2", "column2"),
+                ]),
+                insert_columns: Some(vec![vec![
+                    InsertColumn {
+                        column: "column1".into(),
+                        value: "a".into(),
+                        placeholder_number: None,
+                        is_placeholder: false,
+                    },
+                    InsertColumn {
+                        column: "column2".into(),
+                        value: "b".into(),
+                        placeholder_number: None,
+                        is_placeholder: false,
+                    },
+                ]]),
+            }]
+        );
+    }
+
+    #[test]
+    fn test_insert_on_duplicate_key_backtick_identifiers_mysql() {
+        assert_eq!(
+            idor_analyze_sql(
+                "INSERT INTO users (`Tenant_ID`) VALUES (?) ON DUPLICATE KEY UPDATE `Tenant_ID` = VALUES(`tenant_id`)",
+                8,
+            )
+            .unwrap(),
+            vec![SqlQueryResult {
+                kind: "insert".into(),
+                tables: vec![TableRef {
+                    name: "users".into(),
+                    alias: None,
+                }],
+                filters: vec![],
+                set_columns: Some(vec![insert_column_reference_set(
+                    "users",
+                    "Tenant_ID",
+                    "Tenant_ID",
+                )]),
+                insert_columns: Some(vec![vec![InsertColumn {
+                    column: "Tenant_ID".into(),
+                    value: "?".into(),
+                    placeholder_number: Some(0),
+                    is_placeholder: true,
+                }]]),
+            }]
+        );
+    }
+
+    #[test]
+    fn test_insert_select_on_duplicate_key_mysql() {
+        assert_eq!(
+            idor_analyze_sql(
+                "INSERT INTO users (tenant_id) SELECT tenant_id FROM source WHERE tenant_id = ? ON DUPLICATE KEY UPDATE tenant_id = VALUES(tenant_id)",
+                8,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "source".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "tenant_id".into(),
+                        value: "?".into(),
+                        placeholder_number: Some(0),
+                        is_placeholder: true,
+                    }],
+                    set_columns: None,
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "insert".into(),
+                    tables: vec![TableRef {
+                        name: "users".into(),
+                        alias: None,
+                    }],
+                    filters: vec![],
+                    set_columns: Some(vec![unsupported_set(
+                        "users",
+                        "tenant_id",
+                        "VALUES(tenant_id)",
+                    )]),
+                    insert_columns: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_insert_on_conflict_subquery_postgres() {
+        assert_eq!(
+            idor_analyze_sql(
+                "INSERT INTO users (id, tenant_id) VALUES (1, $1) ON CONFLICT (id) DO UPDATE SET tenant_id = (SELECT tenant_id FROM tenants WHERE id = $2)",
+                9,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "insert".into(),
+                    tables: vec![TableRef {
+                        name: "users".into(),
+                        alias: None,
+                    }],
+                    filters: vec![],
+                    set_columns: Some(vec![unsupported_set(
+                        "users",
+                        "tenant_id",
+                        "(SELECT tenant_id FROM tenants WHERE id = $2)",
+                    )]),
+                    insert_columns: Some(vec![vec![
+                        InsertColumn {
+                            column: "id".into(),
+                            value: "1".into(),
+                            placeholder_number: None,
+                            is_placeholder: false,
+                        },
+                        InsertColumn {
+                            column: "tenant_id".into(),
+                            value: "$1".into(),
+                            placeholder_number: None,
+                            is_placeholder: true,
+                        },
+                    ]]),
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "tenants".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "id".into(),
+                        value: "$2".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    }],
+                    set_columns: None,
+                    insert_columns: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_insert_on_conflict_multiple_subqueries_postgres() {
+        assert_eq!(
+            idor_analyze_sql(
+                "INSERT INTO users (id, tenant_id) VALUES (1, $1) ON CONFLICT (id) DO UPDATE SET tenant_id = (SELECT tenant_id FROM tenants WHERE id = $2) + (SELECT tenant_id FROM defaults WHERE id = $3)",
+                9,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "insert".into(),
+                    tables: vec![TableRef {
+                        name: "users".into(),
+                        alias: None,
+                    }],
+                    filters: vec![],
+                    set_columns: Some(vec![unsupported_set(
+                        "users",
+                        "tenant_id",
+                        "(SELECT tenant_id FROM tenants WHERE id = $2) + (SELECT tenant_id FROM defaults WHERE id = $3)",
+                    )]),
+                    insert_columns: Some(vec![vec![
+                        InsertColumn {
+                            column: "id".into(),
+                            value: "1".into(),
+                            placeholder_number: None,
+                            is_placeholder: false,
+                        },
+                        InsertColumn {
+                            column: "tenant_id".into(),
+                            value: "$1".into(),
+                            placeholder_number: None,
+                            is_placeholder: true,
+                        },
+                    ]]),
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "tenants".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "id".into(),
+                        value: "$2".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    }],
+                    set_columns: None,
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "defaults".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "id".into(),
+                        value: "$3".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    }],
+                    set_columns: None,
+                    insert_columns: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_insert_on_conflict_in_subquery_with_scalar_subquery_postgres() {
+        assert_eq!(
+            idor_analyze_sql(
+                "INSERT INTO users (id, tenant_id) VALUES (1, $1) ON CONFLICT (id) DO UPDATE SET tenant_id = CASE WHEN (SELECT tenant_id FROM policies WHERE id = $2) IN (SELECT tenant_id FROM defaults WHERE id = $3) THEN 1 ELSE 0 END",
+                9,
+            )
+            .unwrap(),
+            vec![
+                SqlQueryResult {
+                    kind: "insert".into(),
+                    tables: vec![TableRef {
+                        name: "users".into(),
+                        alias: None,
+                    }],
+                    filters: vec![],
+                    set_columns: Some(vec![unsupported_set(
+                        "users",
+                        "tenant_id",
+                        "CASE WHEN (SELECT tenant_id FROM policies WHERE id = $2) IN (SELECT tenant_id FROM defaults WHERE id = $3) THEN 1 ELSE 0 END",
+                    )]),
+                    insert_columns: Some(vec![vec![
+                        InsertColumn {
+                            column: "id".into(),
+                            value: "1".into(),
+                            placeholder_number: None,
+                            is_placeholder: false,
+                        },
+                        InsertColumn {
+                            column: "tenant_id".into(),
+                            value: "$1".into(),
+                            placeholder_number: None,
+                            is_placeholder: true,
+                        },
+                    ]]),
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "defaults".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "id".into(),
+                        value: "$3".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    }],
+                    set_columns: None,
+                    insert_columns: None,
+                },
+                SqlQueryResult {
+                    kind: "select".into(),
+                    tables: vec![TableRef {
+                        name: "policies".into(),
+                        alias: None,
+                    }],
+                    filters: vec![FilterColumn {
+                        table: None,
+                        column: "id".into(),
+                        value: "$2".into(),
+                        placeholder_number: None,
+                        is_placeholder: true,
+                    }],
+                    set_columns: None,
+                    insert_columns: None,
+                },
+            ]
         );
     }
 
