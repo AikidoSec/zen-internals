@@ -111,6 +111,34 @@ mod tests {
     }
 
     #[test]
+    fn test_comparison_operator_with_number() {
+        for s in [
+            ">= 18", ">=18", "< 5", "<5", "<= 100", "<> 0", "!= -1", "> -2.25", ">=-1", "<>-1.5",
+        ] {
+            assert!(is_common_sql_string(s), "Failed for {s}");
+        }
+        for s in [
+            ">= 18 or 1=1",
+            ">= 18; drop table users",
+            ">= 18--",
+            ">= 1 2",
+            ">= (select 1)",
+            ">= 18)",
+            ">= '18",
+            "> 1.",
+            "== 1",
+            "=> 1",
+            "<=> 1",
+            "=>= 1",
+            "= 1",
+            ">= 12345678901234",
+            ">=             1",
+        ] {
+            assert!(!is_common_sql_string(s), "Should not be exempt: {s}");
+        }
+    }
+
+    #[test]
     fn test_safe_two_char_payloads() {
         assert!(is_common_sql_string(":p"));
         assert!(is_common_sql_string(":d"));

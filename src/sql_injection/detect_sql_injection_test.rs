@@ -856,6 +856,30 @@ mod tests {
     }
 
     #[test]
+    fn test_comparison_operator_with_number() {
+        not_injection!(
+            "select * from users where age >= 18",
+            ">= 18",
+            dialect("mysql")
+        );
+        not_injection!(
+            "select * from users where age < 18",
+            "< 18",
+            dialect("postgresql")
+        );
+        not_injection!(
+            "select * from products where price > 1.5",
+            "> 1.5",
+            dialect("mysql")
+        );
+        is_injection!(
+            "select * from users where age >= 18 or 1=1",
+            ">= 18 or 1=1",
+            dialect("mysql")
+        );
+    }
+
+    #[test]
     fn test_mysql_string_escape_constant() {
         is_injection!(
             "insert into cats(a,b,c) values ('foo'),((select e'\\u' from (select version() as e from dual) x)),('bar');",
