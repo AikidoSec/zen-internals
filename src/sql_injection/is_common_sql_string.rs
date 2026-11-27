@@ -90,6 +90,15 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
         return true;
     }
 
+    // Comparison operator followed by a single number, e.g. `>= 18` from `WHERE age >= 18`.
+    // Only an operator and one numeric literal can be expressed, so no extra SQL can be added.
+    if matches!(user_input.as_bytes().first(), Some(b'<' | b'>' | b'!'))
+        && user_input.len() <= 16
+        && regex!(r"^(!=|<>|<=|>=|<|>) ?-?[0-9]+(\.[0-9]+)?$").is_match(user_input)
+    {
+        return true;
+    }
+
     // `:p` from `:param`
     // `1)` from `(1)`
     // `(s` from `(select`
