@@ -35,3 +35,23 @@ pub fn clamp_to_range(value: i64, min: i64, max: i64) -> i64 {
         value
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_classify_length() {
+        assert_eq!(classify_length(""), "empty");
+        assert_eq!(classify_length("abc"), "short");
+        assert_eq!(classify_length("a medium length string"), "medium");
+        assert_eq!(classify_length(&"a".repeat(100)), "long");
+    }
+
+    #[test]
+    fn test_count_vowels() {
+        assert_eq!(count_vowels(""), 0);
+        assert_eq!(count_vowels("Hello World"), 3);
+    }
+
+}
