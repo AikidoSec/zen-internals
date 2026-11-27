@@ -377,6 +377,24 @@ mod tests {
     }
 
     #[test]
+    fn test_quoted_order_by_inputs() {
+        let sort = "SELECT label FROM items ORDER BY `code`";
+        for name in ["mysql", "sqlite"] {
+            let dialect_id = dialect(name);
+            is_injection!(sort, "ORDER BY `code`", dialect_id);
+            is_injection!(
+                "SELECT label FROM items ORDER BY`code`",
+                "`code`",
+                dialect_id
+            );
+
+            let result = detect_sql_injection_str(sort, "`code`", dialect_id);
+            assert!(!result.detected);
+            assert!(matches!(result.reason, DetectionReason::NoChangesFound));
+        }
+    }
+
+    #[test]
     fn test_mysql_backslash_shortcut_rejects_extra_backslashes_and_quotes() {
         for (query, input) in [
             (r"SELECT '\\hello\\'", r"\hello\"),
