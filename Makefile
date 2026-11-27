@@ -25,6 +25,11 @@ smoketest:
 		fi \
 	}
 
+.PHONY: e2e
+e2e:
+	./scripts/build-wasm.sh
+	docker compose -f e2e/compose.yml run --rm tests
+
 .PHONY: playground
 playground:
 	wasm-pack build --target web --features wasm-js

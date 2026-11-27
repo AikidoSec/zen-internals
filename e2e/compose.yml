@@ -1,0 +1,92 @@
+name: zen-internals-e2e
+
+x-postgres-healthcheck: &postgres-healthcheck
+  test: ["CMD", "pg_isready", "-U", "postgres", "-h", "127.0.0.1"]
+  interval: 1s
+  retries: 120
+
+x-mysql-healthcheck: &mysql-healthcheck
+  test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-pzen"]
+  interval: 1s
+  retries: 120
+
+x-mariadb-healthcheck: &mariadb-healthcheck
+  test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+  interval: 1s
+  retries: 120
+
+x-clickhouse-healthcheck: &clickhouse-healthcheck
+  test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8123/ping"]
+  interval: 1s
+  retries: 120
+
+services:
+  postgres-14:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_PASSWORD: zen
+    healthcheck: *postgres-healthcheck
+
+  postgres-18:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_PASSWORD: zen
+    healthcheck: *postgres-healthcheck
+
+  mysql-8-0:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: zen
+      MYSQL_DATABASE: zen
+    healthcheck: *mysql-healthcheck
+
+  mysql-9-7:
+    image: mysql:9.7
+    environment:
+      MYSQL_ROOT_PASSWORD: zen
+      MYSQL_DATABASE: zen
+    healthcheck: *mysql-healthcheck
+
+  mariadb-10-6:
+    image: mariadb:10.6
+    environment:
+      MARIADB_ROOT_PASSWORD: zen
+      MARIADB_DATABASE: zen
+    healthcheck: *mariadb-healthcheck
+
+  mariadb-11-8:
+    image: mariadb:11.8
+    environment:
+      MARIADB_ROOT_PASSWORD: zen
+      MARIADB_DATABASE: zen
+    healthcheck: *mariadb-healthcheck
+
+  clickhouse-24-8:
+    image: clickhouse/clickhouse-server:24.8
+    environment:
+      CLICKHOUSE_PASSWORD: zen
+    healthcheck: *clickhouse-healthcheck
+
+  clickhouse-25-8:
+    image: clickhouse/clickhouse-server:25.8
+    environment:
+      CLICKHOUSE_PASSWORD: zen
+    healthcheck: *clickhouse-healthcheck
+
+  tests:
+    image: node:lts-alpine
+    working_dir: /e2e
+    volumes:
+      - ./:/e2e
+      - ../pkg:/pkg:ro
+      - /e2e/node_modules
+    command: sh -c "npm ci && npm test"
+    depends_on:
+      postgres-14: { condition: service_healthy }
+      postgres-18: { condition: service_healthy }
+      mysql-8-0: { condition: service_healthy }
+      mysql-9-7: { condition: service_healthy }
+      mariadb-10-6: { condition: service_healthy }
+      mariadb-11-8: { condition: service_healthy }
+      clickhouse-24-8: { condition: service_healthy }
+      clickhouse-25-8: { condition: service_healthy }
