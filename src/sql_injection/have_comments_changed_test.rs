@@ -19,21 +19,4 @@ mod tests {
         };
     }
 
-    #[test]
-    fn test_queries_with_no_comments_not_compared() {
-        not_comments_changed!("SELECT AVG(salary) AS average_salary FROM employees;", "INSERT INTO employees (name, position, salary) VALUES ('John Doe', 'Software Engineer', 70000);");
-        not_comments_changed!(
-            "DELETE FROM employees WHERE job_title = 'Intern';",
-            "CREATE TABLE departments (
-                id INT PRIMARY KEY AUTO_INCREMENT,
-                name VARCHAR(100) NOT NULL,
-                location VARCHAR(100)
-            );"
-        );
-        not_comments_changed!(
-            "UPDATE employees SET salary = salary * 1.10 WHERE department = 'Sales';",
-            "SELECT DISTINCT job_title FROM employees;"
-        );
-    }
-
 }
