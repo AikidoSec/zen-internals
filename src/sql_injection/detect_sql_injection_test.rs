@@ -1488,4 +1488,39 @@ mod tests {
 
         assert!(result.detected, "{result:?}");
     }
+
+    #[test]
+    fn allows_newline_separated_number_lists() {
+        let input = "1234,\n56789,\n23456";
+        let query = format!("SELECT * FROM users WHERE id IN ({input})");
+        for dia in get_supported_dialects() {
+            let result = detect_sql_injection_str(&query, input, dia);
+            assert!(!result.detected, "dialect {dia}: {result:?}");
+        }
+    }
+
+    #[test]
+    fn detects_injection_after_newline_in_number_list() {
+        let input = "1,\n2 or 1=1";
+        let query = format!("SELECT * FROM users WHERE id IN ({input})");
+        for dia in get_supported_dialects() {
+            let result = detect_sql_injection_str(&query, input, dia);
+            assert!(result.detected, "dialect {dia}: {result:?}");
+        }
+    }
+
+    // A newline ends a `--` comment, so the rest of that line would run as SQL.
+    #[test]
+    fn detects_newline_number_list_in_line_comment() {
+        let input = "1,\n2";
+        let query = format!("SELECT * FROM users WHERE id = 1 -- note: {input} AND tenant = 5");
+        is_injection!(&query, input);
+    }
+
+    #[test]
+    fn allows_newline_number_list_in_multiline_comment_and_string() {
+        let input = "1,\n2";
+        let query = format!("SELECT * FROM users /* ids: {input} */ WHERE note = '{input}'");
+        not_injection!(&query, input);
+    }
 }

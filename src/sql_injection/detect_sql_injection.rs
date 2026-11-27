@@ -1,5 +1,6 @@
 use super::have_comments_changed::have_comments_changed;
 use super::is_common_sql_string::is_common_sql_string;
+use super::is_safe_newline_separated_list::is_safe_newline_separated_list;
 use super::is_safely_escaped_user_input::is_safely_escaped_user_input;
 use super::tokenize_query::tokenize_query;
 use crate::diff_in_vec_len;
@@ -77,6 +78,14 @@ pub fn detect_sql_injection_str(
         return SqlInjectionDetectionResult {
             detected: false,
             reason: DetectionReason::SafelyEscapedUserInput,
+        };
+    }
+
+    // e.g. `1234,\n56789,\n23456` from `... IN (1234,\n56789,\n23456)`
+    if is_safe_newline_separated_list(&query, &userinput, &tokens, dialect) {
+        return SqlInjectionDetectionResult {
+            detected: false,
+            reason: DetectionReason::CommonSQLString,
         };
     }
 

@@ -8,6 +8,8 @@ pub mod is_common_sql_string_test;
 
 mod is_safely_escaped_user_input;
 
+mod is_safe_newline_separated_list;
+
 pub mod tokenize_query;
 pub mod tokenize_query_test;
 
