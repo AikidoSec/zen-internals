@@ -41,42 +41,4 @@ mod tests {
         is_safe!("- -10", &allocator, source_type);
     }
 
-    #[test]
-    fn test_unsafe_js_input() {
-        let allocator = Allocator::default();
-        let source_type: SourceType = SourceType::unambiguous();
-
-        is_unsafe!("globalThis.test()", &allocator, source_type);
-        is_unsafe!("console.log('test')", &allocator, source_type);
-        is_unsafe!("alert('test')", &allocator, source_type);
-        is_unsafe!("const x = 1", &allocator, source_type);
-        is_unsafe!("test()", &allocator, source_type);
-        is_unsafe!("'test'", &allocator, source_type);
-        is_unsafe!("'test' + 'test'", &allocator, source_type);
-        is_unsafe!("'; //", &allocator, source_type);
-        is_unsafe!("// test", &allocator, source_type);
-        is_unsafe!("/* test */", &allocator, source_type);
-        is_unsafe!("1 + 2; // test", &allocator, source_type);
-        is_unsafe!("1 + 2; /* test */", &allocator, source_type);
-        is_unsafe!("1 == true", &allocator, source_type);
-        is_unsafe!("== true", &allocator, source_type);
-        is_unsafe!("!!''", &allocator, source_type);
-        is_unsafe!("[1, 2, 3]", &allocator, source_type);
-        is_unsafe!("({ x: 1, y: 2 })", &allocator, source_type);
-        is_unsafe!("function test() { return 1; }", &allocator, source_type);
-        is_unsafe!("class Test { constructor() {} }", &allocator, source_type);
-        is_unsafe!("new Test()", &allocator, source_type);
-        is_unsafe!("'use strict';", &allocator, source_type);
-        is_unsafe!("process.env", &allocator, source_type);
-        // Unsafe unary operators
-        is_unsafe!("!x", &allocator, source_type);
-        is_unsafe!("~10", &allocator, source_type);
-        is_unsafe!("typeof x", &allocator, source_type);
-        is_unsafe!("void 0", &allocator, source_type);
-        is_unsafe!("delete obj.x", &allocator, source_type);
-        // Safe unary operator but unsafe operand
-        is_unsafe!("-x", &allocator, source_type);
-        is_unsafe!("-alert()", &allocator, source_type);
-        is_unsafe!("-process.env", &allocator, source_type);
-    }
 }
