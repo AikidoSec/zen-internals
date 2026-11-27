@@ -359,6 +359,24 @@ mod tests {
     }
 
     #[test]
+    fn test_backtick_terminated_identifier() {
+        let sort = "SELECT label FROM items ORDER BY `code`";
+        for name in ["mysql", "sqlite"] {
+            for (query, input) in [
+                ("SELECT `item_code` FROM items", "de`"),
+                (sort, "code`"),
+                ("SELECT `_Rank2` FROM items", "_Rank2`"),
+            ] {
+                let result = detect_sql_injection_str(query, input, dialect(name));
+                assert!(!result.detected, "{name}, {input}: {result:?}");
+                assert!(matches!(result.reason, DetectionReason::CommonSQLString));
+            }
+            is_injection!("SELECT `two words` FROM items", "two words`", dialect(name));
+        }
+        is_injection!(sort, "code`", dialect("clickhouse"));
+    }
+
+    #[test]
     fn test_mysql_backslash_shortcut_rejects_extra_backslashes_and_quotes() {
         for (query, input) in [
             (r"SELECT '\\hello\\'", r"\hello\"),

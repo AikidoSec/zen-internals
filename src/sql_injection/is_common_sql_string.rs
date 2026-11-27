@@ -1,4 +1,6 @@
+use super::helpers::select_dialect_based_on_enum::select_dialect_based_on_enum;
 use regex::Regex;
+use sqlparser::dialect::{MySqlDialect, SQLiteDialect};
 use std::sync::LazyLock;
 
 pub const COMMON_SQL_STRINGS: [&str; 28] = [
@@ -191,4 +193,14 @@ pub fn is_common_sql_string(user_input: &str) -> bool {
     }
 
     false
+}
+
+pub(super) fn is_backtick_terminated_identifier(input: &str, dialect_id: i32) -> bool {
+    if !input.ends_with('`') {
+        return false;
+    }
+    // Masking "de`" in `item_code` would remove the column's closing backtick.
+    let dialect = select_dialect_based_on_enum(dialect_id);
+    (dialect.is::<MySqlDialect>() || dialect.is::<SQLiteDialect>())
+        && regex!(r"^[A-Za-z_][A-Za-z0-9_]*`$").is_match(input)
 }
