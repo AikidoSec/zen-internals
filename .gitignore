@@ -21,6 +21,7 @@ Cargo.lock
 #.idea/
 pkg/
 playground/pkg
+node_modules/
 
 # macOS files
 .DS_Store
