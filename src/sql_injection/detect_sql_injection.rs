@@ -1,4 +1,5 @@
 use super::have_comments_changed::have_comments_changed;
+use super::is_backtick_terminated_identifier::is_backtick_terminated_identifier;
 use super::is_common_sql_string::is_common_sql_string;
 use super::is_safely_escaped_user_input::is_safely_escaped_user_input;
 use super::tokenize_query::tokenize_query;
@@ -44,7 +45,8 @@ pub fn detect_sql_injection_str(
 
     // "SELECT *", "INSERT INTO", ... will occur in most queries
     // If the user input is equal to any of these, we can assume it's not an injection.
-    if is_common_sql_string(&userinput) {
+    if is_common_sql_string(&userinput) || is_backtick_terminated_identifier(userinput_raw, dialect)
+    {
         return SqlInjectionDetectionResult {
             detected: false,
             reason: DetectionReason::CommonSQLString,

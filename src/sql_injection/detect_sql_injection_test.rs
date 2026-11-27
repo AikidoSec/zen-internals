@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::sql_injection::detect_sql_injection::{detect_sql_injection_str, DetectionReason};
+    use crate::sql_injection::is_backtick_terminated_identifier::is_backtick_terminated_identifier;
 
     fn dialect(s: &str) -> i32 {
         match s {
@@ -355,6 +356,55 @@ mod tests {
                 "{result:?}\nquery: {query}\ninput: {input}"
             );
             assert!(matches!(result.reason, DetectionReason::TokensHaveDelta));
+        }
+    }
+
+    #[test]
+    fn test_backtick_terminated_identifier() {
+        for name in ["mysql", "sqlite"] {
+            for (query, input) in [
+                ("SELECT `item_code` FROM items", "de`"),
+                ("SELECT label FROM items ORDER BY `code`", "code`"),
+                ("SELECT `_Rank2` FROM items", "_Rank2`"),
+            ] {
+                let result = detect_sql_injection_str(query, input, dialect(name));
+                assert!(!result.detected, "{name}, {input}: {result:?}");
+                assert!(matches!(result.reason, DetectionReason::CommonSQLString));
+            }
+            is_injection!("SELECT `two words` FROM items", "two words`", dialect(name));
+        }
+    }
+
+    #[test]
+    fn test_backtick_identifier_exception_excludes_clickhouse() {
+        assert!(!is_backtick_terminated_identifier(
+            "code`",
+            dialect("clickhouse")
+        ));
+    }
+
+    #[test]
+    fn test_quoted_order_by_inputs() {
+        for name in ["mysql", "sqlite"] {
+            let dialect_id = dialect(name);
+            is_injection!(
+                "SELECT label FROM items ORDER BY `code`",
+                "ORDER BY `code`",
+                dialect_id
+            );
+            is_injection!(
+                "SELECT label FROM items ORDER BY`code`",
+                "`code`",
+                dialect_id
+            );
+
+            let result = detect_sql_injection_str(
+                "SELECT label FROM items ORDER BY `code`",
+                "`code`",
+                dialect_id,
+            );
+            assert!(!result.detected);
+            assert!(matches!(result.reason, DetectionReason::NoChangesFound));
         }
     }
 
